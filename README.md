@@ -1,17 +1,16 @@
 # agents-system-setup
 
-A Copilot CLI plugin that bootstraps, updates, **improves**, or **replicates** a complete multi-agent system across **GitHub Copilot CLI**, **Claude Code**, **OpenCode**, and **OpenAI Codex CLI** — from a single skill, with a single Canonical IR for bidirectional replication.
+A multi-runtime plugin that **bootstraps**, **updates**, **improves**, or **replicates** a complete multi-agent system across **GitHub Copilot CLI**, **Claude Code**, **OpenCode**, and **OpenAI Codex CLI** — from a single skill, with a Canonical IR for bidirectional replication and parallel-aware orchestration baked in.
 
-> Bundles one skill: [`agents-system-setup`](./skills/agents-system-setup/SKILL.md).
+## What it generates
 
-## What you get
-
-- **`AGENTS.md`** at repo root with Directory Architecture, Agent Roster, Capability Matrix.
-- **Orchestrator + N subagents** (3–50, sized to scope) emitted in the right format for every selected runtime.
-- **Project-scoped skills** under each runtime's conventional path.
-- **Curated plugin / MCP recommendations** from vendor-official catalogs (`github/awesome-copilot`, `anthropics/skills`, `anthropics/claude-code`, `openai/codex`, `modelcontextprotocol/servers`) plus high-signal community awesome-lists — every recommendation tagged `[Tier · Vendor]` and opt-in per item.
-- **MCP approval gate** — no MCP config is ever written without explicit user approval.
-- **Cross-OS scripts** — `.sh` for POSIX, `.ps1` for native PowerShell, `.gitattributes` for line-ending safety.
+- `AGENTS.md` at repo root with **Directory Architecture**, **Agent Roster (with parallel-safety waves)**, **Capability Matrix**.
+- **Orchestrator + N subagents** (3–50, sized to scope) emitted in the right format for every selected runtime, with a **fan-out clause** so parallel-safe subagents always run in one wave.
+- **`AGENT-TEAMS.md`** for Claude Code projects when the roster benefits from peer-to-peer teammates (3+ independent concerns).
+- Project-scoped **skills** under each runtime's conventional path.
+- **Curated plugin / MCP recommendations** from vendor-official catalogs, every recommendation tagged `[Tier · Vendor]` and **opt-in per item**.
+- **Mandatory MCP approval gate** — no MCP config is ever written without explicit user approval.
+- Cross-OS scripts (`.sh` + `.ps1`), `.gitattributes` for line-ending safety.
 
 ## Modes
 
@@ -22,9 +21,11 @@ A Copilot CLI plugin that bootstraps, updates, **improves**, or **replicates** a
 | `improve` | Audit existing system → propose checklist of targeted fixes → opt-in apply |
 | `replicate` | Port agents/skills/MCP from one runtime to another (Copilot ↔ Claude ↔ OpenCode ↔ Codex) via Canonical IR |
 
-## Install
+## Install — per runtime
 
-### Copilot CLI
+Each runtime has a different install mechanism. The repo ships the right manifest for each.
+
+### GitHub Copilot CLI
 
 ```
 copilot
@@ -32,29 +33,48 @@ copilot
 > /agents-system-setup
 ```
 
+Reads the root `plugin.json` and exposes the bundled skill as `/agents-system-setup`.
+
 ### Claude Code
 
+```
+claude
+> /plugin install ytthuan/agents-system-setup
+> /agents-system-setup:agents-system-setup
+```
+
+Reads `.claude-plugin/plugin.json`. Skills are namespaced as `/<plugin>:<skill>`. Source: <https://docs.anthropic.com/en/docs/claude-code/plugins>.
+
+### OpenAI Codex CLI
+
 ```bash
-mkdir -p ~/.claude/skills && \
-  cp -R skills/agents-system-setup ~/.claude/skills/
+codex plugin marketplace add ytthuan/agents-system-setup
+codex
+> /plugins        # browse and install agents-system-setup
+> @agents-system-setup
 ```
 
-Then in Claude Code:
-
-```
-/skills agents-system-setup
-```
+Reads `.codex-plugin/plugin.json` and the marketplace descriptor at `.agents/plugins/marketplace.json`. Source: <https://developers.openai.com/codex/plugins/build>.
 
 ### OpenCode
 
+OpenCode plugins are JS/TS hooks — not skill bundles — so install by clone-and-copy:
+
 ```bash
-mkdir -p ~/.config/opencode/skills && \
-  cp -R skills/agents-system-setup ~/.config/opencode/skills/
+git clone https://github.com/ytthuan/agents-system-setup.git
+cd agents-system-setup
+./scripts/install-opencode.sh project   # or "global"
 ```
 
-### Manual (any runtime that reads agents.md skills)
+Windows / cross-platform PowerShell:
 
-Drop the `skills/agents-system-setup/` folder into the runtime's skill search path.
+```powershell
+git clone https://github.com/ytthuan/agents-system-setup.git
+cd agents-system-setup
+pwsh ./scripts/install-opencode.ps1 -Scope project
+```
+
+This places the skill at `.opencode/skills/agents-system-setup/` (or `~/.config/opencode/skills/` for global).
 
 ## Usage
 
@@ -73,26 +93,57 @@ Or be explicit:
 /agents-system-setup replicate
 ```
 
+## Parallel subagents & Claude Code agent teams
+
+The generated orchestrator always fans out **parallel-safe subagents** in one wave (multiple `Task` calls in a single response), then awaits before the next wave. Parallel-safety is computed automatically from the Directory Architecture — see [parallelism reference](./skills/agents-system-setup/references/parallelism.md).
+
+For Claude Code, when 3+ subagents are independent and would benefit from peer-to-peer challenge, the generator additionally emits `AGENT-TEAMS.md` with the opt-in env var (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), settings snippet, suggested teammate roster, and a token-cost warning. Source: <https://docs.anthropic.com/en/docs/claude-code/agent-teams>.
+
 ## Why a plugin (not a bare skill)?
 
-- A **skill** (`SKILL.md` + assets) is the *unit of capability*.
-- A **plugin** is the *distribution unit* — a GitHub repo installable via `/plugin install owner/repo`.
-- Wrapping the skill in a plugin manifest makes it one-line installable for Copilot CLI users while leaving the skill folder portable to Claude Code and OpenCode by simple copy.
+- A **skill** is the *unit of capability*.
+- A **plugin** is the *distribution unit*.
+- Wrapping the skill in plugin manifests for each runtime makes it one-line installable on Copilot CLI / Claude Code / Codex, and clone-and-copy installable on OpenCode.
 
-## Design rationale
+## Repo layout
 
-The procedure is intentional, not arbitrary. See [DESIGN.md](./DESIGN.md) for the reasoning behind every phase (why interview-first, why MCP gate, why Canonical IR, why per-item opt-in).
+```
+agents-system-setup/
+├── plugin.json                  # Copilot CLI manifest
+├── .claude-plugin/plugin.json   # Claude Code manifest
+├── .codex-plugin/plugin.json    # Codex CLI manifest
+├── .agents/plugins/marketplace.json   # Codex marketplace descriptor
+├── scripts/
+│   ├── install-opencode.sh      # OpenCode installer (POSIX)
+│   └── install-opencode.ps1     # OpenCode installer (PowerShell)
+├── skills/
+│   └── agents-system-setup/
+│       ├── SKILL.md
+│       ├── references/          # platforms, marketplaces, replication, parallelism, …
+│       ├── assets/              # AGENTS.md + agent/skill templates
+│       └── scripts/             # git-init.sh + .ps1, link-project-memory.sh + .ps1
+├── README.md
+├── DESIGN.md                    # rationale per phase / hard rule
+├── CHANGELOG.md
+├── LICENSE                      # MIT
+├── .gitignore
+└── .gitattributes
+```
 
 ## Compatibility
 
-| Runtime | Status |
-|---|---|
-| GitHub Copilot CLI | ✅ Primary target |
-| Claude Code | ✅ Skill format compatible |
-| OpenCode | ✅ Skill format compatible |
-| OpenAI Codex CLI | ✅ Emits `AGENTS.md` headings; reads shared `.mcp.json` |
+| Runtime | Plugin install | Skill format compatible | Parallel subagents | Agent teams |
+|---|---|---|---|---|
+| GitHub Copilot CLI | ✅ `/plugin install` | ✅ | ✅ | n/a |
+| Claude Code | ✅ `/plugin install` | ✅ | ✅ | ✅ (opt-in env var) |
+| OpenAI Codex CLI | ✅ `marketplace add` + `/plugins` | ✅ | ✅ | n/a |
+| OpenCode | ⚠️ clone + script copy | ✅ | ✅ | n/a |
 
 Cross-OS: Linux, macOS, Windows (native PowerShell + Git Bash + WSL).
+
+## Design rationale
+
+The procedure is intentional, not arbitrary. See [DESIGN.md](./DESIGN.md) for the reasoning behind every phase (why interview-first, why MCP gate, why Canonical IR, why per-item opt-in, why parallel-by-default).
 
 ## Contributing
 

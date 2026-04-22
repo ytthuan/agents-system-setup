@@ -1,0 +1,20 @@
+{
+  "name": "agents-system-setup",
+  "interface": {
+    "displayName": "agents-system-setup"
+  },
+  "plugins": [
+    {
+      "name": "agents-system-setup",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

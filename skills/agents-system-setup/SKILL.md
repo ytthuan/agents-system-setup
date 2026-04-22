@@ -30,6 +30,7 @@ Scaffold or update a complete agent system for the current project across **Copi
 10. **Multi-platform aware.** Emit per-platform paths and frontmatter per [platforms](./references/platforms.md). Never write Copilot frontmatter into a Claude file.
 11. **Cross-OS aware.** Detect host OS once (Linux / macOS / Windows-bash / Windows-pwsh) per [cross-platform](./references/cross-platform.md). Pick `.sh` for POSIX shells, `.ps1` for native PowerShell. Forward slashes in generated docs. Never symlink on Windows. Bundle `.gitattributes` so line endings stay correct on every clone.
 12. **Git is optional and gated by `ask_user`.**
+13. **Parallelism is mandatory where work is independent.** The generator computes parallel-safety from the Directory Architecture and emits a wave table; the orchestrator prompt always contains a fan-out clause. For Claude Code, also emit `AGENT-TEAMS.md` per [parallelism](./references/parallelism.md). Sequential-only topologies are an error.
 
 ## Procedure
 
@@ -78,16 +79,17 @@ If the user picked **replicate** → run the [replication procedure](./reference
 
 For both branches, finish with Phase 7 (verify & summarize).
 
-### Phase 2 — Plan (Directory Architecture, Roster, Matrix)
+### Phase 2 — Plan (Directory Architecture, Roster, Matrix, Waves)
 
 Build the plan and show it before writing anything. The plan must include:
 
 - **Directory Architecture** — table of `path glob | purpose | owner agent | edit rule`. Derived from project type + frameworks. Always covers: source dirs, tests, docs, infra, agent files, generated artifacts.
-- **Agent Roster** — table of `name | role | owns | triggers | model (optional)`. Use [topology guide](./references/topology.md). Model column populated only where user provided overrides.
+- **Agent Roster** — table of `name | role | owns | triggers | model (optional) | parallel-safe | wave`. Use [topology guide](./references/topology.md). Compute parallel-safety per [parallelism](./references/parallelism.md): a subagent is parallel-safe iff its `owns` glob doesn't overlap any other's, it doesn't write outside `owns`, and it doesn't depend on another subagent's output in the same wave.
 - **Capability Matrix** — capabilities × agents grid (✅ / 🟡).
+- **Wave plan** — grouped list `Wave N → [parallel-safe subagents]`; the orchestrator fans out per wave and awaits each before the next.
 - Skills to create.
 - Plugin/MCP candidates **per capability** (Phase 3 fills this).
-- Per-platform file plan (Copilot/Claude/OpenCode paths the user will actually get).
+- Per-platform file plan (Copilot/Claude/OpenCode/Codex paths the user will actually get).
 - Git actions (if any).
 
 End the phase with `ask_user`: `["Proceed", "Edit plan first"]`.
@@ -131,6 +133,8 @@ For each selected platform, look up paths and frontmatter in [platforms.md](./re
 - Each skill → [template](./assets/skill.template.md) at the platform's skills path.
 - MCP config (only if Phase 3.5 approved) at the platform's MCP path.
 - Drop the [directory-architecture snippet](./assets/directory-architecture.snippet.md) into any agent missing the boundary block.
+- **Orchestrator parallelism clause** — render the wave-aware fan-out instructions per [parallelism](./references/parallelism.md). The orchestrator must invoke all parallel-safe subagents of a wave in a single response (multiple Task-tool calls), await all results, then start the next wave.
+- **Claude Code AGENT-TEAMS.md** — when Claude Code is among the selected platforms AND the Agent Roster has 3+ subagents marked `team-suitable` (independent + benefits from peer challenge), emit `AGENT-TEAMS.md` documenting: opt-in env var (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), settings.json snippet, suggested teammate roster, token-cost warning, and when to fall back to parallel subagents.
 
 **Project-memory linking** (after AGENTS.md is written):
 - If both Claude Code and another platform are selected → pick by detected OS (see [cross-platform](./references/cross-platform.md)):
@@ -206,7 +210,8 @@ Both forms initialize `main`, write a stack-aware `.gitignore` (covering `.githu
 - Overwriting existing `AGENTS.md` / `opencode.json` without `.bak`.
 - Generic descriptions ("helps with code") — kills discovery.
 - Inventing plugin/skill/MCP names. Always cite `[Tier · Vendor]` from [marketplaces](./references/marketplaces.md).
-- Treating Codex CLI as a per-agent-file runtime (it isn't — agents live as `## <Name>` headings inside `AGENTS.md`).
+- **Sequential-only orchestrator** — must fan out parallel-safe subagents (see [parallelism](./references/parallelism.md)).
+- **Treating Codex CLI as a per-agent-file runtime** (it isn't — agents live as `## <Name>` headings inside `AGENTS.md`).
 
 ## Output Contract
 
