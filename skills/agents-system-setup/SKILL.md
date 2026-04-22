@@ -207,6 +207,17 @@ Both forms initialize `main`, write a stack-aware `.gitignore` (covering `.githu
 4. Print "Try it" examples per selected platform (`copilot`, `claude`, `opencode`).
 5. Suggest 2–3 next customizations.
 
+### Phase 8 — Final Wrap-Up (single consolidated ask)
+
+Run after Phase 7, **before** exiting. One multi-select question presents a curated, source-cited menu of well-known add-ons (Spec-Kit, evals, OpenTelemetry GenAI, OWASP LLM Top-10, Claude Code hooks, prompt versioning, cost budgets, additional subagent catalogs). Filtered by signals from Phase 1.7 (domain), Phase 3 (plugins), Phase 3.5 (MCP), and selected target platforms — never show items already installed. Each selected item dispatches to a dedicated skill if available, else runs the inline action documented in [wrap-up](./references/wrapup.md).
+
+1. Build the candidate list per the filter matrix in [wrap-up](./references/wrapup.md#filter-matrix).
+2. Present a **single** multi-select via the runtime's ask-user tool (never per-item round-robin).
+3. For each selection: re-confirm only if the action edits config outside `AGENTS.md`; then execute.
+4. Append `✅ Wrap-up add-ons selected/skipped` lines to the Output Contract.
+
+Skip the entire phase only when `mode == update` and no agents/plugins/MCP changed.
+
 ## Decision Aids
 
 - **How many subagents?** [topology guide](./references/topology.md). One subagent per durable concern — also a path owner in the Directory Architecture.
@@ -235,6 +246,9 @@ Both forms initialize `main`, write a stack-aware `.gitignore` (covering `.githu
 - Inventing plugin/skill/MCP names. Always cite `[Tier · Vendor]` from [marketplaces](./references/marketplaces.md).
 - **Sequential-only orchestrator** — must fan out parallel-safe subagents (see [parallelism](./references/parallelism.md)).
 - **Treating Codex CLI as a per-agent-file runtime** (it isn't — agents live as `## <Name>` headings inside `AGENTS.md`).
+- **Skipping Phase 8 wrap-up** — denies users the curated add-on menu (Spec-Kit, evals, telemetry, security review). See [wrap-up](./references/wrapup.md).
+- **Wrap-up as per-item round-robin** — must be a *single* multi-select prompt.
+- **Citing unofficial sources in the wrap-up menu** — only vendor-official docs or the catalogs listed in [wrap-up](./references/wrapup.md).
 
 ## Output Contract
 
@@ -251,6 +265,8 @@ Both forms initialize `main`, write a stack-aware `.gitignore` (covering `.githu
 ✅ MCP servers: <selected list> (approval: <approve-all | selective | skipped>)
 ✅ Project memory link: <symlink | copy | n/a>
 ✅ Git: <initialized | left untouched | already present>
+✅ Wrap-up add-ons selected: <list with source URL, or "none">
+✅ Wrap-up add-ons skipped: <list, or "none">
 
 # replicate mode adds:
 ✅ Source runtime: <copilot-cli | claude-code | opencode | codex-cli>

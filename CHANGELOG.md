@@ -2,6 +2,19 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [0.2.4] - 2026-04-22
+
+### Added
+
+- **Phase 8 — Final Wrap-Up** in `SKILL.md`: a single consolidated, multi-select prompt run after Phase 7 that surfaces a curated, source-cited menu of well-known add-ons (Spec-Kit, Anthropic/OpenAI evals, OpenTelemetry GenAI, OWASP LLM Top-10, Claude Code hooks, MCP security guidance, additional subagent catalogs, prompt versioning, cost/usage budgets).
+- New reference `skills/agents-system-setup/references/wrapup.md` — full catalog with vendor-official source URLs, filter matrix gated by Phase 1.7 / 3 / 3.5 signals, and per-item action stubs.
+- `.claude-plugin/marketplace.json` so Claude Code's marketplace browser recognizes the repo as a valid plugin source (was rejecting with "No plugins found... not a valid plugin marketplace").
+
+### Changed
+
+- Output Contract gains `Wrap-up add-ons selected/skipped` lines.
+- Anti-patterns extended: skipping wrap-up, per-item round-robin instead of multi-select, citing unofficial sources in the wrap-up menu.
+
 ## [0.2.3] - 2026-04-22
 
 ### Added
