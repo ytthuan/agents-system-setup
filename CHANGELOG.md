@@ -2,6 +2,12 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [0.3.2] - 2026-04-22
+
+### Fixed
+
+- Markdown lint error (MD028 — blank line inside blockquote) in `references/agent-format.md` introduced in v0.3.1; merged the two adjacent blockquotes into one. v0.3.1 release assets are functionally identical but tripped the markdownlint CI gate.
+
 ## [0.3.1] - 2026-04-22
 
 ### Changed
