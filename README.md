@@ -5,7 +5,7 @@
 [![Latest release](https://img.shields.io/github/v/release/ytthuan/agents-system-setup?sort=semver&display_name=tag)](https://github.com/ytthuan/agents-system-setup/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Cross-OS](https://img.shields.io/badge/cross--os-linux%20%7C%20macos%20%7C%20windows-blue)](.github/workflows/ci.yml)
-[![Runtimes](https://img.shields.io/badge/runtimes-Copilot%20CLI%20%7C%20Claude%20Code%20%7C%20Codex%20%7C%20OpenCode-purple)](#install)
+[![Runtimes](https://img.shields.io/badge/runtimes-Copilot%20CLI%20%7C%20Claude%20Code%20%7C%20Codex%20%7C%20OpenCode-purple)](#install--per-runtime)
 
 A multi-runtime plugin that **bootstraps**, **updates**, **improves**, or **replicates** a complete multi-agent system across **GitHub Copilot CLI**, **Claude Code**, **OpenCode**, and **OpenAI Codex CLI** — from a single skill, with a Canonical IR for bidirectional replication and parallel-aware orchestration baked in.
 
