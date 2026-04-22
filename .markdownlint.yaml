@@ -19,3 +19,4 @@ MD049: false   # emphasis style
 MD050: false   # strong style
 MD051: false   # link fragments (slug-mismatch noise from auto-generated anchors)
 MD060: false   # table column style (compact vs padded — purely cosmetic)
+MD029: false   # ordered list prefix (we use sequential numbering across H3 catalog sections)
