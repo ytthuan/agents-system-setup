@@ -1,0 +1,93 @@
+# {{PROJECT_NAME}}
+
+> Agents guide — see https://agents.md/ for the spec. This file is the canonical agent memory and is also surfaced to **Claude Code** (via `CLAUDE.md` symlink) and **OpenCode** (native `AGENTS.md` support).
+
+<!-- agents-system-setup:managed:start -->
+
+## Project Snapshot
+
+- **Purpose:** {{PURPOSE}}
+- **Type:** {{PROJECT_TYPE}}
+- **Languages:** {{LANGUAGES}}
+- **Frameworks:** {{FRAMEWORKS}}
+- **Tests:** {{TEST_FRAMEWORK}}
+- **Deployment:** {{DEPLOYMENT}}
+- **Target platforms:** {{TARGET_PLATFORMS}}  <!-- e.g., copilot-cli, claude-code, opencode -->
+
+## How Agents Should Work Here
+
+This repo uses an **orchestrator + subagent** model. The orchestrator (`@orchestrator`) decomposes work and delegates to specialized subagents. Skills package reusable workflows. **Every agent MUST read the [Directory Architecture](#directory-architecture) before any edit.**
+
+### Golden Rules
+1. **Plan first.** For any non-trivial task, the orchestrator writes a plan and confirms scope before editing.
+2. **One concern per subagent.** Implementer never reviews its own work — delegate to `@reviewer`.
+3. **Respect Directory Architecture.** Each subagent owns specific paths; do not touch paths owned by another agent without delegation.
+4. **Run the project's own checks** before declaring done: `{{BUILD_CMD}}`, `{{TEST_CMD}}`, `{{LINT_CMD}}`.
+5. **Non-destructive edits** to managed files. Touch only what the task requires.
+6. **No secrets in code.** Use the configured secret store / env vars only.
+
+## Directory Architecture
+
+> **Read this before editing.** Every subagent has a defined ownership zone. Editing outside your zone requires delegating to the owning agent via the orchestrator.
+
+| Path (glob) | Purpose | Owner agent | Edit rule |
+|---|---|---|---|
+{{DIRECTORY_ARCHITECTURE_ROWS}}
+
+**Rules:**
+- `read-only` — agent may read for context, must never write.
+- `owned` — agent is the sole writer; others must delegate.
+- `additive-only` — agent may append/create but not modify existing entries.
+- `shared` — multiple owners; coordinate via orchestrator before edits.
+
+## Agent Roster
+
+| Name | Role | Owns | Triggers | Model |
+|---|---|---|---|---|
+{{AGENT_ROSTER_ROWS}}
+
+> The **Model** column is optional. Leave blank to use the platform default.
+
+## Capability × Agent Matrix
+
+Legend: ✅ primary owner · 🟡 assists · *(blank)* not involved.
+
+| Capability ↓ / Agent → | {{AGENT_HEADER_ROW}} |
+|---|{{AGENT_HEADER_SEP}}|
+{{CAPABILITY_MATRIX_ROWS}}
+
+## Skills
+
+| Skill | When invoked | Bundles |
+|---|---|---|
+{{SKILL_TABLE_ROWS}}
+
+## Plugins / MCP Servers
+
+{{PLUGIN_LIST}}
+
+## Build / Test / Lint
+
+```bash
+# Install
+{{INSTALL_CMD}}
+
+# Build
+{{BUILD_CMD}}
+
+# Test
+{{TEST_CMD}}
+
+# Lint
+{{LINT_CMD}}
+```
+
+## Conventions
+
+- Commit style: {{COMMIT_STYLE}}
+- Branching: {{BRANCH_STRATEGY}}
+- Code style enforced by: {{FORMATTER}}
+
+<!-- agents-system-setup:managed:end -->
+
+<!-- Add project-specific guidance below this line; it will be preserved on updates. -->

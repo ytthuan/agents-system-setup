@@ -1,0 +1,32 @@
+# Line endings — keep generated source LF on every OS.
+# Without this, Windows users silently get CRLF in *.sh and break execution.
+
+* text=auto eol=lf
+
+# Force LF for shell, JSON, YAML, Markdown, source.
+*.sh           text eol=lf
+*.bash         text eol=lf
+*.json         text eol=lf
+*.jsonc        text eol=lf
+*.yml          text eol=lf
+*.yaml         text eol=lf
+*.md           text eol=lf
+*.toml         text eol=lf
+
+# PowerShell + Windows-native: CRLF.
+*.ps1          text eol=crlf
+*.psm1         text eol=crlf
+*.psd1         text eol=crlf
+*.cmd          text eol=crlf
+*.bat          text eol=crlf
+
+# Binary — never auto-convert.
+*.png          binary
+*.jpg          binary
+*.jpeg         binary
+*.gif          binary
+*.ico          binary
+*.zip          binary
+*.gz           binary
+*.tar          binary
+*.pdf          binary

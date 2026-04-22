@@ -1,0 +1,16 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+
+# Local agent runtime state
+.copilot/
+.claude/
+.opencode/
+*.bak
+
+# Node (in case any contributor adds tooling)
+node_modules/

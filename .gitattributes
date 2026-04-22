@@ -1,0 +1,8 @@
+# Cross-OS line-ending safety: scripts must keep their native endings.
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.png binary
+*.jpg binary
+*.gif binary

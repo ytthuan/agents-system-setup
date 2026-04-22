@@ -1,0 +1,19 @@
+# Generic baseline — extend per language during generation
+.DS_Store
+*.log
+*.bak
+.env
+.env.local
+.env.*.local
+
+# Editors
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+
+# Copilot session state (local-only)
+.copilot/session-state/
+
+# {{LANG_BLOCK}}

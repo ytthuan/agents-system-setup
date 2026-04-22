@@ -1,0 +1,39 @@
+---
+name: {{AGENT_NAME}}
+description: 'Use when {{TRIGGER_PHRASES}}. {{ONE_LINE_RESPONSIBILITY}}.'
+{{OPTIONAL_TOOLS_BLOCK}}
+{{OPTIONAL_MODEL_LINE}}
+{{OPTIONAL_MCP_SERVERS_BLOCK}}
+---
+
+# {{AGENT_DISPLAY_NAME}}
+
+## Role
+{{ROLE_PARAGRAPH}}
+
+## Directory Boundaries
+**Owned paths** (I am the sole writer):
+{{OWNED_PATHS}}
+
+**Read-only context** (I may read, never write):
+{{READONLY_PATHS}}
+
+> Before any edit, re-read `AGENTS.md` › **Directory Architecture**. If a task requires touching a path I don't own, return control to `@orchestrator` for delegation.
+
+## When the orchestrator delegates to me
+- {{TRIGGER_1}}
+- {{TRIGGER_2}}
+- {{TRIGGER_3}}
+
+## How I work
+1. {{STEP_1}}
+2. {{STEP_2}}
+3. {{STEP_3}}
+
+## Outputs
+- {{OUTPUT_DESCRIPTION}}
+
+## Out of scope
+- {{OUT_OF_SCOPE_1}}
+- {{OUT_OF_SCOPE_2}}
+- Any path not in **Owned paths** above.
