@@ -2,6 +2,28 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+
+## [0.2.1] - 2026-04-22
+
+### Added
+
+- Cross-OS CI matrix (Ubuntu / macOS / Windows) running validators, ShellCheck, PSScriptAnalyzer, and markdownlint on every push and PR.
+- Tag-driven release workflow that publishes a tarball + SHA-256 to GitHub Releases when a `v*.*.*` tag is pushed.
+- JSON Schemas for all four runtime manifests under `schemas/`.
+- `scripts/validate.{sh,ps1}` — cross-platform validator (manifest schema, version sync across all four manifests, frontmatter checks, encoding, internal link resolution).
+- `scripts/bump-version.{sh,ps1}` — atomic version bump across the four manifests + CHANGELOG stub generator.
+- `.github/dependabot.yml` for weekly GitHub Actions updates.
+- `SECURITY.md`, `CONTRIBUTING.md`, issue/PR templates, `.editorconfig`, `.markdownlint.yaml`.
+
+### Changed
+
+- Repository is now public so Actions runs on free-tier minutes.
+
+### Fixed
+
+- Validator now uses POSIX paths internally so dict lookups work on Windows.
+- Validator output is ASCII + UTF-8 stdout to avoid Windows cp1252 `UnicodeEncodeError`.
+
 ## [0.2.0] — 2026-04-22
 
 ### Added
