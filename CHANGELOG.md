@@ -2,6 +2,26 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [0.2.3] - 2026-04-22
+
+### Added
+
+- README badges: CI status, Release status, latest release version, MIT license, cross-OS, supported runtimes.
+
+### Changed
+
+- **GitHub Actions bumped to current majors** (via Dependabot PRs #1–#4):
+  - `actions/checkout` v4 → v6
+  - `actions/setup-python` v5 → v6
+  - `softprops/action-gh-release` v2 → v3
+  - `DavidAnson/markdownlint-cli2-action` v16 → v23 (ships markdownlint v0.40)
+- Trimmed `SKILL.md` description from ~1.6 KB to 936 chars to satisfy the 1024-char skill-description limit.
+
+### Fixed
+
+- `.markdownlint.yaml`: disable MD051 (link-fragments) and MD060 (table-column-style) — new defaults in markdownlint v0.40 that produce only cosmetic noise.
+- README Runtimes badge anchor: `#install` → `#install--per-runtime` to match the actual heading slug.
+
 ## [0.2.2] - 2026-04-22
 
 ### Added
