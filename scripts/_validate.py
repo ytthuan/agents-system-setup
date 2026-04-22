@@ -62,16 +62,16 @@ def load_json(path: Path) -> dict[str, Any] | None:
         with path.open("r", encoding="utf-8") as f:
             return json.load(f)
     except FileNotFoundError:
-        err(f"missing manifest: {path.relative_to(REPO)}")
+        err(f"missing manifest: {path.relative_to(REPO).as_posix()}")
     except json.JSONDecodeError as e:
-        err(f"invalid JSON in {path.relative_to(REPO)}: {e}")
+        err(f"invalid JSON in {path.relative_to(REPO).as_posix()}: {e}")
     return None
 
 
 def check_manifests() -> None:
     versions: dict[str, str] = {}
     for path in VERSIONED_MANIFESTS:
-        rel = str(path.relative_to(REPO))
+        rel = path.relative_to(REPO).as_posix()
         data = load_json(path)
         if data is None:
             continue
@@ -87,7 +87,7 @@ def check_manifests() -> None:
             err(f"{rel}: name `{data['name']}` must be lowercase kebab-case")
 
     # marketplace
-    rel = str(MARKETPLACE.relative_to(REPO))
+    rel = MARKETPLACE.relative_to(REPO).as_posix()
     mdata = load_json(MARKETPLACE)
     if mdata is not None:
         for key in REQUIRED[rel]:

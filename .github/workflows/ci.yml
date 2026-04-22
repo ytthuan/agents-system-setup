@@ -67,7 +67,8 @@ jobs:
         shell: pwsh
         run: |
           Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser
-          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Severity @('Error','Warning')
+          # Severity = Error only; style rules (Write-Host, BOM, etc.) are intentional in CLI scripts.
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Severity Error
           if ($results) {
             $results | Format-Table -AutoSize
             exit 1

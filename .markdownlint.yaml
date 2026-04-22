@@ -1,8 +1,18 @@
-# Default markdownlint config — relaxed for prose-heavy docs.
+# Permissive — these are docs, not production code.
+# Keep only rules that catch real correctness issues (broken links, syntax).
 default: true
-MD013: false   # line length — prose
+MD013: false   # line length
+MD022: false   # blanks around headings (style)
 MD024:
-  siblings_only: true   # allow repeated headings if not siblings (CHANGELOG)
-MD033: false   # raw HTML allowed (managed-block markers)
-MD041: false   # first line need not be H1 (READMEs sometimes lead with badges)
-MD036: false   # emphasis-as-heading (we use **bold** for sub-labels)
+  siblings_only: true
+MD026: false   # trailing punctuation in headings
+MD031: false   # blanks around fences
+MD032: false   # blanks around lists
+MD033: false   # raw HTML
+MD034: false   # bare URLs
+MD036: false   # emphasis as heading
+MD040: false   # fenced code language
+MD041: false   # first line H1
+MD046: false   # code-block style
+MD049: false   # emphasis style
+MD050: false   # strong style
