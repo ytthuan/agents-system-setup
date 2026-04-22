@@ -1,0 +1,8 @@
+# Default markdownlint config — relaxed for prose-heavy docs.
+default: true
+MD013: false   # line length — prose
+MD024:
+  siblings_only: true   # allow repeated headings if not siblings (CHANGELOG)
+MD033: false   # raw HTML allowed (managed-block markers)
+MD041: false   # first line need not be H1 (READMEs sometimes lead with badges)
+MD036: false   # emphasis-as-heading (we use **bold** for sub-labels)

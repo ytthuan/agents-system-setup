@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/ytthuan/agents-system-setup/schemas/claude-plugin.schema.json",
+  "title": "Claude Code plugin manifest (.claude-plugin/plugin.json)",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["name", "version", "description"],
+  "properties": {
+    "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(-[A-Za-z0-9.-]+)?$" },
+    "description": { "type": "string", "minLength": 10 },
+    "author": {
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string" },
+            "email": { "type": "string" },
+            "url": { "type": "string", "format": "uri" }
+          }
+        }
+      ]
+    },
+    "homepage": { "type": "string", "format": "uri" },
+    "repository": { "type": ["string", "object"] },
+    "license": { "type": "string" },
+    "keywords": { "type": "array", "items": { "type": "string" } }
+  }
+}

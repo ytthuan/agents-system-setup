@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/ytthuan/agents-system-setup/schemas/codex-plugin.schema.json",
+  "title": "OpenAI Codex CLI plugin manifest (.codex-plugin/plugin.json)",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["name", "version", "description"],
+  "properties": {
+    "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(-[A-Za-z0-9.-]+)?$" },
+    "description": { "type": "string", "minLength": 10 },
+    "skills": { "type": "string" },
+    "mcp": { "type": "object" },
+    "apps": { "type": "array" }
+  }
+}

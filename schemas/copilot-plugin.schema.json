@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/ytthuan/agents-system-setup/schemas/copilot-plugin.schema.json",
+  "title": "Copilot CLI plugin manifest",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["name", "version", "description"],
+  "properties": {
+    "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(-[A-Za-z0-9.-]+)?$" },
+    "description": { "type": "string", "minLength": 10 },
+    "author": { "type": ["string", "object"] },
+    "license": { "type": "string" },
+    "homepage": { "type": "string", "format": "uri" },
+    "repository": { "type": ["string", "object"] },
+    "skills": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "agents": { "type": "array" },
+    "mcpServers": { "type": "object" },
+    "compatibility": { "type": "object" },
+    "keywords": { "type": "array", "items": { "type": "string" } }
+  }
+}

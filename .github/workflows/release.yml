@@ -1,0 +1,112 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    name: Pre-release validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --quiet pyyaml
+      - run: bash scripts/validate.sh
+
+  smoke-matrix:
+    name: Smoke install (${{ matrix.os }})
+    needs: [validate]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse all manifests (POSIX)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          for f in plugin.json .claude-plugin/plugin.json .codex-plugin/plugin.json .agents/plugins/marketplace.json; do
+            python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$f"
+          done
+      - name: Parse all manifests (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          @('plugin.json','.claude-plugin/plugin.json','.codex-plugin/plugin.json','.agents/plugins/marketplace.json') |
+            ForEach-Object { Get-Content $_ -Raw | ConvertFrom-Json | Out-Null }
+
+  release:
+    name: Publish GitHub Release
+    needs: [validate, smoke-matrix]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: ver
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          ver="${tag#v}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+
+      - name: Verify tag matches manifest versions
+        run: |
+          set -e
+          want="${{ steps.ver.outputs.version }}"
+          for f in plugin.json .claude-plugin/plugin.json .codex-plugin/plugin.json; do
+            got=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['version'])" "$f")
+            if [ "$got" != "$want" ]; then
+              echo "✗ $f version is $got but tag is v$want"
+              exit 1
+            fi
+          done
+          echo "✓ All manifests match tag v$want"
+
+      - name: Extract changelog section for this version
+        id: changelog
+        run: |
+          ver="${{ steps.ver.outputs.version }}"
+          python3 - <<'PY' > release-notes.md
+          import re, os
+          ver = os.environ['VER']
+          text = open('CHANGELOG.md', encoding='utf-8').read()
+          # Match the [version] section up to the next ## or EOF.
+          m = re.search(rf'^## \[{re.escape(ver)}\][^\n]*\n(.*?)(?=^## \[|\Z)', text, re.M | re.S)
+          if not m:
+              print(f'_No changelog entry for {ver}._')
+          else:
+              print(m.group(1).strip())
+          PY
+        env:
+          VER: ${{ steps.ver.outputs.version }}
+
+      - name: Build release tarball
+        run: |
+          name="agents-system-setup-${{ steps.ver.outputs.version }}"
+          mkdir -p dist
+          tar --exclude='.git' --exclude='dist' --exclude='node_modules' \
+              -czf "dist/${name}.tar.gz" .
+          (cd dist && shasum -a 256 "${name}.tar.gz" > "${name}.tar.gz.sha256")
+          ls -la dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: ${{ steps.ver.outputs.tag }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: ${{ contains(steps.ver.outputs.version, '-') }}
+          files: |
+            dist/*.tar.gz
+            dist/*.sha256
