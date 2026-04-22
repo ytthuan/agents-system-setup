@@ -6,7 +6,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$SrcDir = Join-Path (Split-Path $PSScriptRoot -Parent) 'skills/agents-system-setup'
+$SrcDir = Join-Path (Split-Path $PSScriptRoot -Parent) 'plugins/agents-system-setup/skills/agents-system-setup'
 
 switch ($Scope) {
     'project' { $DestBase = Join-Path (Get-Location) '.opencode/skills' }

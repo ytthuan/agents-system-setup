@@ -108,12 +108,27 @@ def check_manifests() -> None:
             if sp is None:
                 err(f"{rel}: plugins[{i}].source.path missing")
             else:
-                target = (MARKETPLACE.parent / sp).resolve() if sp.startswith(".") else (REPO / sp).resolve()
-                # marketplace lives at .agents/plugins/marketplace.json; "./" resolves relative to that dir
-                # but per Codex spec, source.path is relative to the marketplace root which is the repo
-                root_target = (REPO / sp).resolve()
-                if not target.exists() and not root_target.exists():
-                    err(f"{rel}: plugins[{i}].source.path `{sp}` does not exist on disk")
+                # Codex CLI rule: must start with `./`, must not be bare `./`,
+                # must not contain `..`, and must resolve to a dir containing
+                # .codex-plugin/plugin.json or .claude-plugin/plugin.json.
+                # Source: openai/codex codex-rs/core-plugins/src/marketplace.rs
+                # (resolve_local_plugin_source_path) and utils/plugins/src/
+                # plugin_namespace.rs (DISCOVERABLE_PLUGIN_MANIFEST_PATHS).
+                if not sp.startswith("./"):
+                    err(f"{rel}: plugins[{i}].source.path `{sp}` must start with `./`")
+                elif sp.rstrip("/") in ("", "."):
+                    err(f"{rel}: plugins[{i}].source.path `{sp}` must not be bare `./` (Codex rejects it)")
+                elif ".." in sp.split("/"):
+                    err(f"{rel}: plugins[{i}].source.path `{sp}` must not contain `..`")
+                else:
+                    plugin_root = (REPO / sp[2:]).resolve()
+                    if not plugin_root.is_dir():
+                        err(f"{rel}: plugins[{i}].source.path `{sp}` does not exist on disk")
+                    elif not (
+                        (plugin_root / ".codex-plugin" / "plugin.json").is_file()
+                        or (plugin_root / ".claude-plugin" / "plugin.json").is_file()
+                    ):
+                        err(f"{rel}: plugins[{i}].source.path `{sp}` is missing .codex-plugin/plugin.json or .claude-plugin/plugin.json — Codex/Claude marketplace will skip it")
 
     # version sync
     unique = set(versions.values())

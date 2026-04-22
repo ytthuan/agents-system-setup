@@ -18,8 +18,8 @@ We aim to acknowledge within 72 hours and ship a fix or mitigation within 14 day
 ## Scope
 
 In scope:
-- The skill content under `skills/agents-system-setup/`
-- The installer scripts under `scripts/` and `skills/agents-system-setup/scripts/`
+- The skill content under `plugins/agents-system-setup/skills/agents-system-setup/`
+- The installer scripts under `scripts/` and `plugins/agents-system-setup/skills/agents-system-setup/scripts/`
 - The plugin manifests (Copilot, Claude, Codex, marketplace)
 
 Out of scope (report directly to the upstream project):

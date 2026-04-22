@@ -4,7 +4,7 @@
 set -euo pipefail
 
 SCOPE="${1:-project}"   # project | global
-SRC_DIR="$(cd "$(dirname "$0")/.." && pwd)/skills/agents-system-setup"
+SRC_DIR="$(cd "$(dirname "$0")/.." && pwd)/plugins/agents-system-setup/skills/agents-system-setup"
 
 case "$SCOPE" in
   project)

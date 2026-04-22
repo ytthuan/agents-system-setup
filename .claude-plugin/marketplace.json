@@ -11,7 +11,7 @@
   "plugins": [
     {
       "name": "agents-system-setup",
-      "source": "./",
+      "source": "./plugins/agents-system-setup",
       "description": "Bootstrap, update, improve, or replicate multi-agent systems across Copilot CLI, Claude Code, OpenCode, and Codex CLI. Encourages parallel subagents and Claude Code agent teams.",
       "version": "0.2.3",
       "author": {

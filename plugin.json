@@ -1,13 +1,13 @@
 {
   "name": "agents-system-setup",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Bootstrap, update, improve, or replicate multi-agent systems across GitHub Copilot CLI, Claude Code, OpenCode, and OpenAI Codex CLI.",
   "author": "ytthuan",
   "license": "MIT",
   "homepage": "https://github.com/ytthuan/agents-system-setup",
   "repository": "https://github.com/ytthuan/agents-system-setup",
   "skills": [
-    "skills/agents-system-setup"
+    "plugins/agents-system-setup/skills/agents-system-setup"
   ],
   "agents": [],
   "mcpServers": {},

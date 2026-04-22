@@ -8,7 +8,7 @@
       "name": "agents-system-setup",
       "source": {
         "source": "local",
-        "path": "./"
+        "path": "./plugins/agents-system-setup"
       },
       "policy": {
         "installation": "AVAILABLE",

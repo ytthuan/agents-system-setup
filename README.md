@@ -102,7 +102,7 @@ Or be explicit:
 
 ## Parallel subagents & Claude Code agent teams
 
-The generated orchestrator always fans out **parallel-safe subagents** in one wave (multiple `Task` calls in a single response), then awaits before the next wave. Parallel-safety is computed automatically from the Directory Architecture — see [parallelism reference](./skills/agents-system-setup/references/parallelism.md).
+The generated orchestrator always fans out **parallel-safe subagents** in one wave (multiple `Task` calls in a single response), then awaits before the next wave. Parallel-safety is computed automatically from the Directory Architecture — see [parallelism reference](./plugins/agents-system-setup/skills/agents-system-setup/references/parallelism.md).
 
 For Claude Code, when 3+ subagents are independent and would benefit from peer-to-peer challenge, the generator additionally emits `AGENT-TEAMS.md` with the opt-in env var (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), settings snippet, suggested teammate roster, and a token-cost warning. Source: <https://docs.anthropic.com/en/docs/claude-code/agent-teams>.
 
@@ -154,7 +154,7 @@ The procedure is intentional, not arbitrary. See [DESIGN.md](./DESIGN.md) for th
 
 ## Contributing
 
-PRs welcome. The skill is documented heavily in `skills/agents-system-setup/references/`. New marketplace sources go in `references/marketplaces.md` with a `[Tier · Vendor]` tag.
+PRs welcome. The skill is documented heavily in `plugins/agents-system-setup/skills/agents-system-setup/references/`. New marketplace sources go in `references/marketplaces.md` with a `[Tier · Vendor]` tag.
 
 ## License
 

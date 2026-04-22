@@ -2,6 +2,24 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [0.2.5] - 2026-04-22
+
+### Fixed
+
+- **Codex CLI plugin discovery.** Marketplace plugin source path was bare `./`, which Codex's `resolve_local_plugin_source_path` rejects (the `./` prefix is stripped and an empty remainder is invalid). The plugin was silently dropped from `/plugin` even after `codex plugin marketplace add ytthuan/agents-system-setup` succeeded.
+  - Source: openai/codex `codex-rs/core-plugins/src/marketplace.rs` (`resolve_local_plugin_source_path`, `MARKETPLACE_MANIFEST_RELATIVE_PATHS`) and `codex-rs/utils/plugins/src/plugin_namespace.rs` (`DISCOVERABLE_PLUGIN_MANIFEST_PATHS`).
+
+### Changed
+
+- **Repo layout.** Plugin payload moved from `skills/` (repo root) to `plugins/agents-system-setup/`, which now owns `.codex-plugin/plugin.json`, `.claude-plugin/plugin.json`, and `skills/`. Both marketplace manifests (`.agents/plugins/marketplace.json`, `.claude-plugin/marketplace.json`) now point at `./plugins/agents-system-setup`. Root `plugin.json` (Copilot) updated to `skills: ["plugins/agents-system-setup/skills/agents-system-setup"]`.
+- Root `.codex-plugin/plugin.json` and `.claude-plugin/plugin.json` retained for direct local-path installs.
+- Install scripts (`scripts/install-opencode.sh`, `scripts/install-opencode.ps1`) and docs (README, SECURITY) repathed.
+- `scripts/_bump_version.py` now updates the new sub-tree manifests too — five files kept in sync.
+
+### Added
+
+- `scripts/_validate.py` gains a Codex-strict marketplace validator: rejects bare `./`, paths containing `..`, and paths whose target dir lacks a discoverable plugin manifest. Catches future regressions of this same class.
+
 ## [0.2.4] - 2026-04-22
 
 ### Added
