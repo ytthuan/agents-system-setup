@@ -23,7 +23,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # We want LF/CRLF as recorded by .gitattributes, not whatever the runner default is.
           fetch-depth: 1
@@ -50,7 +50,7 @@ jobs:
     name: ShellCheck (Linux)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run ShellCheck
         uses: ludeeus/action-shellcheck@2.0.0
         with:
@@ -62,7 +62,7 @@ jobs:
     name: PSScriptAnalyzer (Windows)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run PSScriptAnalyzer
         shell: pwsh
         run: |
@@ -78,7 +78,7 @@ jobs:
     name: Markdown lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: DavidAnson/markdownlint-cli2-action@v23
         with:
           globs: |
@@ -95,7 +95,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Smoke — list manifests exist & parse (POSIX)
         if: runner.os != 'Windows'
