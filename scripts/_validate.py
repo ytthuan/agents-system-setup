@@ -20,12 +20,18 @@ Usage:
 """
 from __future__ import annotations
 
+import io
 import json
 import os
 import re
 import sys
 from pathlib import Path
 from typing import Any
+
+# Force UTF-8 on stdout/stderr so Windows cp1252 doesn't reject non-ASCII output.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 REPO = Path(__file__).resolve().parent.parent
 ERRORS: list[str] = []
@@ -237,14 +243,14 @@ def main() -> int:
     if WARNINGS:
         print("\nWARNINGS:")
         for w in WARNINGS:
-            print(f"  ⚠ {w}")
+            print(f"  [WARN] {w}")
     if ERRORS:
         print("\nERRORS:")
         for e in ERRORS:
-            print(f"  ✗ {e}")
+            print(f"  [FAIL] {e}")
         print(f"\n{len(ERRORS)} error(s).")
         return 1
-    print(f"\n✓ All checks passed ({len(WARNINGS)} warning(s)).")
+    print(f"\n[OK] All checks passed ({len(WARNINGS)} warning(s)).")
     return 0
 
 

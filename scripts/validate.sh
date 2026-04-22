@@ -14,7 +14,7 @@ for cand in python3 python; do
   fi
 done
 if [[ -z "$python_bin" ]]; then
-  echo "✗ Python 3 is required (python3 or python on PATH)." >&2
+  echo "[FAIL] Python 3 is required (python3 or python on PATH)." >&2
   exit 2
 fi
 
@@ -29,7 +29,7 @@ status=$?
 fail=0
 while IFS= read -r -d '' f; do
   if grep -qU $'\r' "$f"; then
-    echo "✗ $f contains CRLF (must be LF)"
+    echo "[FAIL] $f contains CRLF (must be LF)"
     fail=1
   fi
 done < <(find . -type f -name '*.sh' -not -path './.git/*' -print0)
@@ -38,7 +38,7 @@ done < <(find . -type f -name '*.sh' -not -path './.git/*' -print0)
 # editors typically save LF, and git normalizes on commit/checkout. We warn instead.
 while IFS= read -r -d '' f; do
   if ! grep -qU $'\r' "$f"; then
-    echo "⚠ $f is LF (will be CRLF on Windows checkout via .gitattributes)"
+    echo "[WARN] $f is LF (will be CRLF on Windows checkout via .gitattributes)"
   fi
 done < <(find . -type f -name '*.ps1' -not -path './.git/*' -print0)
 
