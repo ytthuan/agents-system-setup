@@ -64,7 +64,7 @@ You are a <role>...
 ```
 
 > Tool names are Claude's canonical names: `Read`, `Edit`, `Write`, `Bash`, `Grep`, `Glob`, `Task`, `WebFetch`. Do **not** use Copilot's tool names here. If both `tools` and `disallowedTools` are set, `disallowedTools` is applied first, then `tools` is resolved against the remaining pool.
-
+>
 > **Scopes & precedence** (highest→lowest): managed settings → `--agents` CLI JSON → `.claude/agents/` (project) → `~/.claude/agents/` (user) → plugin `agents/`. Higher-priority same-name subagents override lower ones. Project subagents are discovered by walking up from CWD; `--add-dir` paths are NOT scanned.
 
 ## OpenCode (`.opencode/agents/<name>.md` or `~/.config/opencode/agents/<name>.md`)
