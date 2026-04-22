@@ -31,6 +31,7 @@ Scaffold or update a complete agent system for the current project across **Copi
 11. **Cross-OS aware.** Detect host OS once (Linux / macOS / Windows-bash / Windows-pwsh) per [cross-platform](./references/cross-platform.md). Pick `.sh` for POSIX shells, `.ps1` for native PowerShell. Forward slashes in generated docs. Never symlink on Windows. Bundle `.gitattributes` so line endings stay correct on every clone.
 12. **Git is optional and gated by `ask_user`.**
 13. **Parallelism is mandatory where work is independent.** The generator computes parallel-safety from the Directory Architecture and emits a wave table; the orchestrator prompt always contains a fan-out clause. For Claude Code, also emit `AGENT-TEAMS.md` per [parallelism](./references/parallelism.md). Sequential-only topologies are an error.
+14. **If the project domain is software-development, recommend GitHub Spec-Kit.** After domain detection (Phase 1.7), if the brief matches a software-dev keyword set, present spec-kit as an opt-in companion via `ask_user`, never auto-install. See [spec-kit](./references/spec-kit.md).
 
 ## Procedure
 
@@ -78,6 +79,27 @@ If the user picked **replicate** → run the [replication procedure](./reference
 8. Verify round-trip (re-parse emitted → diff IR → surface drift).
 
 For both branches, finish with Phase 7 (verify & summarize).
+
+### Phase 1.7 — Domain Detection & Spec-Kit Recommendation
+
+Run after Phase 1 (and 1.5 if branched), before Phase 2. Inspect the project brief gathered during interview against this software-development keyword set:
+
+`app, application, api, service, microservice, library, sdk, cli, tool, devtool,
+backend, frontend, fullstack, web, mobile, ios, android, desktop,
+framework, plugin, extension, package, module,
+infrastructure, infra, terraform, pulumi, kubernetes, helm,
+compiler, parser, runtime, database, orm`.
+
+If **any** keyword matches (case-insensitive, word-boundary), or the project already has source-language signals (`package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `*.csproj`, `pom.xml`, `Package.swift`, `build.gradle`, `mix.exs`, `composer.json`), classify as `software-dev`. Otherwise `non-dev` (marketing, research, content, data-analysis).
+
+If `software-dev`, call `ask_user`:
+
+> "This looks like a software project. Would you like to install **GitHub Spec-Kit** (Spec-Driven Development: `/specify` → `/plan` → `/tasks` → `/implement` slash commands) alongside the agent system?"
+> Choices: `["Yes — install for this runtime (Recommended)", "Just print the install command", "No, skip"]`
+
+On approval, emit the runtime-matched command from [spec-kit](./references/spec-kit.md) (`uv tool install specify-cli --from git+https://github.com/github/spec-kit.git` then `specify init --here --ai <copilot|claude|codex|opencode>`). Print, never silently shell-out unless the user picked "install".
+
+Record the choice in the plan so Phase 4 orchestrator output can reference the `/specify` workflow when appropriate.
 
 ### Phase 2 — Plan (Directory Architecture, Roster, Matrix, Waves)
 
@@ -134,6 +156,7 @@ For each selected platform, look up paths and frontmatter in [platforms.md](./re
 - MCP config (only if Phase 3.5 approved) at the platform's MCP path.
 - Drop the [directory-architecture snippet](./assets/directory-architecture.snippet.md) into any agent missing the boundary block.
 - **Orchestrator parallelism clause** — render the wave-aware fan-out instructions per [parallelism](./references/parallelism.md). The orchestrator must invoke all parallel-safe subagents of a wave in a single response (multiple Task-tool calls), await all results, then start the next wave.
+- **Spec-Kit block** — if Phase 1.7 recorded `spec_kit_installed = true`, render `assets/spec-kit-block.snippet.md` into the `{{SPEC_KIT_BLOCK}}` placeholder of `AGENTS.md` (substituting `{{RUNTIME}}` per platform: `copilot|claude|codex|opencode`). If `false`, replace the placeholder with an empty string. See [spec-kit](./references/spec-kit.md).
 - **Claude Code AGENT-TEAMS.md** — when Claude Code is among the selected platforms AND the Agent Roster has 3+ subagents marked `team-suitable` (independent + benefits from peer challenge), emit `AGENT-TEAMS.md` documenting: opt-in env var (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), settings.json snippet, suggested teammate roster, token-cost warning, and when to fall back to parallel subagents.
 
 **Project-memory linking** (after AGENTS.md is written):

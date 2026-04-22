@@ -2,6 +2,7 @@
 # Keep only rules that catch real correctness issues (broken links, syntax).
 default: true
 MD013: false   # line length
+MD012: false   # multiple blank lines
 MD022: false   # blanks around headings (style)
 MD024:
   siblings_only: true

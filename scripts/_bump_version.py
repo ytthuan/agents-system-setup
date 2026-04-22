@@ -36,28 +36,20 @@ def bump_changelog(new_version: str) -> str:
     cl = REPO / "CHANGELOG.md"
     text = cl.read_text(encoding="utf-8")
     today = date.today().isoformat()
-    stub = f"## [{new_version}] - {today}\n\n### Added\n\n- _TBD_\n\n### Changed\n\n- _TBD_\n\n### Fixed\n\n- _TBD_\n\n"
+    stub = f"## [{new_version}] - {today}\n\n### Added\n\n- _TBD_\n\n### Changed\n\n- _TBD_\n\n### Fixed\n\n- _TBD_\n"
     if f"[{new_version}]" in text:
         return f"  CHANGELOG.md: section [{new_version}] already exists, skipped"
-    # Insert after the first H1 (top of file).
-    lines = text.splitlines(keepends=True)
-    out: list[str] = []
-    inserted = False
-    for i, ln in enumerate(lines):
-        out.append(ln)
-        if not inserted and ln.startswith("# "):
-            # Skip until we hit the first '## ' to insert just above it.
-            j = i + 1
-            while j < len(lines) and not lines[j].startswith("## "):
-                out.append(lines[j])
-                j += 1
-            out.append("\n" + stub)
-            out.extend(lines[j:])
-            inserted = True
-            break
-    if not inserted:
-        out = [stub, "\n"] + lines
-    cl.write_text("".join(out), encoding="utf-8")
+    # Insert just above the first existing "## [" line; preserve single blank line before it.
+    m = re.search(r"^## \[", text, re.M)
+    if m:
+        insert_at = m.start()
+        new_text = text[:insert_at] + stub + "\n" + text[insert_at:]
+    else:
+        # No prior versions — append after H1 paragraph.
+        new_text = text.rstrip() + "\n\n" + stub
+    # Collapse any 3+ consecutive blank lines down to a single blank line.
+    new_text = re.sub(r"\n{3,}", "\n\n", new_text)
+    cl.write_text(new_text, encoding="utf-8")
     return f"  CHANGELOG.md: prepended [{new_version}] stub"
 
 

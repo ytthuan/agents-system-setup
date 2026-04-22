@@ -2,6 +2,24 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [0.2.2] - 2026-04-22
+
+### Added
+
+- **Phase 1.7 — Domain Detection & Spec-Kit recommendation.** When the project brief matches a software-development keyword set or shows source-language signals, the skill now offers to install [GitHub Spec-Kit](https://github.com/github/spec-kit) for the chosen runtime (`copilot`, `claude`, `codex`, `opencode`).
+- New reference doc `skills/agents-system-setup/references/spec-kit.md` covering positioning, install commands, and the `/specify` → `/plan` → `/tasks` → `/implement` workflow.
+- New asset `skills/agents-system-setup/assets/spec-kit-block.snippet.md` — managed `AGENTS.md` block that documents the Spec-Driven workflow when Spec-Kit is opted in.
+- Hard Rule #14: Spec-Kit recommendation is opt-in only and scoped to software-dev domains.
+
+### Changed
+
+- `assets/AGENTS.md.template` now has a `{{SPEC_KIT_BLOCK}}` placeholder rendered conditionally by Phase 4.
+- `.markdownlint.yaml` disables MD012 so changelog stubs don't break the lint job.
+- `scripts/_bump_version.py` tightens stub spacing to keep markdownlint green.
+
+### Fixed
+
+- CHANGELOG header had a stray blank line that tripped MD012 on CI.
 
 ## [0.2.1] - 2026-04-22
 

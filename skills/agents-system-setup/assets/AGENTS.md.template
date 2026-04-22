@@ -66,6 +66,8 @@ Legend: ✅ primary owner · 🟡 assists · *(blank)* not involved.
 
 {{PLUGIN_LIST}}
 
+{{SPEC_KIT_BLOCK}}
+
 ## Build / Test / Lint
 
 ```bash
