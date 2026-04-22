@@ -15,7 +15,7 @@ This skill targets three agent runtimes. The user picks one or more in **Phase 0
 
 | Artifact | Copilot CLI | Claude Code | OpenCode | OpenAI Codex CLI |
 |---|---|---|---|---|
-| Agents | `.github/agents/<name>.agent.md` | `.claude/agents/<name>.md` | `.opencode/agents/<name>.md` | encoded as `## <Name>` heading inside `AGENTS.md` |
+| Agents | `.github/agents/<name>.agent.md` | `.claude/agents/<name>.md` | `.opencode/agents/<name>.md` | orchestrator + project rules in `AGENTS.md`; **specialized subagents in `.codex/agents/<name>.toml`** (project) or `~/.codex/agents/` (user) |
 | Skills | `.github/skills/<name>/SKILL.md` | `.claude/skills/<name>/SKILL.md` | `.opencode/skills/<name>/SKILL.md` | not supported natively — describe in `AGENTS.md` |
 | MCP servers | `.mcp.json` (root) | `.mcp.json` (root, shared with Copilot) | `opencode.json` › `"mcp": { ... }` | `.mcp.json` (root, shared) |
 | Hooks | `.github/hooks/*.json` | `.claude/settings.json` › `"hooks"` | `.opencode/hooks/` | not supported |
@@ -65,20 +65,45 @@ permission:
 ---
 ```
 
-### OpenAI Codex CLI (`AGENTS.md` heading)
+### OpenAI Codex CLI — split layout
 
-Codex CLI does not use per-agent files. Each "agent" is a `## <Display Name>` section inside `AGENTS.md` (project root or `~/.codex/AGENTS.md`):
+**Project rules + orchestrator** live in `AGENTS.md` at the repo root (Codex's primary input). `## <Display Name>` headings inside `AGENTS.md` are reserved for **the orchestrator and shared project-wide concerns** (Directory Architecture, Capability Matrix, Waves) — *not* specialized workers.
 
-```markdown
-## Security Reviewer
-**Use when** auditing dependencies, scanning for secrets, or reviewing IaC.
-**Tools**: read, grep, glob, bash (no write/edit).
-**Model**: gpt-5
+**Specialized subagents** are standalone TOML files under `.codex/agents/<name>.toml` (project-scoped) or `~/.codex/agents/<name>.toml` (user-scoped). Codex loads each file as a configuration layer for the spawned session, so a custom agent file may override any setting a normal session config sets. Switch threads with `/agent` in the CLI.
 
-You are a senior security engineer. ...
+**Required fields** (per [openai docs](https://developers.openai.com/codex/subagents)):
+
+| Field                    | Type     | Purpose                                                         |
+| ------------------------ | -------- | --------------------------------------------------------------- |
+| `name`                   | string   | Source of truth for the agent identity (filename is convention only). |
+| `description`            | string   | Human-facing guidance for when Codex should use this agent.     |
+| `developer_instructions` | string   | Core instructions defining behavior (use TOML triple-quoted string). |
+
+**Optional fields** (inherit from parent session if omitted): `nickname_candidates: string[]`, `model`, `model_reasoning_effort` (`low`|`medium`|`high`), `sandbox_mode` (e.g. `read-only`, `workspace-write`), `[mcp_servers.<id>]` table, `[[skills.config]]` array. Built-in agent names — `default`, `worker`, `explorer` — can be overridden by a custom file using the same `name`.
+
+```toml
+name = "reviewer"
+description = "PR reviewer focused on correctness, security, and missing tests."
+model = "gpt-5.4"
+model_reasoning_effort = "high"
+sandbox_mode = "read-only"
+developer_instructions = """
+Review code like an owner.
+Prioritize correctness, security, behavior regressions, and missing test coverage.
+Lead with concrete findings, include reproduction steps when possible.
+"""
+nickname_candidates = ["Atlas", "Delta", "Echo"]
 ```
 
-Codex reads `.mcp.json` at the repo root for MCP servers (shares the file with Copilot CLI / Claude Code).
+**Global subagent settings** live under `[agents]` in `.codex/config.toml`:
+
+```toml
+[agents]
+max_threads = 6   # default 6
+max_depth = 1     # default 1; raise only if you truly need recursive delegation
+```
+
+Codex reads `.mcp.json` at repo root (shared with Copilot/Claude). Per-agent MCP servers may also be declared inline via `[mcp_servers.<id>]` in the agent's TOML.
 
 ## MCP Configuration — per platform
 

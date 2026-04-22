@@ -62,16 +62,17 @@ enabled: true
 
 | IR field | Copilot CLI | Claude Code | OpenCode | OpenAI Codex CLI |
 |---|---|---|---|---|
-| `name` | frontmatter `name:` ✅ | frontmatter `name:` ✅ | filename only (no `name:`) ⚠️ derive from basename | n/a — Codex has no per-agent files; encoded as `## <Name>` heading inside `AGENTS.md` ⚠️ |
-| `description` | `description:` ✅ | `description:` ✅ | `description:` ✅ | first sentence under heading ⚠️ |
-| `role_prompt` | body ✅ | body ✅ | body ✅ | body under heading ✅ |
-| `model.family` | `model: claude-sonnet-4.6` ✅ | `model: sonnet` ✅ | `model: anthropic/claude-sonnet-4-5` ✅ | `model: gpt-5` (free-text) ⚠️ |
-| `tools.*` (bool map) | `tools: [view, grep, ...]` (list) — map names | `tools: Read, Grep, ...` (comma string) — map names | `tools: { write: false, ... }` (bool map) ✅ | not enforced — describe in prose ⚠️ |
-| `mcp_refs` | per-agent `mcp-servers:` *or* central `.mcp.json` | central `.mcp.json` only ⚠️ | central `opencode.json` › `mcp` only ⚠️ | central `.mcp.json` (Codex reads it) ✅ |
-| `permission.edit` | n/a — drop with warning ❌ | n/a — drop with warning ❌ | `permission.edit:` ✅ | n/a ❌ |
+| `name` | frontmatter `name:` ✅ | frontmatter `name:` ✅ | filename only (no `name:`) ⚠️ derive from basename | TOML `name` in `.codex/agents/<name>.toml` ✅ (orchestrator only as `## <Name>` in `AGENTS.md`) |
+| `description` | `description:` ✅ | `description:` ✅ | `description:` ✅ | TOML `description` ✅ |
+| `role_prompt` | body ✅ | body ✅ | body ✅ | TOML `developer_instructions` (triple-quoted) ✅ |
+| `model.family` | `model: claude-sonnet-4.6` ✅ | `model: sonnet` ✅ | `model: anthropic/claude-sonnet-4-5` ✅ | TOML `model = "gpt-5.4"` ✅ + optional `model_reasoning_effort = "low\|medium\|high"` |
+| `tools.*` (bool map) | `tools: [view, grep, ...]` (list) — map names | `tools: Read, Grep, ...` (comma string) — map names | `tools: { write: false, ... }` (bool map) ✅ | model `sandbox_mode` (`read-only`\|`workspace-write`); fine-grained tool list not enforced — drop with warning ⚠️ |
+| `mcp_refs` | per-agent `mcp-servers:` *or* central `.mcp.json` | central `.mcp.json` only ⚠️ | central `opencode.json` › `mcp` only ⚠️ | central `.mcp.json` ✅ **and/or** per-agent `[mcp_servers.<id>]` table inside the agent's TOML ✅ |
+| `permission.edit` | n/a — drop with warning ❌ | n/a — drop with warning ❌ | `permission.edit:` ✅ | mapped to `sandbox_mode` (read-only ↔ no edits) ✅ |
 | `permission.bash_deny_patterns` | n/a ❌ | n/a ❌ | `permission.bash:` map ✅ | n/a ❌ |
-| `scope: user` | `~/.copilot/agents/` | `~/.claude/agents/` | `~/.config/opencode/agents/` | `~/.codex/AGENTS.md` (heading) |
-| `scope: project` | `.github/agents/<name>.agent.md` | `.claude/agents/<name>.md` | `.opencode/agents/<name>.md` | `AGENTS.md` (heading) |
+| `scope: user` | `~/.copilot/agents/` | `~/.claude/agents/` | `~/.config/opencode/agents/` | `~/.codex/agents/<name>.toml` |
+| `scope: project` | `.github/agents/<name>.agent.md` | `.claude/agents/<name>.md` | `.opencode/agents/<name>.md` | `.codex/agents/<name>.toml` (orchestrator stays in `AGENTS.md`) |
+| `nicknames` | n/a — drop ❌ | n/a — drop ❌ | n/a — drop ❌ | TOML `nickname_candidates = ["Atlas", "Delta"]` ✅ (Codex-only IR field) |
 
 ### Tool-name canonicalization
 
@@ -148,4 +149,5 @@ Common improve targets:
 - Copilot CLI custom agents: https://docs.github.com/en/copilot/concepts/agents/copilot-cli/about-custom-agents
 - Claude Code subagents: https://docs.anthropic.com/en/docs/claude-code/sub-agents
 - OpenCode agents: https://opencode.ai/docs/agents/
-- OpenAI Codex AGENTS.md spec: https://agents.md and https://github.com/openai/codex
+- OpenAI Codex CLI subagents spec: https://developers.openai.com/codex/subagents
+- OpenAI Codex (general) AGENTS.md spec: https://agents.md and https://github.com/openai/codex

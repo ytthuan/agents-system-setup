@@ -2,6 +2,26 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [0.3.0] - 2026-04-22
+
+### Added
+
+- **Codex CLI native subagents.** The skill now generates one `.codex/agents/<name>.toml` per specialized subagent, matching OpenAI's current Codex subagents spec (https://developers.openai.com/codex/subagents). Required TOML fields wired through the canonical IR: `name`, `description`, `developer_instructions`. Optional fields (`model`, `model_reasoning_effort`, `sandbox_mode`, `nickname_candidates`, per-agent `[mcp_servers.<id>]`, `[[skills.config]]`) are emitted only when the IR sets them; otherwise the subagent inherits from the parent session.
+- New asset `assets/subagent.codex.toml.template` with placeholders (`{{NAME}}`, `{{DESCRIPTION}}`, `{{DEVELOPER_INSTRUCTIONS}}`, `{{MODEL}}`, `{{REASONING_EFFORT}}`, `{{SANDBOX_MODE}}`, `{{MCP_ID}}`, `{{MCP_URL}}`, `{{SKILL_PATH}}`).
+- New validator pass `check_codex_toml_agents` in `scripts/_validate.py`: parses every `.codex/agents/*.toml` under the repo via `tomllib`, enforces the three required fields, validates `model_reasoning_effort ∈ {low,medium,high}` and `sandbox_mode ∈ {read-only,workspace-write}`, and warns when TOML `name` ≠ filename stem.
+
+### Changed
+
+- **Codex generation flow split.** `AGENTS.md` is now reserved for project rules, Directory Architecture, Capability Matrix, Waves, and the orchestrator section only. Per-subagent `## <Name>` headings are no longer emitted for Codex targets — specialized workers live in `.codex/agents/*.toml` instead. `AGENTS.md` is still the primary project memory file Codex reads on session start.
+- `.codex/config.toml` is upserted with `[agents] max_threads = 6` and `max_depth = 1` defaults when Codex is in the target set.
+- `references/platforms.md` Codex section rewritten with the TOML schema, the `/agent` switching workflow, and the global `[agents]` config block.
+- `references/agent-format.md` Codex section replaced; Tool Restriction Patterns table now shows Codex `sandbox_mode` instead of prose.
+- `references/replication.md` Field-Mapping Matrix updated: `name` → TOML `name`, `role_prompt` → `developer_instructions`, `model` → `model` + `model_reasoning_effort`, `tools.*` → `sandbox_mode` (lossy at fine grain), `permission.edit` ↔ `sandbox_mode`. New IR field `nicknames` ↔ Codex-only `nickname_candidates`.
+
+### Fixed
+
+- Anti-pattern guidance flipped: treating Codex CLI as `AGENTS.md`-only is now explicitly called out as wrong; current Codex supports project-scoped TOML subagents.
+
 ## [0.2.5] - 2026-04-22
 
 ### Fixed

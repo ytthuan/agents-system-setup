@@ -52,7 +52,7 @@ Persist the selection. All later phases loop over selected platforms using [plat
      - Copilot CLI: `AGENTS.md`, `.github/agents/`, `.github/skills/`, `.mcp.json`
      - Claude Code: `CLAUDE.md`, `.claude/agents/`, `.claude/skills/`, `.claude/settings.json`
      - OpenCode: `opencode.json`, `.opencode/agents/`, `.opencode/skills/`
-     - Codex CLI: top-level `## <Name>` headings in `AGENTS.md`, `~/.codex/AGENTS.md`
+     - Codex CLI: `AGENTS.md` (orchestrator + project rules), `.codex/agents/*.toml` (specialized subagents), `.codex/config.toml`, `~/.codex/AGENTS.md`, `~/.codex/agents/`
 2. **Decide mode** with `ask_user` — show what was detected:
 
    | Detected footprint | Default offer | Choices |
@@ -152,6 +152,7 @@ For each selected platform, look up paths and frontmatter in [platforms.md](./re
 - `AGENTS.md` at repo root → [template](./assets/AGENTS.md.template). Fill **Directory Architecture**, **Agent Roster**, **Capability Matrix**, **Skills**, **Plugins/MCP** tables.
 - Orchestrator → [template](./assets/orchestrator.agent.md.template) at the platform's agents path.
 - Each subagent → [template](./assets/subagent.agent.md.template) at the platform's agents path. Fill `{{OWNED_PATHS}}` / `{{READONLY_PATHS}}` from the Directory Architecture.
+  - **Codex CLI exception:** subagents are NOT rendered as `## <Name>` headings in `AGENTS.md`. Instead, emit one `.codex/agents/<kebab-name>.toml` per subagent with required fields `name`, `description`, `developer_instructions` (use TOML triple-quoted basic string). Carry the IR's `tool_allowlist` only if explicitly set (otherwise inherit from parent session). Map IR `model` → `model` and `model` reasoning hints → `model_reasoning_effort` (`low`|`medium`|`high`). Set `sandbox_mode = "read-only"` for read-only subagents. Per-agent MCP servers go under `[mcp_servers.<id>]` in the same file. `AGENTS.md` keeps only the orchestrator section + Directory Architecture / Capability Matrix / Waves. See [Codex layout](./references/platforms.md#openai-codex-cli--split-layout) and [openai docs](https://developers.openai.com/codex/subagents). Also emit/upsert `.codex/config.toml` with `[agents] max_threads = 6` and `max_depth = 1` unless the user supplied other values.
 - Each skill → [template](./assets/skill.template.md) at the platform's skills path.
 - MCP config (only if Phase 3.5 approved) at the platform's MCP path.
 - Drop the [directory-architecture snippet](./assets/directory-architecture.snippet.md) into any agent missing the boundary block.
@@ -223,7 +224,7 @@ Skip the entire phase only when `mode == update` and no agents/plugins/MCP chang
 - **How many subagents?** [topology guide](./references/topology.md). One subagent per durable concern — also a path owner in the Directory Architecture.
 - **Skill vs Subagent?** Reusable workflow with assets → Skill. Context isolation / different tool restrictions → Subagent.
 - **Plugin vs MCP?** Plugins extend the runtime; MCP servers expose tools to agents. External-system integrations are usually MCP.
-- **Which platform?** Copilot CLI for GitHub-tight teams; Claude Code for Anthropic-first; OpenCode for vendor-neutral / self-hosted; Codex CLI for OpenAI-first / `AGENTS.md`-only setups. Multi-target if uncertain — files coexist cleanly via shared `AGENTS.md` + `.mcp.json`.
+- **Which platform?** Copilot CLI for GitHub-tight teams; Claude Code for Anthropic-first; OpenCode for vendor-neutral / self-hosted; Codex CLI for OpenAI-first (uses split layout: `AGENTS.md` for orchestrator + rules, `.codex/agents/*.toml` for specialized subagents). Multi-target if uncertain — files coexist cleanly via shared `AGENTS.md` + `.mcp.json`.
 - **`update` vs `improve` vs `replicate`?**
   - `update` regenerates managed blocks against the current plan (still asks before writing).
   - `improve` audits the existing system and proposes a checklist of targeted fixes — user picks which to apply.
@@ -245,7 +246,8 @@ Skip the entire phase only when `mode == update` and no agents/plugins/MCP chang
 - Generic descriptions ("helps with code") — kills discovery.
 - Inventing plugin/skill/MCP names. Always cite `[Tier · Vendor]` from [marketplaces](./references/marketplaces.md).
 - **Sequential-only orchestrator** — must fan out parallel-safe subagents (see [parallelism](./references/parallelism.md)).
-- **Treating Codex CLI as a per-agent-file runtime** (it isn't — agents live as `## <Name>` headings inside `AGENTS.md`).
+- **Treating Codex CLI as `AGENTS.md`-only.** Current Codex (per [openai docs](https://developers.openai.com/codex/subagents)) supports project-scoped subagents at `.codex/agents/<name>.toml`. Reserve `## <Name>` headings inside `AGENTS.md` for the orchestrator + project rules; emit specialized subagents as TOML files.
+- **Forgetting Codex's required TOML fields.** Every `.codex/agents/<name>.toml` MUST have `name`, `description`, and `developer_instructions`. Missing any of the three = silent skip on load.
 - **Skipping Phase 8 wrap-up** — denies users the curated add-on menu (Spec-Kit, evals, telemetry, security review). See [wrap-up](./references/wrapup.md).
 - **Wrap-up as per-item round-robin** — must be a *single* multi-select prompt.
 - **Citing unofficial sources in the wrap-up menu** — only vendor-official docs or the catalogs listed in [wrap-up](./references/wrapup.md).
@@ -267,6 +269,7 @@ Skip the entire phase only when `mode == update` and no agents/plugins/MCP chang
 ✅ Git: <initialized | left untouched | already present>
 ✅ Wrap-up add-ons selected: <list with source URL, or "none">
 ✅ Wrap-up add-ons skipped: <list, or "none">
+✅ Codex subagent files (if codex-cli target): <list of .codex/agents/*.toml, or "none">
 
 # replicate mode adds:
 ✅ Source runtime: <copilot-cli | claude-code | opencode | codex-cli>
@@ -285,7 +288,7 @@ Try it:
   copilot          # then: "@orchestrator <task>"
   claude           # then: invoke a subagent
   opencode         # then: pick an agent
-  codex            # then: reference an AGENTS.md heading
+  codex            # then: /agent to switch threads; orchestrator + rules in AGENTS.md, subagents in .codex/agents/*.toml
 
 Suggested next customizations:
   - <suggestion 1>

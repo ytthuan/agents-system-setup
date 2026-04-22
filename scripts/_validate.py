@@ -246,6 +246,40 @@ def check_internal_links() -> None:
                 err(f"{path.relative_to(REPO)}: broken link → {m.group(1)}")
 
 
+# ---------- 7: Codex TOML subagents (.codex/agents/*.toml) ----------
+
+def check_codex_toml_agents() -> None:
+    try:
+        import tomllib  # py 3.11+
+    except ImportError:
+        warn("tomllib unavailable (Python <3.11) — skipping .codex/agents/*.toml validation")
+        return
+    # Validate any .codex/agents/ tree under the repo (project-scope) but skip
+    # samples inside skill assets/templates.
+    for agents_dir in REPO.rglob(".codex/agents"):
+        if not agents_dir.is_dir() or ".git" in agents_dir.parts:
+            continue
+        for toml_path in agents_dir.glob("*.toml"):
+            rel = toml_path.relative_to(REPO)
+            try:
+                data = tomllib.loads(toml_path.read_text(encoding="utf-8"))
+            except Exception as e:
+                err(f"{rel}: invalid TOML: {e}")
+                continue
+            for key in ("name", "description", "developer_instructions"):
+                if not data.get(key):
+                    err(f"{rel}: missing required Codex subagent field `{key}`")
+            name = data.get("name")
+            if isinstance(name, str) and name != toml_path.stem:
+                warn(f"{rel}: TOML `name` ({name}) differs from filename stem ({toml_path.stem}) — name is the source of truth, but matching filenames is the recommended convention")
+            effort = data.get("model_reasoning_effort")
+            if effort and effort not in ("low", "medium", "high"):
+                err(f"{rel}: model_reasoning_effort must be low|medium|high (got `{effort}`)")
+            sandbox = data.get("sandbox_mode")
+            if sandbox and sandbox not in ("read-only", "workspace-write"):
+                warn(f"{rel}: sandbox_mode `{sandbox}` is not one of the documented values (read-only|workspace-write)")
+
+
 # ---------- main ----------
 
 def main() -> int:
@@ -254,6 +288,7 @@ def main() -> int:
     check_frontmatter_files()
     check_encoding()
     check_internal_links()
+    check_codex_toml_agents()
 
     if WARNINGS:
         print("\nWARNINGS:")

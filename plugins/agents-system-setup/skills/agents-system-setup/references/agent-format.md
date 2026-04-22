@@ -77,33 +77,45 @@ You are a <role>...
 
 > OpenCode does not embed MCP servers in agent frontmatter — put them in `opencode.json` › `mcp`. Per-agent gating uses `permission:`.
 
-## OpenAI Codex CLI (`AGENTS.md`)
+## OpenAI Codex CLI — split layout: `AGENTS.md` + `.codex/agents/*.toml`
 
-Source: https://github.com/openai/codex · spec: https://agents.md
+Source: https://developers.openai.com/codex/subagents · general AGENTS.md spec: https://agents.md
 
-Codex CLI does **not** read per-agent files. Each "agent" is a `## <Display Name>` section inside `AGENTS.md` (project root, with optional `~/.codex/AGENTS.md` for personal scope). MCP servers are read from a shared `.mcp.json` at the repo root.
+Codex uses **two complementary surfaces**:
 
-```markdown
-## Security Reviewer
+1. **`AGENTS.md`** at the repo root — project memory + orchestrator instructions + Directory Architecture / Capability Matrix / Waves. The orchestrator MAY appear here as `## Orchestrator`.
+2. **`.codex/agents/<name>.toml`** (project) or **`~/.codex/agents/<name>.toml`** (user) — one TOML file per specialized subagent. Codex loads each as a session config layer; switch with `/agent`.
 
-**Use when** auditing dependencies, scanning for secrets, or reviewing IaC.
+```toml
+name = "reviewer"
+description = "PR reviewer focused on correctness, security, and missing tests."
+model = "gpt-5.4"                       # optional; inherits from session if omitted
+model_reasoning_effort = "high"         # optional: low|medium|high
+sandbox_mode = "read-only"              # optional: read-only|workspace-write
+nickname_candidates = ["Atlas", "Delta"]  # optional, presentation only
+developer_instructions = """
+You are a senior reviewer. Lead with concrete findings.
+Prioritize correctness, security, behavior regressions, and missing tests.
+"""
 
-- **Tools**: read, grep, glob, bash (no write/edit)
-- **Model**: gpt-5
-- **Owns**: `infra/**`, `.github/workflows/**`
+[mcp_servers.openaiDeveloperDocs]       # optional, per-agent MCP allowlist
+url = "https://developers.openai.com/mcp"
 
-You are a senior security engineer. ...
+[[skills.config]]                        # optional, per-agent skill toggle
+path = "/abs/path/to/SKILL.md"
+enabled = false
 ```
 
-Codex CLI quirks:
-- No `name:` frontmatter — the H2 heading **is** the agent name.
-- Tool restrictions are conventions in prose, not enforced fields. Document them clearly.
-- MCP servers: shared `.mcp.json` (same format as Copilot CLI / Claude Code).
-- Skills: not natively supported — embed reusable workflows as `### <Workflow>` sub-sections under the relevant agent.
+Codex CLI rules:
+- **Required fields**: `name`, `description`, `developer_instructions`. Missing any → silent skip.
+- **`name` is the source of truth** (filename is convention only). Custom files may override built-ins (`default`, `worker`, `explorer`) by reusing the name.
+- **Global config** in `.codex/config.toml`: `[agents] max_threads = 6` and `max_depth = 1` defaults.
+- MCP servers can be shared via `.mcp.json` at repo root *or* declared per-agent inside the TOML.
+- Skills: per-agent enable/disable via `[[skills.config]]` array entries.
 
 ## Discovery Surface (all platforms)
 
-The router/orchestrator picks a subagent based on the **`description`** field (or the first sentence under the H2 heading on Codex CLI).
+The router/orchestrator picks a subagent based on the **`description`** field (or `description` in `.codex/agents/<name>.toml` for Codex).
 
 - Always start with `"Use when ..."`
 - Include concrete trigger keywords from the user's domain
@@ -121,11 +133,11 @@ The router/orchestrator picks a subagent based on the **`description`** field (o
 
 ## Tool Restriction Patterns (use the platform's syntax)
 
-| Pattern | Copilot CLI | Claude Code | OpenCode | Codex CLI (prose) |
+| Pattern | Copilot CLI | Claude Code | OpenCode | Codex CLI |
 |---|---|---|---|---|
-| Read-only reviewer | `tools: [view, grep, glob, bash]` | `tools: Read, Grep, Glob, Bash` | `tools: { write: false, edit: false, bash: true }` | "Tools: read, grep, glob, bash (no write/edit)" |
-| Implementer (full) | omit `tools:` | omit `tools:` | omit `tools:` (or all true) | "Tools: full access" |
-| Docs writer | `tools: [view, edit, create]` | `tools: Read, Edit, Write` | `tools: { bash: false }` | "Tools: read, edit, write (no bash)" |
+| Read-only reviewer | `tools: [view, grep, glob, bash]` | `tools: Read, Grep, Glob, Bash` | `tools: { write: false, edit: false, bash: true }` | `sandbox_mode = "read-only"` in `.codex/agents/<name>.toml` |
+| Implementer (full) | omit `tools:` | omit `tools:` | omit `tools:` (or all true) | `sandbox_mode = "workspace-write"` (or omit to inherit) |
+| Docs writer | `tools: [view, edit, create]` | `tools: Read, Edit, Write` | `tools: { bash: false }` | `sandbox_mode = "workspace-write"`; describe scope in `developer_instructions` |
 
 ## MCP Per-Agent Reference
 

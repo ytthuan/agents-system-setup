@@ -1,0 +1,28 @@
+# OpenAI Codex CLI subagent — project-scoped at .codex/agents/{{NAME}}.toml
+# Spec: https://developers.openai.com/codex/subagents
+#
+# Required: name, description, developer_instructions
+# Optional: model, model_reasoning_effort, sandbox_mode, nickname_candidates,
+#           [mcp_servers.<id>], [[skills.config]]
+
+name = "{{NAME}}"
+description = "{{DESCRIPTION}}"
+
+# Optional — omit to inherit from the parent session.
+# model = "{{MODEL}}"
+# model_reasoning_effort = "{{REASONING_EFFORT}}"   # low | medium | high
+# sandbox_mode = "{{SANDBOX_MODE}}"                  # read-only | workspace-write
+# nickname_candidates = ["Atlas", "Delta", "Echo"]
+
+developer_instructions = """
+{{DEVELOPER_INSTRUCTIONS}}
+"""
+
+# Optional per-agent MCP server allowlist (also reads repo-root .mcp.json).
+# [mcp_servers.{{MCP_ID}}]
+# url = "{{MCP_URL}}"
+
+# Optional per-agent Skill toggles.
+# [[skills.config]]
+# path = "{{SKILL_PATH}}"
+# enabled = true
