@@ -2,6 +2,25 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [0.3.1] - 2026-04-22
+
+### Changed
+
+- **Claude Code subagent spec — full alignment with current docs** ([docs.claude.com/en/docs/claude-code/sub-agents](https://docs.claude.com/en/docs/claude-code/sub-agents)):
+  - Source URL fixed (was `docs.anthropic.com`, now `docs.claude.com`).
+  - Documented all optional frontmatter fields the skill previously omitted: `disallowedTools`, `permissionMode` (`default|acceptEdits|auto|dontAsk|bypassPermissions|plan`), `maxTurns`, `skills` (full content injected, NOT inherited from parent), `mcpServers` (name ref or inline), `hooks`, `memory` (`user|project|local`), `background`, `effort` (`low|medium|high|xhigh|max`), `isolation: worktree`, `color`, `initialPrompt`.
+  - Clarified `model` accepts full model IDs (e.g. `claude-opus-4-7`) in addition to aliases; default is `inherit`.
+  - Documented scope precedence: managed settings → `--agents` CLI JSON → `.claude/agents/` (project) → `~/.claude/agents/` (user) → plugin `agents/`. Higher-priority same-name overrides lower.
+  - Documented `disallowedTools` ordering: applied before `tools`.
+- **OpenCode subagent spec — full alignment with current docs** ([opencode.ai/docs/agents](https://opencode.ai/docs/agents)):
+  - **`tools:` field is now flagged as deprecated**; `permission:` (with `edit` / `bash` / `webfetch` granularity) is the recommended path.
+  - Removed misleading `mcp: []` example from frontmatter — OpenCode does not configure MCP in agent frontmatter; declare in `opencode.json` › `mcp`.
+  - Added missing fields: `prompt` (file ref), `disable`, `hidden`, `color` (hex or theme), `top_p`, `steps` (max agentic iterations), `permission.task` (gate Task-tool subagent invocation), `permission.webfetch`.
+  - Documented bash-permission ordering: wildcard FIRST, specific rules after (last match wins).
+  - Documented built-in agents: primaries `build` + `plan`; subagents `general` + `explore`. Filename = agent name.
+  - Noted that extra top-level keys (e.g. `reasoningEffort`, `textVerbosity`) pass through directly as provider model options.
+- `references/replication.md` Field-Mapping Matrix updated: Claude `tools` cell now mentions `disallowedTools` denylist; OpenCode cell flips primary recommendation to `permission` and marks legacy `tools: { ... }` map as deprecated.
+
 ## [0.3.0] - 2026-04-22
 
 ### Added

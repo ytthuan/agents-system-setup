@@ -37,33 +37,47 @@ mcp-servers:                    # optional, hyphenated key
 ```
 
 ### Claude Code (`.md` under `.claude/agents/`)
+Only `name` + `description` required. Defaults: `model: inherit`, all tools inherited from parent. Source: https://docs.claude.com/en/docs/claude-code/sub-agents
 ```yaml
 ---
-name: planner
-description: Use when ...
-tools: Read, Grep, Glob, Bash    # comma-separated string OR omit for all
-model: sonnet                    # optional: opus | sonnet | haiku | inherit
+name: planner                    # REQUIRED — lowercase + hyphens, unique, matches filename
+description: Use when ...        # REQUIRED — drives delegation
+tools: Read, Grep, Glob, Bash    # optional comma-string allowlist; omit = inherit all
+disallowedTools: Write, Edit     # optional denylist (applied before `tools`)
+model: sonnet                    # optional: sonnet | opus | haiku | <full-id> | inherit (default)
+permissionMode: default          # optional: default | acceptEdits | auto | dontAsk | bypassPermissions | plan
+skills: [code-review]            # optional: full skill body injected (subagents do NOT inherit parent skills)
+mcpServers: { slack: {} }        # optional: name ref or inline config
+isolation: worktree              # optional: isolated git worktree copy
+color: blue                      # optional UI color
+# Also: maxTurns, hooks, memory (user|project|local), background, effort, initialPrompt
 ---
 ```
-> Tool names are Claude's canonical names (`Read`, `Edit`, `Bash`, `Grep`, `Glob`, `Task`, …). Do **not** copy Copilot tool names verbatim.
+> Tool names are Claude's canonical names (`Read`, `Edit`, `Write`, `Bash`, `Grep`, `Glob`, `Task`, `WebFetch`). Do **not** copy Copilot tool names verbatim. Scope precedence: managed settings > `--agents` CLI > project (`.claude/agents/`) > user (`~/.claude/agents/`) > plugin.
 
-### OpenCode (`.md` under `.opencode/agents/`)
+### OpenCode (`.md` under `.opencode/agents/` or `~/.config/opencode/agents/`)
+Only `description` required. Filename = agent name. `tools:` is deprecated — prefer `permission`. Source: https://opencode.ai/docs/agents/
 ```yaml
 ---
-description: Use when ...
-mode: subagent                   # primary | subagent | all
-model: anthropic/claude-sonnet-4-5
-temperature: 0.1                 # optional
-tools:
-  write: false
-  edit: false
-  bash: true
-permission:
-  edit: ask                      # allow | ask | deny
+description: Use when ...                                  # REQUIRED
+mode: subagent                                             # primary | subagent | all (default: all)
+model: anthropic/claude-sonnet-4-20250514                  # provider/model-id
+temperature: 0.1                                           # optional
+prompt: "{file:./prompts/review.txt}"                      # optional external system prompt
+steps: 5                                                   # optional max agentic iterations
+hidden: false                                              # hide from @ autocomplete
+permission:                                                # preferred over deprecated `tools:`
+  edit: deny                                               # allow | ask | deny
+  webfetch: deny
   bash:
-    "git push": deny
+    "*": ask                                               # wildcard FIRST, specific after (last match wins)
+    "git status *": allow
+  task:                                                    # gate Task-tool subagent invocation
+    "*": deny
+    "code-reviewer": allow
 ---
 ```
+> MCP servers live in `opencode.json` › `mcp`, NOT in agent frontmatter. Built-in primaries: `build`, `plan`. Built-in subagents: `general`, `explore`. Extra top-level keys (e.g. `reasoningEffort`) pass through as provider model options.
 
 ### OpenAI Codex CLI — split layout
 

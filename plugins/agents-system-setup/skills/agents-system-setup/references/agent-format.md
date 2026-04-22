@@ -34,48 +34,75 @@ mcp-servers:                      # OPTIONAL — hyphenated key
 
 ## Claude Code (`.claude/agents/<name>.md`)
 
-Source: https://docs.anthropic.com/en/docs/claude-code/sub-agents
+Source: https://docs.claude.com/en/docs/claude-code/sub-agents
+
+Only `name` and `description` are required. The body becomes the system prompt. Subagents start in the main conversation's CWD; `cd` does not persist between Bash calls (use `isolation: worktree` for an isolated repo copy).
 
 ```markdown
 ---
-name: <kebab-case-name>
-description: Use when ... <triggers>.
-tools: Read, Grep, Glob, Bash     # OPTIONAL — comma-separated string; omit for all
-model: sonnet                     # OPTIONAL — opus | sonnet | haiku | inherit
+name: <kebab-case-name>           # REQUIRED — lowercase letters and hyphens; unique
+description: Use when ... <triggers>.   # REQUIRED — when Claude should delegate
+tools: Read, Grep, Glob, Bash     # OPTIONAL — comma-separated allowlist; omit = inherit all
+disallowedTools: Write, Edit      # OPTIONAL — denylist; applied before `tools`
+model: sonnet                     # OPTIONAL — sonnet | opus | haiku | <full-id> | inherit (default)
+permissionMode: default           # OPTIONAL — default | acceptEdits | auto | dontAsk | bypassPermissions | plan
+maxTurns: 20                      # OPTIONAL — agentic-turn cap
+skills: [code-review, lint]       # OPTIONAL — full skill content injected at startup (NOT inherited from parent)
+mcpServers:                       # OPTIONAL — name reference OR inline server config
+  slack: {}
+hooks: { ... }                    # OPTIONAL — lifecycle hooks scoped to this subagent
+memory: project                   # OPTIONAL — user | project | local (cross-session memory)
+background: false                 # OPTIONAL — run as background task
+effort: medium                    # OPTIONAL — low | medium | high | xhigh | max (model-dependent)
+isolation: worktree               # OPTIONAL — isolated git worktree copy of repo
+color: blue                       # OPTIONAL — red|blue|green|yellow|purple|orange|pink|cyan
+initialPrompt: "Begin by ..."     # OPTIONAL — auto-submitted first turn when run as main agent
 ---
 
 You are a <role>...
-(prompt body)
+(prompt body — this is the system prompt)
 ```
 
-> Tool names are Claude's canonical names: `Read`, `Edit`, `Write`, `Bash`, `Grep`, `Glob`, `Task`, `WebFetch`. Do **not** use Copilot's tool names here.
+> Tool names are Claude's canonical names: `Read`, `Edit`, `Write`, `Bash`, `Grep`, `Glob`, `Task`, `WebFetch`. Do **not** use Copilot's tool names here. If both `tools` and `disallowedTools` are set, `disallowedTools` is applied first, then `tools` is resolved against the remaining pool.
 
-## OpenCode (`.opencode/agents/<name>.md`)
+> **Scopes & precedence** (highest→lowest): managed settings → `--agents` CLI JSON → `.claude/agents/` (project) → `~/.claude/agents/` (user) → plugin `agents/`. Higher-priority same-name subagents override lower ones. Project subagents are discovered by walking up from CWD; `--add-dir` paths are NOT scanned.
+
+## OpenCode (`.opencode/agents/<name>.md` or `~/.config/opencode/agents/<name>.md`)
 
 Source: https://opencode.ai/docs/agents/
 
+Only `description` is required. **The markdown filename becomes the agent name** (`review.md` → `review`). Built-in primaries: `build`, `plan`. Built-in subagents: `general`, `explore`. The `tools:` field is **deprecated** — prefer `permission:` for new configs.
+
 ```markdown
 ---
-description: Use when ...
-mode: subagent                    # primary | subagent | all
-model: anthropic/claude-sonnet-4-5    # OPTIONAL — provider/model
-temperature: 0.1                  # OPTIONAL
-tools:                            # OPTIONAL — bool-keyed map
-  write: false
-  edit: false
-  bash: true
-permission:                       # OPTIONAL — fine-grained gates
-  edit: ask                       # allow | ask | deny
+description: Use when ...           # REQUIRED
+mode: subagent                      # OPTIONAL — primary | subagent | all (default: all)
+model: anthropic/claude-sonnet-4-20250514   # OPTIONAL — provider/model-id format
+temperature: 0.1                    # OPTIONAL — 0.0-1.0 (defaults are model-specific)
+top_p: 0.9                          # OPTIONAL — alternative to temperature
+prompt: "{file:./prompts/review.txt}"   # OPTIONAL — external system-prompt file (relative to config)
+steps: 5                            # OPTIONAL — max agentic iterations
+disable: false                      # OPTIONAL — set true to disable
+hidden: false                       # OPTIONAL — hide from @ autocomplete (still callable via Task)
+color: accent                       # OPTIONAL — hex (#FF5733) or theme (primary|secondary|accent|success|warning|error|info)
+permission:                         # OPTIONAL — preferred over deprecated `tools:`
+  edit: deny                        # allow | ask | deny
+  webfetch: deny
   bash:
+    "*": ask                        # put wildcard FIRST, specific rules after (last match wins)
+    "git status *": allow
     "git push": deny
-mcp:                              # NOTE: project MCP lives in opencode.json, not here
-  []
+  task:                             # OPTIONAL — gate which subagents this agent may invoke
+    "*": deny
+    "code-reviewer": allow
+# Any other top-level keys (e.g. reasoningEffort, textVerbosity) are passed through
+# directly as provider model options — provider-specific.
 ---
 
 You are a <role>...
 ```
 
-> OpenCode does not embed MCP servers in agent frontmatter — put them in `opencode.json` › `mcp`. Per-agent gating uses `permission:`.
+> **MCP** is NOT configured in agent frontmatter — declare servers globally in `opencode.json` › `mcp`. Per-agent allow/deny is via `permission:`. The `tools:` map (e.g. `{ write: false }`) still works but is deprecated; prefer `permission:` for `edit`/`bash`/`webfetch` and `permission.task` for subagent gating.
 
 ## OpenAI Codex CLI — split layout: `AGENTS.md` + `.codex/agents/*.toml`
 
