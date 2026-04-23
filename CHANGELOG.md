@@ -2,6 +2,29 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [0.4.0] - 2026-04-23
+
+### Added — `references/marketplaces.md` rewrite (verified 2026-04 via live GitHub search)
+
+- **OpenAI official catalogs** added to Tier 1: `openai/skills` (Skills Catalog for Codex, ~17k★), `openai/plugins`, `openai/codex-plugin-cc` (Codex-from-Claude-Code bridge).
+- **Anthropic** Tier 1 entries cleaned up.
+- **OpenCode** ecosystem entry added to Tier 2: `awesome-opencode/awesome-opencode` (~5.5k★) — was missing previously.
+- **Claude Code Tier 2 expanded** with verified high-signal repos:
+  - `wshobson/agents` (~34k★) — multi-agent orchestration
+  - `obra/superpowers` — agentic skills framework
+  - `rohitg00/awesome-claude-code-toolkit` — 135 agents / 35 skills / 176+ plugins
+  - `helloianneo/awesome-claude-code-skills` — 50+ scenario-grouped picks
+  - `alexei-led/cc-thingz` — battle-tested marketplace
+- **Cross-runtime catalogs** new section: `EveryInc/compound-engineering-plugin`, `numman-ali/n-skills`, `gmh5225/awesome-skills`, `safishamsi/graphify`.
+- **Domain-specific skill packs** new section as prior-art reference: `dotnet/skills`, `kepano/obsidian-skills`, `microsoft/GitHub-Copilot-for-Azure`.
+
+### Changed
+
+- Doc anchors updated: Claude Code plugins doc moved to `docs.claude.com`; Codex plugins now split into separate "build" and "use" anchors; OpenCode anchor added.
+- **Install patterns section** rewritten per-runtime with current commands (Codex `marketplace add ... --ref / --sparse`, `marketplace upgrade/remove`).
+- **Cross-runtime cheat sheet** added (table mapping Agents / Skills / Hooks / MCP / LSP / Commands to each runtime's path).
+- Vendor-attribution rule kept; tag format unchanged.
+
 ## [0.3.3] - 2026-04-23
 
 ### Changed
