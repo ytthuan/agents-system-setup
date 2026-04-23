@@ -280,6 +280,37 @@ def check_codex_toml_agents() -> None:
                 warn(f"{rel}: sandbox_mode `{sandbox}` is not one of the documented values (read-only|workspace-write)")
 
 
+# ---------- 8: replication ledger location ----------
+
+LEDGER_FORBIDDEN_DIRS = (
+    ".claude/agents",
+    ".codex/agents",
+    ".opencode/agents",
+    ".github/agents",
+    ".config/opencode/agents",
+)
+
+
+def check_replication_ledger() -> None:
+    """The replication ledger and any operational log MUST NOT live inside an
+    agents/ directory or use a `.md` extension — runtime loaders walk those
+    trees by extension and will treat the file as a malformed agent.
+    """
+    patterns = ("*replication*", "*replicat*.log", "*replicat*.md", "*replicat*.jsonl")
+    for path in REPO.rglob("*"):
+        if not path.is_file() or ".git" in path.parts:
+            continue
+        name_lower = path.name.lower()
+        if "replicat" not in name_lower:
+            continue
+        rel = path.relative_to(REPO).as_posix()
+        for forbidden in LEDGER_FORBIDDEN_DIRS:
+            if forbidden in rel:
+                err(f"{rel}: replication ledger/log must not live inside `{forbidden}` — runtime will misread it as an agent. Move to `.agents-system-setup/replication.jsonl`.")
+        if path.suffix == ".md" and "/agents/" in f"/{rel}":
+            err(f"{rel}: replication artifact with `.md` extension inside an agents/ tree will be parsed as a malformed agent.")
+
+
 # ---------- main ----------
 
 def main() -> int:
@@ -289,6 +320,7 @@ def main() -> int:
     check_encoding()
     check_internal_links()
     check_codex_toml_agents()
+    check_replication_ledger()
 
     if WARNINGS:
         print("\nWARNINGS:")

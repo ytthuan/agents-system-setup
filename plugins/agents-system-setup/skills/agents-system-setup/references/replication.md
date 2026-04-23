@@ -106,8 +106,16 @@ Triggered when the user picks **mode: `replicate`** in Phase 1, or when Phase 1 
 7. EMIT per target    → write per-platform paths + frontmatter (platforms.md)
                         with `<!-- agents-system-setup:replicated-from: <source> -->`
                         marker just under the frontmatter.
-8. WRITE ledger       → append to `.github/agent-replication.log` (or platform-equiv):
-                        timestamp | source | targets | sha256 of each emitted file
+8. WRITE ledger       → append one JSON object per line to
+                        `.agents-system-setup/replication.jsonl` at the repo root.
+                        **NEVER** place the ledger inside any agents/ directory
+                        (`.claude/agents/`, `.codex/agents/`, `.opencode/agents/`,
+                        `.github/agents/`) and **NEVER** use a `.md` extension —
+                        agent loaders walk those trees by extension and will
+                        treat the file as a malformed agent.
+                        Each line:
+                        `{"ts":"<ISO8601>","source":"<runtime>","targets":["..."],
+                         "files":[{"path":"...","sha256":"..."}]}`
 9. VERIFY round-trip  → re-parse the emitted files back to IR; assert structural
                         equality on (name, description, tools-canonical, mcp_refs).
                         Surface any drift.
@@ -143,11 +151,12 @@ Common improve targets:
 - **Tool-name pass-through.** Writing Claude's `Read` into a Copilot agent (or vice-versa) breaks discovery silently.
 - **Replicating without MCP gate.** Replication must re-trigger the MCP approval gate for any new target.
 - **Skipping the round-trip verify.** A successful emit isn't success — re-parse and diff IR.
+- **Markdown-format replication ledger inside an agents/ directory.** A `.md` file named like `agent-replication.md` placed in `.claude/agents/`, `.codex/agents/`, `.opencode/agents/`, or `.github/agents/` will be parsed as a malformed agent by the runtime and either silently ignored *or* corrupt the agent list. Always write the ledger as `.agents-system-setup/replication.jsonl` (JSON Lines, never `.md`, never inside an agents tree). Same rule applies to any other operational log this skill writes.
 
 ## 6. References
 
 - Copilot CLI custom agents: https://docs.github.com/en/copilot/concepts/agents/copilot-cli/about-custom-agents
-- Claude Code subagents: https://docs.anthropic.com/en/docs/claude-code/sub-agents
+- Claude Code subagents: https://docs.claude.com/en/docs/claude-code/sub-agents
 - OpenCode agents: https://opencode.ai/docs/agents/
 - OpenAI Codex CLI subagents spec: https://developers.openai.com/codex/subagents
 - OpenAI Codex (general) AGENTS.md spec: https://agents.md and https://github.com/openai/codex

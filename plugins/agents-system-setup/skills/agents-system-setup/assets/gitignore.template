@@ -16,4 +16,9 @@
 # Copilot session state (local-only)
 .copilot/session-state/
 
+# agents-system-setup operational state (replication ledger, audit logs, .bak files)
+# NEVER commit these and NEVER place them inside an agents/ directory — runtime
+# loaders will try to parse them as agents.
+.agents-system-setup/
+
 # {{LANG_BLOCK}}

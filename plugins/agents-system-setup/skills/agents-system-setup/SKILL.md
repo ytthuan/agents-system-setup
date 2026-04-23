@@ -75,7 +75,7 @@ If the user picked **replicate** → run the [replication procedure](./reference
 4. Render lossiness report; `ask_user` to approve dropped fields per target.
 5. Re-run **Phase 3.5** MCP approval gate against each new target.
 6. Emit per target with `<!-- agents-system-setup:replicated-from: <source> -->` markers.
-7. Write replication ledger (`agent-replication.log`).
+7. Write replication ledger to `.agents-system-setup/replication.jsonl` (one JSON object per line — **never `.md`, never inside any `agents/` directory**, or it will be misread as a malformed agent).
 8. Verify round-trip (re-parse emitted → diff IR → surface drift).
 
 For both branches, finish with Phase 7 (verify & summarize).
@@ -251,6 +251,7 @@ Skip the entire phase only when `mode == update` and no agents/plugins/MCP chang
 - **Skipping Phase 8 wrap-up** — denies users the curated add-on menu (Spec-Kit, evals, telemetry, security review). See [wrap-up](./references/wrapup.md).
 - **Wrap-up as per-item round-robin** — must be a *single* multi-select prompt.
 - **Citing unofficial sources in the wrap-up menu** — only vendor-official docs or the catalogs listed in [wrap-up](./references/wrapup.md).
+- **Replication ledger as `.md` or inside any `agents/` directory.** The replication ledger and any other operational log MUST be written to `.agents-system-setup/replication.jsonl` (JSON Lines). A `.md` log inside `.claude/agents/` / `.codex/agents/` / `.opencode/agents/` / `.github/agents/` will be parsed as a malformed agent by the runtime loader. See [replication anti-patterns](./references/replication.md#5-anti-patterns).
 
 ## Output Contract
 

@@ -2,6 +2,23 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [0.4.1] - 2026-04-23
+
+### Fixed
+
+- **Replication ledger no longer lands in an agents/ directory.** Previously the procedure wrote `.github/agent-replication.log` (or "platform-equiv"), which on Codex / Claude / OpenCode could end up adjacent to `agents/` trees. Worse, anyone hand-renaming the ledger to `.md` would have it parsed as a malformed agent by the runtime loader.
+  - Ledger path is now pinned to **`.agents-system-setup/replication.jsonl`** at the repo root.
+  - Format switched from free-form text → **JSON Lines** (`{"ts":..., "source":..., "targets":[...], "files":[{"path":..., "sha256":...}]}` per line).
+  - **NEVER** allowed inside `.claude/agents/`, `.codex/agents/`, `.opencode/agents/`, `.github/agents/`, `~/.config/opencode/agents/`.
+  - **NEVER** allowed with a `.md` extension inside any `agents/` tree.
+- New validator pass `check_replication_ledger` in `scripts/_validate.py` enforces both rules and fails the build if violated.
+- New anti-pattern entries added to `SKILL.md` § Anti-patterns and `references/replication.md` § 5.
+
+### Changed
+
+- `assets/gitignore.template` now ignores `.agents-system-setup/` (operational state — replication ledger, audit logs, `.bak` files) with an inline warning explaining why this directory must never sit inside an `agents/` tree.
+- `references/replication.md` § 6 References: Claude Code subagents URL updated `docs.anthropic.com` → `docs.claude.com` (canonical home).
+
 ## [0.4.0] - 2026-04-23
 
 ### Added — `references/marketplaces.md` rewrite (verified 2026-04 via live GitHub search)
