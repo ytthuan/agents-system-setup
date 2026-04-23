@@ -2,6 +2,18 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [0.3.3] - 2026-04-23
+
+### Changed
+
+- **Marketplace identifier renamed** from `agents-system-setup` → `ytthuan` (owner handle) in both marketplace manifests:
+  - `.agents/plugins/marketplace.json` (`name` + `interface.displayName`)
+  - `.claude-plugin/marketplace.json` (top-level `name`)
+- The plugin name itself (`agents-system-setup`) is unchanged in both files. Only the **marketplace** key is renamed so it no longer collides with the plugin name.
+- **User impact (Codex CLI):** the local config block changes from `[marketplaces.agents-system-setup]` to `[marketplaces.ytthuan]`. Users who already added the marketplace can either:
+  - Run `codex plugin marketplace remove agents-system-setup` then `codex plugin marketplace add ytthuan/agents-system-setup` to refresh, or
+  - Edit `~/.codex/config.toml` and rename the section header from `[marketplaces.agents-system-setup]` to `[marketplaces.ytthuan]`.
+
 ## [0.3.2] - 2026-04-22
 
 ### Fixed

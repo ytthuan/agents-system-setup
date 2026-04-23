@@ -1,7 +1,7 @@
 {
-  "name": "agents-system-setup",
+  "name": "ytthuan",
   "interface": {
-    "displayName": "agents-system-setup"
+    "displayName": "ytthuan"
   },
   "plugins": [
     {
