@@ -7,16 +7,17 @@
 [![Cross-OS](https://img.shields.io/badge/cross--os-linux%20%7C%20macos%20%7C%20windows-blue)](.github/workflows/ci.yml)
 [![Runtimes](https://img.shields.io/badge/runtimes-Copilot%20CLI%20%7C%20Claude%20Code%20%7C%20Codex%20%7C%20OpenCode-purple)](#install--per-runtime)
 
-A multi-runtime plugin that **bootstraps**, **updates**, **improves**, or **replicates** a complete multi-agent system across **GitHub Copilot CLI**, **Claude Code**, **OpenCode**, and **OpenAI Codex CLI** — from a single skill, with a Canonical IR for bidirectional replication and parallel-aware orchestration baked in.
+A multi-runtime plugin that **bootstraps**, **updates**, **improves**, or **replicates** a complete multi-agent system across **GitHub Copilot CLI**, **Claude Code**, **OpenCode**, and **OpenAI Codex CLI** — from a single skill, with a Canonical IR for bidirectional replication, parallel-aware orchestration, and mandatory security/audit/architecture governance baked in.
 
 ## What it generates
 
-- `AGENTS.md` at repo root with **Directory Architecture**, **Agent Roster (with parallel-safety waves)**, **Capability Matrix**.
+- `AGENTS.md` at repo root with **Directory Architecture**, **Agent Roster (with parallel-safety waves)**, **Capability Matrix**, **Security & Audit Matrix**, **Threat Model**, **Architecture / Design Pattern Decisions**, **ADR Index**, and **Quality Gates**.
 - **Orchestrator + N subagents** (3–50, sized to scope) emitted in the right format for every selected runtime, with a **fan-out clause** so parallel-safe subagents always run in one wave.
 - **`AGENT-TEAMS.md`** for Claude Code projects when the roster benefits from peer-to-peer teammates (3+ independent concerns).
 - Project-scoped **skills** under each runtime's conventional path.
 - **Curated plugin / MCP recommendations** from vendor-official catalogs, every recommendation tagged `[Tier · Vendor]` and **opt-in per item**.
 - **Mandatory MCP approval gate** — no MCP config is ever written without explicit user approval.
+- **Source-backed governance baseline** — OWASP GenAI, NIST SSDF, MCP Security Best Practices, GitHub Code Security, SLSA, OPA, Azure Well-Architected, C4, and TOGAF (enterprise only).
 - Cross-OS scripts (`.sh` + `.ps1`), `.gitattributes` for line-ending safety.
 
 ## Modes
@@ -123,12 +124,16 @@ agents-system-setup/
 ├── scripts/
 │   ├── install-opencode.sh      # OpenCode installer (POSIX)
 │   └── install-opencode.ps1     # OpenCode installer (PowerShell)
-├── skills/
+├── plugins/
 │   └── agents-system-setup/
-│       ├── SKILL.md
-│       ├── references/          # platforms, marketplaces, replication, parallelism, …
-│       ├── assets/              # AGENTS.md + agent/skill templates
-│       └── scripts/             # git-init.sh + .ps1, link-project-memory.sh + .ps1
+│       ├── .claude-plugin/plugin.json
+│       ├── .codex-plugin/plugin.json
+│       └── skills/
+│           └── agents-system-setup/
+│               ├── SKILL.md
+│               ├── references/      # platforms, marketplaces, replication, governance, …
+│               ├── assets/          # AGENTS.md + agent/skill templates
+│               └── scripts/         # git-init.sh + .ps1, link-project-memory.sh + .ps1
 ├── README.md
 ├── DESIGN.md                    # rationale per phase / hard rule
 ├── CHANGELOG.md

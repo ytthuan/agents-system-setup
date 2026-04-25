@@ -4,7 +4,7 @@ Use `ask_user` for **every** question. One question per call. Multiple-choice wh
 
 ## 0. Platform Selection (FIRST question after detection)
 - Q: "Which agent runtime(s) should I configure?"
-- Choices: `["Copilot CLI only (Recommended for GitHub-centric teams)", "Claude Code only", "OpenCode only", "Copilot CLI + Claude Code", "All three (Copilot CLI + Claude Code + OpenCode)"]`
+- Choices: `["Copilot CLI only (Recommended for GitHub-centric teams)", "Claude Code only", "OpenCode only", "OpenAI Codex CLI only", "Copilot CLI + Claude Code", "All four (Copilot + Claude Code + OpenCode + Codex)"]`
 
 ## 1. Purpose
 - Q: "In one sentence, what does this project do?"
@@ -57,16 +57,48 @@ Use `ask_user` for **every** question. One question per call. Multiple-choice wh
 - Q: "How should I handle MCP server config writes when we get to the approval gate?"
 - Choices: `["Approve all at once after I show the config (Recommended)", "Approve selectively, per server", "Skip MCP entirely — recommend in plan only, write nothing"]`
 
-## 11. Git
+## 11. Security, Audit, Architecture Intake
+
+Use [security-audit-architecture](./security-audit-architecture.md). Ask only questions not answered by detection, one `ask_user` call at a time.
+
+### 11a. Data sensitivity
+- Q: "What is the highest sensitivity of data this project handles?"
+- Choices: `["Public only", "Internal business data", "User personal data / PII", "Payment / financial data", "Health / regulated data", "Secrets or credentials"]`
+
+### 11b. Auth boundary
+- Q: "How is access controlled?"
+- Choices: `["No auth", "User login", "Service-to-service auth", "OAuth/OIDC", "API keys", "Unsure"]`
+
+### 11c. External tools / MCP
+- Q: "Will agents call external systems or MCP servers?"
+- Choices: `["No external tools", "Approved internal tools only", "Public APIs", "MCP servers", "Unsure"]`
+
+### 11d. Audit evidence
+- Q: "What audit evidence should agents preserve?"
+- Choices: `["Diff summary only", "Test/build evidence", "Security findings", "Decision records / ADRs", "Compliance evidence", "Unsure"]`
+
+### 11e. Architecture style
+- Q: "What architecture style should the agents preserve or move toward?"
+- Choices: `["Layered", "Clean/Hexagonal", "Event-driven", "Microservices", "Modular monolith", "Serverless", "CLI/library", "Unsure"]`
+
+### 11f. Critical qualities
+- Q: "Which quality attributes matter most?"
+- Choices: `["Security", "Reliability", "Maintainability", "Performance", "Cost", "Accessibility", "Compliance"]`
+
+### 11g. Design anti-patterns
+- Q: "Any architecture or design anti-patterns to avoid?"
+- Freeform. Allow blank.
+
+## 12. Git
 - Only if no `.git/` present.
 - Q: "No git repo detected. Run `git init` + `.gitignore` + initial commit?"
 - Choices: `["Yes (Recommended)", "No, leave git untouched"]`
 
-## 12. Plan Approval (after Phase 2)
+## 13. Plan Approval (after Phase 2)
 - Q: "Here is the plan: <render>. Proceed?"
 - Choices: `["Yes, proceed", "Edit plan first"]`
 
-## 13. Per-Capability Recommendation Choice (Phase 3, looped)
+## 14. Per-Capability Recommendation Choice (Phase 3, looped)
 - One call per capability the user named in Q10.
 - Q: "For capability **<x>**, which would you like?"
 - Choices built dynamically: `["<candidate 1 — name + tier>", "<candidate 2>", "<candidate 3>", "Show more (Tier-3 fallback)", "None — skip this capability"]`

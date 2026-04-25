@@ -12,7 +12,7 @@
 - **Frameworks:** {{FRAMEWORKS}}
 - **Tests:** {{TEST_FRAMEWORK}}
 - **Deployment:** {{DEPLOYMENT}}
-- **Target platforms:** {{TARGET_PLATFORMS}}  <!-- e.g., copilot-cli, claude-code, opencode -->
+- **Target platforms:** {{TARGET_PLATFORMS}}  <!-- e.g., copilot-cli, claude-code, opencode, codex-cli -->
 
 ## How Agents Should Work Here
 
@@ -25,6 +25,7 @@ This repo uses an **orchestrator + subagent** model. The orchestrator (`@orchest
 4. **Run the project's own checks** before declaring done: `{{BUILD_CMD}}`, `{{TEST_CMD}}`, `{{LINT_CMD}}`.
 5. **Non-destructive edits** to managed files. Touch only what the task requires.
 6. **No secrets in code.** Use the configured secret store / env vars only.
+7. **Security and architecture are first-class.** Before risky writes, check the Security & Audit Matrix, Threat Model, Architecture Decisions, and Quality Gates below.
 
 ## Directory Architecture
 
@@ -55,6 +56,36 @@ Legend: ✅ primary owner · 🟡 assists · *(blank)* not involved.
 | Capability ↓ / Agent → | {{AGENT_HEADER_ROW}} |
 |---|{{AGENT_HEADER_SEP}}|
 {{CAPABILITY_MATRIX_ROWS}}
+
+## Security & Audit Matrix
+
+| Risk / control | Owner agent | Applies to paths | Evidence required | Source |
+|---|---|---|---|---|
+{{SECURITY_AUDIT_MATRIX_ROWS}}
+
+## Threat Model
+
+| Asset | Trust boundary | Threat | Mitigation | Owner | Status |
+|---|---|---|---|---|---|
+{{THREAT_MODEL_ROWS}}
+
+## Architecture & Design Pattern Decisions
+
+| Decision | Selected pattern | Alternatives considered | Why | Risks / guardrails | ADR |
+|---|---|---|---|---|---|
+{{ARCHITECTURE_DECISION_ROWS}}
+
+## ADR Index
+
+| ADR | Decision | Owner | Status |
+|---|---|---|---|
+{{ADR_INDEX_ROWS}}
+
+## Quality Gates
+
+| Gate | Command or evidence | Owner | Required before done |
+|---|---|---|---|
+{{QUALITY_GATE_ROWS}}
 
 ## Skills
 

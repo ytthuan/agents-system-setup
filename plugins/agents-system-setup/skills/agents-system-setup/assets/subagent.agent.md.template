@@ -20,6 +20,23 @@ description: 'Use when {{TRIGGER_PHRASES}}. {{ONE_LINE_RESPONSIBILITY}}.'
 
 > Before any edit, re-read `AGENTS.md` › **Directory Architecture**. If a task requires touching a path I don't own, return control to `@orchestrator` for delegation.
 
+## Security & Audit Boundaries
+
+- **Sensitive paths:** {{SENSITIVE_PATHS}}
+- **Forbidden actions:** {{FORBIDDEN_ACTIONS}}
+- **Approval required before:** {{APPROVAL_REQUIRED_FOR}}
+- **Evidence I must return:** {{AUDIT_EVIDENCE}}
+
+Before touching auth, secrets, MCP/tool config, dependency manifests, CI/release config, generated scripts, or deployment settings, re-read `AGENTS.md` › **Security & Audit Matrix** and **Threat Model**. If the task exceeds my boundary, return control to `@orchestrator`.
+
+## Architecture & Design Expectations
+
+- **Relevant decisions / ADRs:** {{RELEVANT_ADRS}}
+- **Patterns to preserve:** {{PATTERNS_TO_PRESERVE}}
+- **Anti-patterns to avoid:** {{ANTI_PATTERNS_TO_AVOID}}
+
+If implementation would change a public API, module boundary, data model, service boundary, persistence model, or deployment topology, ask `@orchestrator` to route through the architecture owner before editing.
+
 ## When the orchestrator delegates to me
 - {{TRIGGER_1}}
 - {{TRIGGER_2}}
@@ -32,6 +49,8 @@ description: 'Use when {{TRIGGER_PHRASES}}. {{ONE_LINE_RESPONSIBILITY}}.'
 
 ## Outputs
 - {{OUTPUT_DESCRIPTION}}
+- Security/audit evidence: {{AUDIT_OUTPUT_DESCRIPTION}}
+- Architecture/design notes: {{ARCHITECTURE_OUTPUT_DESCRIPTION}}
 
 ## Out of scope
 - {{OUT_OF_SCOPE_1}}

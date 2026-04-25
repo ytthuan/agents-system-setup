@@ -14,8 +14,23 @@ description = "{{DESCRIPTION}}"
 # sandbox_mode = "{{SANDBOX_MODE}}"                  # read-only | workspace-write
 # nickname_candidates = ["Atlas", "Delta", "Echo"]
 
+# developer_instructions MUST include: Directory Boundaries, Security & Audit
+# Boundaries, Architecture & Design Expectations, Quality Gates, and required
+# audit evidence. Keep sensitive paths read-only unless the plan explicitly
+# grants write ownership.
 developer_instructions = """
 {{DEVELOPER_INSTRUCTIONS}}
+
+Security & Audit Boundaries:
+- Sensitive paths: {{SENSITIVE_PATHS}}
+- Forbidden actions: {{FORBIDDEN_ACTIONS}}
+- Approval required before: {{APPROVAL_REQUIRED_FOR}}
+- Evidence to return: {{AUDIT_EVIDENCE}}
+
+Architecture & Design Expectations:
+- Relevant decisions / ADRs: {{RELEVANT_ADRS}}
+- Patterns to preserve: {{PATTERNS_TO_PRESERVE}}
+- Anti-patterns to avoid: {{ANTI_PATTERNS_TO_AVOID}}
 """
 
 # Optional per-agent MCP server allowlist (also reads repo-root .mcp.json).

@@ -33,6 +33,15 @@ permission:                           # OpenCode-style; degrades on others
 scope: project | user | session
 owns_paths: ["src/auth/**", ...]      # from AGENTS.md Directory Architecture
 trigger_keywords: [auth, login, ...]  # parsed from description
+security_controls:                   # governance baseline; see security-audit-architecture.md
+  - { control: "secrets handling", source: "GitHub Code Security", evidence: "secret scan" }
+audit_requirements:
+  - "return build/test/security evidence before done"
+architecture_decisions:
+  - { decision: "API boundary", pattern: "ports-and-adapters", adr: "ADR-0001" }
+quality_gates:
+  - { gate: "tests", evidence: "npm test", required: true }
+sensitive_paths: [".env*", ".mcp.json", ".github/workflows/**"]
 ```
 
 ### 1b. SkillIR
@@ -73,6 +82,7 @@ enabled: true
 | `scope: user` | `~/.copilot/agents/` | `~/.claude/agents/` | `~/.config/opencode/agents/` | `~/.codex/agents/<name>.toml` |
 | `scope: project` | `.github/agents/<name>.agent.md` | `.claude/agents/<name>.md` | `.opencode/agents/<name>.md` | `.codex/agents/<name>.toml` (orchestrator stays in `AGENTS.md`) |
 | `nicknames` | n/a — drop ❌ | n/a — drop ❌ | n/a — drop ❌ | TOML `nickname_candidates = ["Atlas", "Delta"]` ✅ (Codex-only IR field) |
+| `security_controls`, `audit_requirements`, `architecture_decisions`, `quality_gates`, `sensitive_paths` | body + `AGENTS.md` managed governance sections ✅ | body + `AGENTS.md` / `CLAUDE.md` memory ✅ | body + `AGENTS.md` / `opencode.json` notes ✅ | TOML `developer_instructions` + `AGENTS.md` managed governance sections ✅ |
 
 ### Tool-name canonicalization
 
@@ -117,7 +127,8 @@ Triggered when the user picks **mode: `replicate`** in Phase 1, or when Phase 1 
                         `{"ts":"<ISO8601>","source":"<runtime>","targets":["..."],
                          "files":[{"path":"...","sha256":"..."}]}`
 9. VERIFY round-trip  → re-parse the emitted files back to IR; assert structural
-                        equality on (name, description, tools-canonical, mcp_refs).
+                        equality on (name, description, tools-canonical, mcp_refs,
+                        governance metadata that the target can represent).
                         Surface any drift.
 ```
 
@@ -129,10 +140,15 @@ Different from `update` (which re-runs the generator) and `replicate` (which cop
 1. DETECT current footprint (which runtimes; which artifacts present).
 2. AUDIT each artifact against per-platform schema (frontmatter validity,
    description quality, tool minimization, `name`↔filename match, MCP gate
-   compliance, Directory Architecture coverage).
-3. SCORE: assign each artifact one of {ok, warn, fail} with reasons.
+   compliance, Directory Architecture coverage) and the governance baseline:
+   Security & Audit Matrix, Threat Model, Architecture / Design Pattern Matrix,
+   ADR plan, Quality Gates, least-privilege tool boundaries, secrets handling,
+   dependency/supply-chain provenance, and source-backed recommendations.
+3. SCORE: assign each artifact and governance category one of
+   {ok, warn, fail, requires-human} with reasons.
 4. PROPOSE deltas as a checklist. For each item show: file, issue, suggested
-   fix, blast radius. ask_user multi-select which to apply.
+   fix, blast radius, source reference, and evidence required. ask_user
+   multi-select which to apply.
 5. APPLY only the approved deltas, with .bak backups (Phase 5 mechanics).
 6. SUMMARY: applied / skipped / requires-human counts.
 ```
@@ -142,6 +158,10 @@ Common improve targets:
 - `tools:` omitted on a read-only agent → restrict to read+grep+glob.
 - MCP server in `.mcp.json` not referenced by any agent → flag for removal.
 - `AGENTS.md` missing Directory Architecture or Capability Matrix → regenerate sections inside managed block.
+- `AGENTS.md` missing Security & Audit Matrix, Threat Model, Architecture / Design Pattern Matrix, ADR Index, or Quality Gates → regenerate sections inside managed block.
+- Agent can write secrets/MCP/CI/release/dependency paths without a security owner → downgrade tools or require orchestrator/security review.
+- Plugin/MCP/skill recommendation has no source URL or untrusted source → remove or replace with a tiered marketplace candidate.
+- Design-pattern guidance is absent or contradictory → add architecture reviewer delta and ADR plan.
 - New marketplace plugin/skill exists for an installed capability (compare against [marketplaces.md](./marketplaces.md)) — surface as opt-in upgrade.
 
 ## 5. Anti-patterns
@@ -152,6 +172,7 @@ Common improve targets:
 - **Replicating without MCP gate.** Replication must re-trigger the MCP approval gate for any new target.
 - **Skipping the round-trip verify.** A successful emit isn't success — re-parse and diff IR.
 - **Markdown-format replication ledger inside an agents/ directory.** A `.md` file named like `agent-replication.md` placed in `.claude/agents/`, `.codex/agents/`, `.opencode/agents/`, or `.github/agents/` will be parsed as a malformed agent by the runtime and either silently ignored *or* corrupt the agent list. Always write the ledger as `.agents-system-setup/replication.jsonl` (JSON Lines, never `.md`, never inside an agents tree). Same rule applies to any other operational log this skill writes.
+- **Dropping governance metadata silently.** Security controls, audit requirements, architecture decisions, quality gates, and sensitive paths must either round-trip or appear in the lossiness report.
 
 ## 6. References
 
@@ -160,3 +181,4 @@ Common improve targets:
 - OpenCode agents: https://opencode.ai/docs/agents/
 - OpenAI Codex CLI subagents spec: https://developers.openai.com/codex/subagents
 - OpenAI Codex (general) AGENTS.md spec: https://agents.md and https://github.com/openai/codex
+- Security / audit / architecture baseline: ./security-audit-architecture.md

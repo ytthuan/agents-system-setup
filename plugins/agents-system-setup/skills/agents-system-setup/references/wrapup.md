@@ -47,40 +47,68 @@ Every item below cites a vendor-official doc or a well-known curated catalog. Up
    - Source: <https://owasp.org/www-project-top-10-for-large-language-model-applications/>
    - Action: append a `## Security Review` checklist to `AGENTS.md` with the 10 categories and a column for "owner / status".
 8. **MCP server security guidance** — auth, transports, secrets.
-   - Source: <https://modelcontextprotocol.io/docs/concepts/architecture> and <https://modelcontextprotocol.io/specification/2025-06-18/basic/security>
+   - Source: <https://modelcontextprotocol.io/docs/concepts/architecture> and <https://modelcontextprotocol.io/specification/2025-06-18/basic/security_best_practices>
    - Action (only if any MCP server selected in Phase 3.5): annotate each entry in `.mcp.json` with the recommended auth/transport from the spec.
+9. **NIST SSDF mapping** — secure development practice checklist.
+   - Source: <https://csrc.nist.gov/Projects/ssdf>
+   - Action: add an SSDF crosswalk to `AGENTS.md` Quality Gates (PO/PS/PW/RV groups) with owner and evidence columns.
+10. **GitHub Code Security baseline** — secret scanning, code scanning, dependency review, Dependabot.
+   - Source: <https://docs.github.com/en/code-security>
+   - Action (GitHub repos): add a `## GitHub Code Security` checklist to `AGENTS.md`; optionally scaffold a CodeQL workflow only after explicit approval.
+11. **SLSA provenance review** — build/release supply-chain integrity.
+   - Source: <https://slsa.dev/spec/v1.1/>
+   - Action (release-producing projects): append SLSA provenance / artifact verification notes to Quality Gates.
+12. **OPA policy-as-code** — explicit, testable policy decisions.
+   - Source: <https://www.openpolicyagent.org/docs/latest/>
+   - Action (infra/platform/API gateway projects): add a policy-as-code section with candidate policy boundaries and test evidence.
+
+### Architecture & design patterns
+
+13. **C4 architecture views** — context/container/component views.
+    - Source: <https://c4model.com/>
+    - Action: add a C4 view plan to `AGENTS.md` Architecture section; scaffold docs only after approval.
+14. **ADR index** — architecture decisions with status.
+    - Source (pattern): C4 / architecture documentation conventions; enterprise option: <https://www.opengroup.org/togaf>
+    - Action: add `docs/adr/` plan and ADR index rows; create files only after approval.
+15. **Azure Well-Architected review** — cloud quality pillars.
+    - Source: <https://learn.microsoft.com/en-us/azure/well-architected/>
+    - Action (Azure/cloud target): add reliability/security/cost/operational/performance review gates.
 
 ### Additional well-known subagents
 
-9. **awesome-copilot agent gallery** — curated GitHub-Copilot-CLI agents.
-   - Source: <https://github.com/github/awesome-copilot> (subdir: `agents/`)
-   - Action (Copilot target): present a sub-menu of agents not yet installed; replicate selections through the Canonical IR.
-10. **wshobson/agents** — large multi-runtime subagent collection.
-    - Source: <https://github.com/wshobson/agents>
-    - Action: same flow as #9.
-11. **VoltAgent/awesome-claude-code-subagents** — curated Claude Code subagents.
-    - Source: <https://github.com/VoltAgent/awesome-claude-code-subagents>
-    - Action (Claude target): same flow as #9.
+16. **awesome-copilot agent gallery** — curated GitHub-Copilot-CLI agents.
+    - Source: <https://github.com/github/awesome-copilot> (subdir: `agents/`)
+    - Action (Copilot target): present a sub-menu of agents not yet installed; replicate selections through the Canonical IR.
+17. **wshobson/agents** — large multi-runtime subagent collection.
+     - Source: <https://github.com/wshobson/agents>
+     - Action: same flow as #9.
+18. **VoltAgent/awesome-claude-code-subagents** — curated Claude Code subagents.
+     - Source: <https://github.com/VoltAgent/awesome-claude-code-subagents>
+     - Action (Claude target): same flow as #9.
 
 ### Operations
 
-12. **Prompt versioning / changelog** — per-agent CHANGELOG for prompt drift.
-    - Source (pattern): Anthropic prompt-engineering docs <https://docs.claude.com/en/docs/build-with-claude/prompt-engineering/overview>; OpenAI prompt-engineering guide <https://platform.openai.com/docs/guides/prompt-engineering>.
-    - Action: scaffold `prompts/CHANGELOG.md` and a `prompts/` dir mirror of each agent's instructions.
-13. **Cost / usage budgeting** — per-provider usage caps.
-    - Source: Anthropic <https://docs.claude.com/en/api/admin-api/usage-cost/get-usage-report>; OpenAI <https://platform.openai.com/docs/guides/production-best-practices/managing-rate-limits>.
-    - Action: append a `## Budgets` section to `AGENTS.md` with target $/day per agent + alert hook.
+19. **Prompt versioning / changelog** — per-agent CHANGELOG for prompt drift.
+     - Source (pattern): Anthropic prompt-engineering docs <https://docs.claude.com/en/docs/build-with-claude/prompt-engineering/overview>; OpenAI prompt-engineering guide <https://platform.openai.com/docs/guides/prompt-engineering>.
+     - Action: scaffold `prompts/CHANGELOG.md` and a `prompts/` dir mirror of each agent's instructions.
+20. **Cost / usage budgeting** — per-provider usage caps.
+     - Source: Anthropic <https://docs.claude.com/en/api/admin-api/usage-cost/get-usage-report>; OpenAI <https://platform.openai.com/docs/guides/production-best-practices/managing-rate-limits>.
+     - Action: append a `## Budgets` section to `AGENTS.md` with target $/day per agent + alert hook.
 
 ## Filter matrix
 
 | Signal from earlier phases     | Items shown                              |
 |--------------------------------|------------------------------------------|
-| domain == software-dev         | 1, 2 (always also: 3–8, 12, 13)          |
-| domain != software-dev         | 3–8, 12, 13                              |
+| domain == software-dev         | 1, 2 (always also: 3–15, 19, 20)         |
+| domain != software-dev         | 3–8, 13, 14, 19, 20                      |
 | any MCP server selected        | 8 (always)                               |
-| Claude target included         | 6, 11                                    |
-| Copilot target included        | 9                                        |
-| Multi-runtime                  | 10                                       |
+| GitHub repo detected           | 10                                       |
+| release/package/CI detected    | 11                                       |
+| infra/platform/API gateway     | 12                                       |
+| cloud/Azure target             | 15                                       |
+| Claude target included         | 6, 18                                    |
+| Copilot target included        | 16                                       |
+| Multi-runtime                  | 17                                       |
 
 ## Output addendum
 

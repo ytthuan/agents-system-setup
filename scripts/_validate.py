@@ -9,6 +9,9 @@ Checks (per the CONTRIBUTING.md contract):
   4. Frontmatter `name` matches filename basename
   5. UTF-8-without-BOM encoding for every text file under git
   6. Internal markdown link resolution (./relative paths only)
+  7. Codex TOML subagents parse and include required fields
+  8. Replication ledger/logs do not live inside agents/ directories
+  9. Governance baseline references and templates are present
 
 Exits non-zero on any failure. Designed to be invoked from CI on
 Linux / macOS / Windows runners with only Python 3.10+ available
@@ -311,6 +314,102 @@ def check_replication_ledger() -> None:
             err(f"{rel}: replication artifact with `.md` extension inside an agents/ tree will be parsed as a malformed agent.")
 
 
+# ---------- 9: governance baseline ----------
+
+SKILL_ROOT = REPO / "plugins" / "agents-system-setup" / "skills" / "agents-system-setup"
+
+
+def require_contains(path: Path, needles: tuple[str, ...]) -> None:
+    rel = path.relative_to(REPO).as_posix()
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        err(f"{rel}: required governance file is missing")
+        return
+    except UnicodeDecodeError:
+        err(f"{rel}: not valid UTF-8")
+        return
+    for needle in needles:
+        if needle not in text:
+            err(f"{rel}: missing required governance marker `{needle}`")
+
+
+def check_governance_baseline() -> None:
+    """The skill must keep security, audit, architecture, and design-pattern
+    governance as first-class generated outputs, not optional wrap-up notes.
+    """
+    required_files = [
+        SKILL_ROOT / "references" / "security-audit-architecture.md",
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        SKILL_ROOT / "assets" / "orchestrator.agent.md.template",
+        SKILL_ROOT / "assets" / "subagent.agent.md.template",
+        SKILL_ROOT / "assets" / "subagent.codex.toml.template",
+    ]
+    for path in required_files:
+        if not path.is_file():
+            err(f"{path.relative_to(REPO).as_posix()}: required governance file is missing")
+
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "Phase 1.8 — Security, Audit, Architecture Intake",
+            "Security & Audit Matrix",
+            "Threat Model",
+            "Architecture & Design Pattern",
+            "Quality Gates",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "security-audit-architecture.md",
+        (
+            "OWASP GenAI",
+            "NIST SSDF",
+            "MCP Security Best Practices",
+            "SLSA",
+            "C4 Model",
+            "Quality Gates",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "## Security & Audit Matrix",
+            "## Threat Model",
+            "## Architecture & Design Pattern Decisions",
+            "## ADR Index",
+            "## Quality Gates",
+            "{{SECURITY_AUDIT_MATRIX_ROWS}}",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "orchestrator.agent.md.template",
+        (
+            "Security & Audit Matrix",
+            "Threat Model",
+            "Architecture & Design Pattern Decisions",
+            "security/audit evidence",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "subagent.agent.md.template",
+        (
+            "## Security & Audit Boundaries",
+            "## Architecture & Design Expectations",
+            "{{AUDIT_EVIDENCE}}",
+            "{{PATTERNS_TO_PRESERVE}}",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "subagent.codex.toml.template",
+        (
+            "Security & Audit Boundaries",
+            "Architecture & Design Expectations",
+            "{{AUDIT_EVIDENCE}}",
+            "{{PATTERNS_TO_PRESERVE}}",
+        ),
+    )
+
+
 # ---------- main ----------
 
 def main() -> int:
@@ -321,6 +420,7 @@ def main() -> int:
     check_internal_links()
     check_codex_toml_agents()
     check_replication_ledger()
+    check_governance_baseline()
 
     if WARNINGS:
         print("\nWARNINGS:")

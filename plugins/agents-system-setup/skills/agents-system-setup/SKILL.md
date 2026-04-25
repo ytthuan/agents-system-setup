@@ -1,12 +1,12 @@
 ---
 name: agents-system-setup
-description: 'Bootstrap, update, improve, or replicate a multi-agent system across GitHub Copilot CLI, Claude Code, OpenCode, and OpenAI Codex CLI. Generates AGENTS.md (Directory Architecture, Agent Roster, Capability Matrix), an orchestrator + N subagents, project-scoped skills, and opt-in plugin/MCP recommendations sourced from vendor-official catalogs. Detects existing systems on entry; bidirectional replication via a single Canonical IR (no pairwise rewrites). Cross-OS (Linux/macOS/Windows). Mandatory MCP approval gate. Recommends GitHub Spec-Kit for software-dev domains. USE FOR: "set up agents", "scaffold AGENTS.md", "init agents system", "improve my agents", "audit agent setup", "port agents from copilot to claude code", "replicate agents", "configure copilot/claude/opencode/codex for this repo", "discover plugins/MCP servers". DO NOT USE FOR: editing a single existing agent file, unrelated coding work, MCP server implementation.'
+description: 'Bootstrap, update, improve, or replicate a multi-agent system across GitHub Copilot CLI, Claude Code, OpenCode, and OpenAI Codex CLI. Generates AGENTS.md (Directory Architecture, Agent Roster, Capability Matrix, Security & Audit Matrix, Threat Model, Architecture/Design Decisions), an orchestrator + N subagents, project-scoped skills, and opt-in plugin/MCP recommendations sourced from vendor-official catalogs. Detects existing systems on entry; bidirectional replication via a single Canonical IR (no pairwise rewrites). Cross-OS (Linux/macOS/Windows). Mandatory MCP approval gate, security/audit baseline, and architecture/design-pattern rationale. Recommends GitHub Spec-Kit for software-dev domains. USE FOR: "set up agents", "scaffold AGENTS.md", "init agents system", "improve my agents", "audit agent setup", "architecture review", "security audit agents", "port agents from copilot to claude code", "replicate agents", "configure copilot/claude/opencode/codex for this repo", "discover plugins/MCP servers". DO NOT USE FOR: editing a single existing agent file, unrelated coding work, MCP server implementation.'
 argument-hint: '[init | update | improve | replicate] (omit to auto-detect)'
 ---
 
 # Setup Copilot Agents (multi-platform)
 
-Scaffold or update a complete agent system for the current project across **Copilot CLI**, **Claude Code**, and/or **OpenCode**. Produces a canonical `AGENTS.md` (with **Directory Architecture**, **Agent Roster**, **Capability Matrix**), an **orchestrator + N subagents**, project-scoped **skills**, and **approved** plugins/MCP servers — derived from a structured interview.
+Scaffold or update a complete agent system for the current project across **Copilot CLI**, **Claude Code**, **OpenCode**, and/or **OpenAI Codex CLI**. Produces a canonical `AGENTS.md` (with **Directory Architecture**, **Agent Roster**, **Capability Matrix**, **Security & Audit Matrix**, **Threat Model**, and **Architecture / Design Decisions**), an **orchestrator + N subagents**, project-scoped **skills**, and **approved** plugins/MCP servers — derived from a structured interview.
 
 ## When to Use
 
@@ -32,6 +32,9 @@ Scaffold or update a complete agent system for the current project across **Copi
 12. **Git is optional and gated by `ask_user`.**
 13. **Parallelism is mandatory where work is independent.** The generator computes parallel-safety from the Directory Architecture and emits a wave table; the orchestrator prompt always contains a fan-out clause. For Claude Code, also emit `AGENT-TEAMS.md` per [parallelism](./references/parallelism.md). Sequential-only topologies are an error.
 14. **If the project domain is software-development, recommend GitHub Spec-Kit.** After domain detection (Phase 1.7), if the brief matches a software-dev keyword set, present spec-kit as an opt-in companion via `ask_user`, never auto-install. See [spec-kit](./references/spec-kit.md).
+15. **Security, audit, architecture, and design-pattern governance are mandatory.** Every plan and generated `AGENTS.md` must include the baseline from [security-audit-architecture](./references/security-audit-architecture.md): Security & Audit Matrix, Threat Model, Architecture / Design Pattern Matrix, ADR plan, and Quality Gates. Small projects may merge roles, but not omit the concerns.
+16. **Security-sensitive writes require evidence.** MCP config, secrets-adjacent paths, CI/release config, and generated scripts must have an owner, approval state, and verification evidence in the output contract. No broad write permissions without rationale.
+17. **Improve mode is evidence-based.** Existing systems are scored for security boundaries, secrets, audit evidence, architecture ownership, design-pattern consistency, and supply-chain source trust before any delta is applied.
 
 ## Procedure
 
@@ -101,6 +104,23 @@ On approval, emit the runtime-matched command from [spec-kit](./references/spec-
 
 Record the choice in the plan so Phase 4 orchestrator output can reference the `/specify` workflow when appropriate.
 
+### Phase 1.8 — Security, Audit, Architecture Intake
+
+Run after domain detection and before Phase 2. Use [security-audit-architecture](./references/security-audit-architecture.md) as the source of truth.
+
+Ask only questions not already answered by detection:
+
+1. Data sensitivity.
+2. Auth boundary.
+3. External tools / MCP usage.
+4. Audit evidence expectations.
+5. Deployment / release risk.
+6. Architecture style.
+7. Critical quality attributes.
+8. Known design anti-patterns to avoid.
+
+Record the answers in the plan. If the user is unsure, choose safe defaults: least privilege, no silent MCP writes, no secrets in code, architecture decisions documented in `AGENTS.md`, and dedicated security/architecture ownership when the project handles sensitive data or external tools.
+
 ### Phase 2 — Plan (Directory Architecture, Roster, Matrix, Waves)
 
 Build the plan and show it before writing anything. The plan must include:
@@ -113,6 +133,11 @@ Build the plan and show it before writing anything. The plan must include:
 - Plugin/MCP candidates **per capability** (Phase 3 fills this).
 - Per-platform file plan (Copilot/Claude/OpenCode/Codex paths the user will actually get).
 - Git actions (if any).
+- **Security & Audit Matrix** — controls, owner agents, affected paths, evidence required, and source reference.
+- **Threat Model Summary** — assets, trust boundaries, threats, mitigations, owners, and status.
+- **Architecture & Design Pattern Matrix** — selected patterns, alternatives, rationale, risks/guardrails, and ADR refs.
+- **ADR plan** — decisions that should become docs if the user approves docs writes.
+- **Quality Gates** — build/test/lint/security/supply-chain/architecture evidence required before "done".
 
 End the phase with `ask_user`: `["Proceed", "Edit plan first"]`.
 
@@ -149,7 +174,7 @@ If any user-selected candidate from Phase 3 includes an MCP server:
 
 For each selected platform, look up paths and frontmatter in [platforms.md](./references/platforms.md), then render:
 
-- `AGENTS.md` at repo root → [template](./assets/AGENTS.md.template). Fill **Directory Architecture**, **Agent Roster**, **Capability Matrix**, **Skills**, **Plugins/MCP** tables.
+- `AGENTS.md` at repo root → [template](./assets/AGENTS.md.template). Fill **Directory Architecture**, **Agent Roster**, **Capability Matrix**, **Security & Audit Matrix**, **Threat Model**, **Architecture / Design Pattern Decisions**, **ADR Index**, **Quality Gates**, **Skills**, **Plugins/MCP** tables.
 - Orchestrator → [template](./assets/orchestrator.agent.md.template) at the platform's agents path.
 - Each subagent → [template](./assets/subagent.agent.md.template) at the platform's agents path. Fill `{{OWNED_PATHS}}` / `{{READONLY_PATHS}}` from the Directory Architecture.
   - **Codex CLI exception:** subagents are NOT rendered as `## <Name>` headings in `AGENTS.md`. Instead, emit one `.codex/agents/<kebab-name>.toml` per subagent with required fields `name`, `description`, `developer_instructions` (use TOML triple-quoted basic string). Carry the IR's `tool_allowlist` only if explicitly set (otherwise inherit from parent session). Map IR `model` → `model` and `model` reasoning hints → `model_reasoning_effort` (`low`|`medium`|`high`). Set `sandbox_mode = "read-only"` for read-only subagents. Per-agent MCP servers go under `[mcp_servers.<id>]` in the same file. `AGENTS.md` keeps only the orchestrator section + Directory Architecture / Capability Matrix / Waves. See [Codex layout](./references/platforms.md#openai-codex-cli--split-layout) and [openai docs](https://developers.openai.com/codex/subagents). Also emit/upsert `.codex/config.toml` with `[agents] max_threads = 6` and `max_depth = 1` unless the user supplied other values.
@@ -157,6 +182,7 @@ For each selected platform, look up paths and frontmatter in [platforms.md](./re
 - MCP config (only if Phase 3.5 approved) at the platform's MCP path.
 - Drop the [directory-architecture snippet](./assets/directory-architecture.snippet.md) into any agent missing the boundary block.
 - **Orchestrator parallelism clause** — render the wave-aware fan-out instructions per [parallelism](./references/parallelism.md). The orchestrator must invoke all parallel-safe subagents of a wave in a single response (multiple Task-tool calls), await all results, then start the next wave.
+- **Governance baseline** — render the security, audit, architecture, design-pattern, ADR, and quality-gate sections from Phase 1.8 / Phase 2. Subagents that touch sensitive paths, MCP/tool config, CI/release config, dependency manifests, or architecture boundaries must include explicit security boundaries and audit evidence expectations.
 - **Spec-Kit block** — if Phase 1.7 recorded `spec_kit_installed = true`, render `assets/spec-kit-block.snippet.md` into the `{{SPEC_KIT_BLOCK}}` placeholder of `AGENTS.md` (substituting `{{RUNTIME}}` per platform: `copilot|claude|codex|opencode`). If `false`, replace the placeholder with an empty string. See [spec-kit](./references/spec-kit.md).
 - **Claude Code AGENT-TEAMS.md** — when Claude Code is among the selected platforms AND the Agent Roster has 3+ subagents marked `team-suitable` (independent + benefits from peer challenge), emit `AGENT-TEAMS.md` documenting: opt-in env var (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), settings.json snippet, suggested teammate roster, token-cost warning, and when to fall back to parallel subagents.
 
@@ -205,8 +231,10 @@ Both forms initialize `main`, write a stack-aware `.gitignore` (covering `.githu
 1. List every file created/modified with absolute paths, grouped by platform.
 2. Re-read each generated agent/skill: confirm `name` matches filename, `description` present, no unquoted colons, frontmatter parses for the *target platform's* schema.
 3. Verify `AGENTS.md` contains non-empty **Directory Architecture**, **Agent Roster**, **Capability Matrix**.
-4. Print "Try it" examples per selected platform (`copilot`, `claude`, `opencode`).
-5. Suggest 2–3 next customizations.
+4. Verify `AGENTS.md` contains non-empty **Security & Audit Matrix**, **Threat Model**, **Architecture / Design Pattern Decisions**, **ADR Index**, and **Quality Gates**. If a concern is not applicable, it must still have an explicit `n/a` rationale.
+5. Verify security-sensitive files (`.mcp.json`, `opencode.json`, `.env*`, CI/release config, lockfiles, generated scripts) have an owner and evidence requirement in the governance sections.
+6. Print "Try it" examples per selected platform (`copilot`, `claude`, `opencode`).
+7. Suggest 2–3 next customizations.
 
 ### Phase 8 — Final Wrap-Up (single consolidated ask)
 
@@ -224,6 +252,7 @@ Skip the entire phase only when `mode == update` and no agents/plugins/MCP chang
 - **How many subagents?** [topology guide](./references/topology.md). One subagent per durable concern — also a path owner in the Directory Architecture.
 - **Skill vs Subagent?** Reusable workflow with assets → Skill. Context isolation / different tool restrictions → Subagent.
 - **Plugin vs MCP?** Plugins extend the runtime; MCP servers expose tools to agents. External-system integrations are usually MCP.
+- **Dedicated security/architecture agent or merged role?** Dedicated when the repo handles sensitive data, external tools/MCP, CI/release, regulated domains, monorepos, or user-requested architecture work. Merge into `@reviewer` only for small projects, and keep explicit ownership in the Security & Audit Matrix.
 - **Which platform?** Copilot CLI for GitHub-tight teams; Claude Code for Anthropic-first; OpenCode for vendor-neutral / self-hosted; Codex CLI for OpenAI-first (uses split layout: `AGENTS.md` for orchestrator + rules, `.codex/agents/*.toml` for specialized subagents). Multi-target if uncertain — files coexist cleanly via shared `AGENTS.md` + `.mcp.json`.
 - **`update` vs `improve` vs `replicate`?**
   - `update` regenerates managed blocks against the current plan (still asks before writing).
@@ -252,6 +281,9 @@ Skip the entire phase only when `mode == update` and no agents/plugins/MCP chang
 - **Wrap-up as per-item round-robin** — must be a *single* multi-select prompt.
 - **Citing unofficial sources in the wrap-up menu** — only vendor-official docs or the catalogs listed in [wrap-up](./references/wrapup.md).
 - **Replication ledger as `.md` or inside any `agents/` directory.** The replication ledger and any other operational log MUST be written to `.agents-system-setup/replication.jsonl` (JSON Lines). A `.md` log inside `.claude/agents/` / `.codex/agents/` / `.opencode/agents/` / `.github/agents/` will be parsed as a malformed agent by the runtime loader. See [replication anti-patterns](./references/replication.md#5-anti-patterns).
+- **Treating security or architecture as optional wrap-up only** — the governance baseline is part of planning and generation, not a postscript.
+- **Generating pattern names without rationale** — every architecture/design-pattern decision needs alternatives, guardrails, and an ADR reference or `n/a` rationale.
+- **Creating a security auditor with broad write access** — security review is read-mostly unless the plan grants tightly scoped remediation paths.
 
 ## Output Contract
 
@@ -266,6 +298,10 @@ Skip the entire phase only when `mode == update` and no agents/plugins/MCP chang
 ✅ Plugins selected: <list with [Tier · Vendor] and /plugin install (or platform-equivalent)>
 ✅ Plugins skipped: <list>
 ✅ MCP servers: <selected list> (approval: <approve-all | selective | skipped>)
+✅ Security & audit baseline: <present | n/a with rationale>
+✅ Threat model: <present | n/a with rationale>
+✅ Architecture decisions: <count + ADR refs, or n/a with rationale>
+✅ Quality gates: <build/test/lint/security/supply-chain/architecture evidence>
 ✅ Project memory link: <symlink | copy | n/a>
 ✅ Git: <initialized | left untouched | already present>
 ✅ Wrap-up add-ons selected: <list with source URL, or "none">
@@ -281,6 +317,8 @@ Skip the entire phase only when `mode == update` and no agents/plugins/MCP chang
 
 # improve mode adds:
 ✅ Audit findings: <ok / warn / fail counts>
+✅ Security findings: <ok / warn / fail / requires-human counts>
+✅ Architecture findings: <ok / warn / fail / requires-human counts>
 ✅ Deltas applied: <count>
 ✅ Deltas skipped: <count>
 ✅ Requires-human: <count>

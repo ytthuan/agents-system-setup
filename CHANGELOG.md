@@ -2,6 +2,34 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [0.5.0] - 2026-04-25
+
+### Added
+
+- **Mandatory security, audit, design-pattern, and architecture governance baseline.** Generated systems now plan and emit:
+  - Security & Audit Matrix
+  - Threat Model
+  - Architecture / Design Pattern Decisions
+  - ADR Index
+  - Quality Gates
+- New reference: `references/security-audit-architecture.md`, source-backed by OWASP GenAI Security, NIST SSDF, MCP Security Best Practices, GitHub Code Security, SLSA, Open Policy Agent, Azure Well-Architected Framework, C4 Model, and TOGAF (enterprise-only framing).
+- New Phase 1.8 in `SKILL.md`: Security, Audit, Architecture Intake.
+- New validator guardrail `check_governance_baseline` ensures required governance references and template sections cannot be removed accidentally.
+
+### Changed
+
+- `SKILL.md` hard rules, procedure, output contract, decision aids, and anti-patterns now treat governance as a first-class generation gate, not a final optional wrap-up.
+- `references/interview.md` adds focused questions for data sensitivity, auth boundary, external tools/MCP, audit evidence, architecture style, quality attributes, and design anti-patterns.
+- `references/topology.md` now models governance ownership: `security-auditor`, `architecture-reviewer`, `design-pattern-reviewer`, optional `threat-modeler` / `compliance-auditor`, and merged-role guidance for small projects.
+- `assets/AGENTS.md.template`, orchestrator, subagent, Codex TOML, and Directory Architecture snippets now include security boundaries, audit evidence, architecture decisions, ADRs, and quality gates.
+- `references/replication.md` Canonical IR now preserves governance metadata (`security_controls`, `audit_requirements`, `architecture_decisions`, `quality_gates`, `sensitive_paths`) or reports lossiness.
+- `references/marketplaces.md` and `references/wrapup.md` expanded with source-backed security/supply-chain/policy/architecture recommendations.
+- `README.md` and `DESIGN.md` updated for the governance baseline and current plugin sub-tree layout.
+
+### Fixed
+
+- Removed a stale untracked root `skills/` skeleton before validation; canonical skill payload remains under `plugins/agents-system-setup/skills/agents-system-setup/`.
+
 ## [0.4.1] - 2026-04-23
 
 ### Fixed

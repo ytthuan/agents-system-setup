@@ -24,6 +24,9 @@ A "marketplace" is a registry where plugins (which can bundle agents, skills, ho
 | `openai/codex` | <https://github.com/openai/codex> | OpenAI | Codex CLI core (~77k★); consumes `AGENTS.md` + `.codex/agents/*.toml` |
 | `openai/codex-plugin-cc` | <https://github.com/openai/codex-plugin-cc> | OpenAI | Use Codex from Claude Code (cross-runtime bridge, ~15k★) |
 | `modelcontextprotocol/servers` | <https://github.com/modelcontextprotocol/servers> | MCP project | Reference MCP servers (filesystem, github, git, fetch, …) |
+| GitHub Code Security docs | <https://docs.github.com/en/code-security> | GitHub | Source-of-truth for secret scanning, code scanning, dependency review, Dependabot, push protection |
+| OWASP GenAI Security | <https://owasp.org/www-project-top-10-for-large-language-model-applications/> | OWASP | Agentic AI / LLM threat categories and review checklist |
+| MCP Security Best Practices | <https://modelcontextprotocol.io/specification/2025-06-18/basic/security_best_practices> | MCP project | MCP authorization, confused deputy, token, and transport risk guidance |
 
 ## Tier 2 — High-signal community catalogs (cross-checked, current)
 
@@ -76,6 +79,19 @@ A "marketplace" is a registry where plugins (which can bundle agents, skills, ho
 | `kepano/obsidian-skills` | <https://github.com/kepano/obsidian-skills> | Obsidian (Markdown / Bases / Canvas) |
 | `microsoft/GitHub-Copilot-for-Azure` | <https://github.com/microsoft/GitHub-Copilot-for-Azure> | Azure (official) |
 
+### Security, audit, architecture, and policy references
+
+These are not all "plugins", but they are approved source material for the governance baseline and for recommending tools or checks.
+
+| Source | URL | Use |
+|---|---|---|
+| NIST SSDF SP 800-218 | <https://csrc.nist.gov/Projects/ssdf> | Secure development practice map (PO, PS, PW, RV) |
+| SLSA v1.1 | <https://slsa.dev/spec/v1.1/> | Build provenance and supply-chain integrity requirements |
+| Open Policy Agent | <https://www.openpolicyagent.org/docs/latest/> | Policy-as-code prior art for CI/CD, Kubernetes, API gateways, and config checks |
+| Azure Well-Architected Framework | <https://learn.microsoft.com/en-us/azure/well-architected/> | Cloud architecture quality pillars and review structure |
+| C4 Model | <https://c4model.com/> | Context/container/component architecture views |
+| TOGAF Standard | <https://www.opengroup.org/togaf> | Enterprise architecture framing for large organizations only |
+
 ## Tier 3 — Topic search (fallback only)
 
 When tiers 1–2 yield nothing for a capability:
@@ -88,6 +104,10 @@ github-search_repositories topic:claude-code-skills <capability>
 github-search_repositories topic:codex-skills <capability>
 github-search_repositories topic:opencode-skills <capability>
 github-search_repositories topic:agent-skills <capability>
+github-search_repositories topic:codeql <capability>
+github-search_repositories topic:openssf <capability>
+github-search_repositories topic:slsa <capability>
+github-search_repositories topic:opa <capability>
 github-search_repositories "<capability> mcp server" in:name,description
 ```
 
@@ -99,6 +119,9 @@ When recommending an item, always tag it with the source tier and vendor so prov
 [Tier 1 · Anthropic] anthropics/skills/<skill-name> — ...
 [Tier 1 · GitHub]    github/awesome-copilot/agents/<name> — ...
 [Tier 1 · OpenAI]    openai/skills/<skill-name> — ...
+[Tier 1 · OWASP]     OWASP GenAI Security / LLM Top 10 — ...
+[Tier 1 · GitHub]    GitHub Code Security — ...
+[Tier 1 · MCP]       MCP Security Best Practices — ...
 [Tier 2 · Community] hesreallyhim/awesome-claude-code → entry "<name>" — ...
 ```
 

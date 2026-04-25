@@ -18,6 +18,11 @@ This document explains **why** each phase and hard rule of `agents-system-setup`
 | 10. Per-platform paths and frontmatter | Copilot frontmatter in a Claude file is silently ignored | Agents that look installed but never trigger |
 | 11. Cross-OS aware | Plugin will be installed on Linux, macOS, Windows | `.sh` scripts on Windows, CRLF in bash files |
 | 12. Git is opt-in | Some users scaffold inside an existing repo; auto-initing would corrupt history | Detached HEAD, lost commits |
+| 13. Parallelism is mandatory where independent | Agent teams should use the user's available concurrency safely | Sequential bottlenecks and hidden shared-path conflicts |
+| 14. Spec-Kit recommendation for software projects | Spec-driven development is valuable but should remain opt-in | Silent tool installs or missed high-value workflow setup |
+| 15. Security/audit/architecture governance baseline | Agent systems can change code, config, tools, and release paths; ownership and evidence must be explicit | Unsafe MCP/tool writes, secrets leakage, unauditable changes, architecture drift |
+| 16. Security-sensitive writes require evidence | Risky changes need proof, not just a success-shaped summary | "Done" reports with no build/test/security/audit trail |
+| 17. Evidence-based improve mode | Audits should prioritize real findings with sources and severity | Cosmetic rewrites that miss security, architecture, or supply-chain risk |
 
 ## Phase-by-phase reasoning
 
@@ -39,7 +44,13 @@ This document explains **why** each phase and hard rule of `agents-system-setup`
 
 **Why score (ok/warn/fail) before proposing?** Without a numeric prior, every audit finding looks equally important. Scoring lets the user triage the checklist.
 
-### Phase 2 — Plan (Directory Architecture, Roster, Matrix)
+### Phase 1.8 — Security, Audit, Architecture Intake
+
+**Why before planning?** Security and architecture are not add-ons; they affect topology, tool permissions, MCP approval, owned paths, and verification. Asking after generation would produce the wrong agents.
+
+**Why source-backed?** OWASP GenAI, NIST SSDF, MCP Security Best Practices, GitHub Code Security, SLSA, OPA, Azure Well-Architected, C4, and TOGAF each cover different parts of the risk model. The skill uses them as references, not as automatic installs.
+
+### Phase 2 — Plan (Directory Architecture, Roster, Matrix, Governance)
 
 **Why a plan before any writes?** Generating files first and then asking for approval means rolling back filesystem changes on disagreement. The plan is the cheap cancellation point.
 
@@ -47,6 +58,10 @@ This document explains **why** each phase and hard rule of `agents-system-setup`
 - *Directory Architecture* — defines path ownership; the orchestrator's routing table.
 - *Agent Roster* — the discovery surface; what each agent does, in one row.
 - *Capability Matrix* — surfaces overlaps and gaps before they become bugs.
+- *Security & Audit Matrix* — assigns risky controls to owners with evidence.
+- *Threat Model* — records assets, trust boundaries, threats, and mitigations.
+- *Architecture / Design Pattern Matrix* — documents pattern decisions, alternatives, guardrails, and ADR refs.
+- *Quality Gates* — defines what proof is required before agents can claim completion.
 
 ### Phase 3 — Marketplace Lookup with per-item opt-in
 
@@ -86,6 +101,8 @@ This document explains **why** each phase and hard rule of `agents-system-setup`
 
 **Why "Try it" examples in the summary?** Reduces the activation cost from minutes to seconds.
 
+**Why verify governance sections?** Missing frontmatter breaks discovery, but missing security/architecture sections is just as harmful: agents may still run while ignoring the riskiest boundaries.
+
 ## Replication design — reasoning
 
 ### Why a Canonical IR
@@ -114,6 +131,9 @@ MCP approval is per-target, not global. Approving a server for Copilot CLI tells
 - **Backslash paths in Markdown** — render wrong on macOS/Linux, render right but break on Windows when copy-pasted.
 - **Skipping `.gitattributes`** — `.sh` files arrive with CRLF on Windows clones, fail with `bad interpreter`.
 - **Inventing plugin/MCP names** — exact opposite of provenance.
+- **Treating security/architecture as wrap-up only** — too late to affect topology, permissions, or quality gates.
+- **Security auditor with broad write access** — review roles should be read-mostly unless a scoped remediation is explicitly approved.
+- **Pattern names without rationale** — "use clean architecture" is not an architecture decision unless alternatives, risks, and boundaries are recorded.
 
 ## Open questions / future work
 
