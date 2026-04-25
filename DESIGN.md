@@ -23,6 +23,7 @@ This document explains **why** each phase and hard rule of `agents-system-setup`
 | 15. Security/audit/architecture governance baseline | Agent systems can change code, config, tools, and release paths; ownership and evidence must be explicit | Unsafe MCP/tool writes, secrets leakage, unauditable changes, architecture drift |
 | 16. Security-sensitive writes require evidence | Risky changes need proof, not just a success-shaped summary | "Done" reports with no build/test/security/audit trail |
 | 17. Evidence-based improve mode | Audits should prioritize real findings with sources and severity | Cosmetic rewrites that miss security, architecture, or supply-chain risk |
+| 18. Context budget is a feature | Generated agent systems become less useful when every file repeats every rule | Prompt bloat, missed routing facts, expensive/noisy subagent delegation |
 
 ## Phase-by-phase reasoning
 
@@ -50,6 +51,12 @@ This document explains **why** each phase and hard rule of `agents-system-setup`
 
 **Why source-backed?** OWASP GenAI, NIST SSDF, MCP Security Best Practices, GitHub Code Security, SLSA, OPA, Azure Well-Architected, C4, and TOGAF each cover different parts of the risk model. The skill uses them as references, not as automatic installs.
 
+### Phase 1.9 — Output Profile & Context Budget
+
+**Why ask this explicitly?** Some users want exhaustive onboarding docs; others want the shortest useful agent memory. The default `Balanced` profile keeps routing, ownership, security/audit, architecture, and quality gates inline while moving long rationale into references.
+
+**Why not use collapsible Markdown?** Models still receive the text. Real context optimization means shorter inline text plus explicit load-on-demand references.
+
 ### Phase 2 — Plan (Directory Architecture, Roster, Matrix, Governance)
 
 **Why a plan before any writes?** Generating files first and then asking for approval means rolling back filesystem changes on disagreement. The plan is the cheap cancellation point.
@@ -62,6 +69,7 @@ This document explains **why** each phase and hard rule of `agents-system-setup`
 - *Threat Model* — records assets, trust boundaries, threats, and mitigations.
 - *Architecture / Design Pattern Matrix* — documents pattern decisions, alternatives, guardrails, and ADR refs.
 - *Quality Gates* — defines what proof is required before agents can claim completion.
+- *Context Loading Policy* — tells agents what to read first and what to load only when needed.
 
 ### Phase 3 — Marketplace Lookup with per-item opt-in
 
@@ -103,6 +111,8 @@ This document explains **why** each phase and hard rule of `agents-system-setup`
 
 **Why verify governance sections?** Missing frontmatter breaks discovery, but missing security/architecture sections is just as harmful: agents may still run while ignoring the riskiest boundaries.
 
+**Why verify context policy?** A generated system can pass schema checks while still being too noisy to use. The verify pass confirms the output profile and overflow references are visible.
+
 ## Replication design — reasoning
 
 ### Why a Canonical IR
@@ -134,6 +144,7 @@ MCP approval is per-target, not global. Approving a server for Copilot CLI tells
 - **Treating security/architecture as wrap-up only** — too late to affect topology, permissions, or quality gates.
 - **Security auditor with broad write access** — review roles should be read-mostly unless a scoped remediation is explicitly approved.
 - **Pattern names without rationale** — "use clean architecture" is not an architecture decision unless alternatives, risks, and boundaries are recorded.
+- **Using verbosity as safety** — repeated long policy prose hides the actual routing and quality gates.
 
 ## Open questions / future work
 

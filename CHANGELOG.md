@@ -2,6 +2,30 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [0.6.0] - 2026-04-25
+
+### Added
+
+- **Context optimization baseline.** New `references/context-optimization.md` defines output profiles (`Balanced`, `Compact`, `Full`), generated-output hierarchy, context budgets, inline-vs-reference split, concise delegation packets, and anti-patterns.
+- New `assets/context-loading-policy.snippet.md` for consistent generated `AGENTS.md` context-loading guidance.
+- New `references/output-contract.md` moves the verbose completion contract out of always-loaded `SKILL.md`.
+- New Phase 1.9 in `SKILL.md`: Output Profile & Context Budget.
+- New validator pass `check_context_optimization` requires the context optimization reference, generated-template markers, load-order guidance, concise-output guidance, and warns if `SKILL.md` grows beyond the target size.
+
+### Changed
+
+- `SKILL.md` frontmatter description shortened and made trigger-focused; body reduced below the context-budget target by moving the full output contract to a reference.
+- Generated `AGENTS.md` template now includes **Read First**, **Context Loading Policy**, `{{CONTEXT_PROFILE}}`, `{{DETAIL_REFERENCES}}`, and overflow placeholders for large matrices.
+- Orchestrator template now includes context load order and concise delegation-packet format.
+- Subagent and Codex TOML templates now include load-order and concise output guidance without duplicating full project policy.
+- Interview flow now asks the user to choose `Balanced (Recommended)`, `Compact`, or `Full` detail.
+- Governance, replication, wrap-up, and plugin-discovery references now explicitly support compact inline summaries with linked overflow detail.
+- README and DESIGN updated to document compact-by-default generated output.
+
+### Fixed
+
+- Prevented the previous large Output Contract block from inflating always-loaded `SKILL.md` context.
+
 ## [0.5.0] - 2026-04-25
 
 ### Added

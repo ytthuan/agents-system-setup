@@ -6,6 +6,7 @@ Single consolidated prompt run **after** Phase 7 (Verify & Summarize) and **befo
 
 - **Trigger:** always run, unless `mode == update` and no new agents/plugins were added.
 - **Presentation:** single multi-select checklist via the runtime's ask-user tool.
+- **Context budget:** show only item name, source, and one-line action in the prompt. Keep extended rationale in this reference.
 - **Filtering:** filter the menu by signals from Phase 1.7 (domain) + Phase 3 (selected plugins) + Phase 3.5 (MCP). Never show an item the user already installed.
 - **Execution:** for each selected item, prefer dispatching to an existing dedicated skill. If none, run the inline action documented below.
 - **No silent installs.** Every item still carries its own confirmation if it writes files or edits config beyond `AGENTS.md` notes.
@@ -122,6 +123,7 @@ After the wrap-up menu runs, append to the Phase 7 Output Contract:
 ## Anti-patterns
 
 - Asking the wrap-up question one item at a time (must be a single multi-select).
+- Dumping the full catalog into the final response; show the filtered compact menu only.
 - Showing items already installed.
 - Auto-installing without per-item confirmation when the action edits config beyond `AGENTS.md`.
 - Citing unofficial third-party blog posts. Only vendor docs or the catalogs listed above.

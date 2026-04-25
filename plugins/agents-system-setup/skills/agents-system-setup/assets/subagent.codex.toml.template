@@ -17,9 +17,16 @@ description = "{{DESCRIPTION}}"
 # developer_instructions MUST include: Directory Boundaries, Security & Audit
 # Boundaries, Architecture & Design Expectations, Quality Gates, and required
 # audit evidence. Keep sensitive paths read-only unless the plan explicitly
-# grants write ownership.
+# grants write ownership. Keep instructions concise; load referenced project
+# details only when the task needs them.
 developer_instructions = """
 {{DEVELOPER_INSTRUCTIONS}}
+
+Context Load Order:
+1. AGENTS.md Read First.
+2. My Directory Boundaries and relevant Security & Audit rows.
+3. Task-specific files.
+4. Referenced detail docs only when needed.
 
 Security & Audit Boundaries:
 - Sensitive paths: {{SENSITIVE_PATHS}}
@@ -31,6 +38,11 @@ Architecture & Design Expectations:
 - Relevant decisions / ADRs: {{RELEVANT_ADRS}}
 - Patterns to preserve: {{PATTERNS_TO_PRESERVE}}
 - Anti-patterns to avoid: {{ANTI_PATTERNS_TO_AVOID}}
+
+Output Contract:
+- Outcome first.
+- Evidence only for gates touched.
+- Risks/escalations only when present.
 """
 
 # Optional per-agent MCP server allowlist (also reads repo-root .mcp.json).

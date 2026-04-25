@@ -12,6 +12,7 @@ Checks (per the CONTRIBUTING.md contract):
   7. Codex TOML subagents parse and include required fields
   8. Replication ledger/logs do not live inside agents/ directories
   9. Governance baseline references and templates are present
+ 10. Context optimization policy and generated-template markers are present
 
 Exits non-zero on any failure. Designed to be invoked from CI on
 Linux / macOS / Windows runners with only Python 3.10+ available
@@ -410,6 +411,78 @@ def check_governance_baseline() -> None:
     )
 
 
+# ---------- 10: context optimization ----------
+
+def check_context_optimization() -> None:
+    """The skill must stay compact-by-default and preserve progressive loading
+    markers in generated templates.
+    """
+    context_ref = SKILL_ROOT / "references" / "context-optimization.md"
+    if not context_ref.is_file():
+        err(f"{context_ref.relative_to(REPO).as_posix()}: required context optimization reference is missing")
+
+    require_contains(
+        SKILL_ROOT / "references" / "context-optimization.md",
+        (
+            "Balanced",
+            "Compact",
+            "Full",
+            "Context budgets",
+            "Concise delegation packets",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "Phase 1.9 — Output Profile & Context Budget",
+            "Context Loading Policy",
+            "Context profile",
+            "Context split",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "## Read First",
+            "## Context Loading Policy",
+            "{{CONTEXT_PROFILE}}",
+            "{{DETAIL_REFERENCES}}",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "orchestrator.agent.md.template",
+        (
+            "## Context Load Order",
+            "## Delegation Packet",
+            "concise delegation packet",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "subagent.agent.md.template",
+        (
+            "## Context Load Order",
+            "Keep the response concise",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "subagent.codex.toml.template",
+        (
+            "Context Load Order",
+            "Outcome first",
+        ),
+    )
+
+    skill_path = SKILL_ROOT / "SKILL.md"
+    try:
+        line_count = len(skill_path.read_text(encoding="utf-8").splitlines())
+    except OSError:
+        return
+    if line_count > 500:
+        err(f"{skill_path.relative_to(REPO).as_posix()}: SKILL.md exceeds hard 500-line limit ({line_count})")
+    elif line_count > 300:
+        warn(f"{skill_path.relative_to(REPO).as_posix()}: SKILL.md is {line_count} lines; target is about 250. Consider moving more detail to references.")
+
+
 # ---------- main ----------
 
 def main() -> int:
@@ -421,6 +494,7 @@ def main() -> int:
     check_codex_toml_agents()
     check_replication_ledger()
     check_governance_baseline()
+    check_context_optimization()
 
     if WARNINGS:
         print("\nWARNINGS:")

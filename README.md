@@ -7,17 +7,18 @@
 [![Cross-OS](https://img.shields.io/badge/cross--os-linux%20%7C%20macos%20%7C%20windows-blue)](.github/workflows/ci.yml)
 [![Runtimes](https://img.shields.io/badge/runtimes-Copilot%20CLI%20%7C%20Claude%20Code%20%7C%20Codex%20%7C%20OpenCode-purple)](#install--per-runtime)
 
-A multi-runtime plugin that **bootstraps**, **updates**, **improves**, or **replicates** a complete multi-agent system across **GitHub Copilot CLI**, **Claude Code**, **OpenCode**, and **OpenAI Codex CLI** — from a single skill, with a Canonical IR for bidirectional replication, parallel-aware orchestration, and mandatory security/audit/architecture governance baked in.
+A multi-runtime plugin that **bootstraps**, **updates**, **improves**, or **replicates** a complete multi-agent system across **GitHub Copilot CLI**, **Claude Code**, **OpenCode**, and **OpenAI Codex CLI** — from a single skill, with a Canonical IR for bidirectional replication, parallel-aware orchestration, mandatory security/audit/architecture governance, and compact-by-default context output baked in.
 
 ## What it generates
 
-- `AGENTS.md` at repo root with **Directory Architecture**, **Agent Roster (with parallel-safety waves)**, **Capability Matrix**, **Security & Audit Matrix**, **Threat Model**, **Architecture / Design Pattern Decisions**, **ADR Index**, and **Quality Gates**.
+- `AGENTS.md` at repo root with a **Read First** section, **Context Loading Policy**, **Directory Architecture**, **Agent Roster (with parallel-safety waves)**, **Capability Matrix**, **Security & Audit Matrix**, **Threat Model**, **Architecture / Design Pattern Decisions**, **ADR Index**, and **Quality Gates**.
 - **Orchestrator + N subagents** (3–50, sized to scope) emitted in the right format for every selected runtime, with a **fan-out clause** so parallel-safe subagents always run in one wave.
 - **`AGENT-TEAMS.md`** for Claude Code projects when the roster benefits from peer-to-peer teammates (3+ independent concerns).
 - Project-scoped **skills** under each runtime's conventional path.
 - **Curated plugin / MCP recommendations** from vendor-official catalogs, every recommendation tagged `[Tier · Vendor]` and **opt-in per item**.
 - **Mandatory MCP approval gate** — no MCP config is ever written without explicit user approval.
 - **Source-backed governance baseline** — OWASP GenAI, NIST SSDF, MCP Security Best Practices, GitHub Code Security, SLSA, OPA, Azure Well-Architected, C4, and TOGAF (enterprise only).
+- **Context-optimized output profiles** — `Balanced` by default, with `Compact` and `Full` options for generated files and summaries.
 - Cross-OS scripts (`.sh` + `.ps1`), `.gitattributes` for line-ending safety.
 
 ## Modes
@@ -106,6 +107,10 @@ Or be explicit:
 The generated orchestrator always fans out **parallel-safe subagents** in one wave (multiple `Task` calls in a single response), then awaits before the next wave. Parallel-safety is computed automatically from the Directory Architecture — see [parallelism reference](./plugins/agents-system-setup/skills/agents-system-setup/references/parallelism.md).
 
 For Claude Code, when 3+ subagents are independent and would benefit from peer-to-peer challenge, the generator additionally emits `AGENT-TEAMS.md` with the opt-in env var (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), settings snippet, suggested teammate roster, and a token-cost warning. Source: <https://docs.anthropic.com/en/docs/claude-code/agent-teams>.
+
+## Context optimization
+
+Generated output is **compact by default**. The skill asks for an output profile (`Balanced`, `Compact`, or `Full`) and records where long detail lives. `AGENTS.md` stays the routing and policy index; exhaustive marketplace research, long threat rationale, full ADR text, and platform schema detail are linked as references instead of repeated in every agent file.
 
 ## Why a plugin (not a bare skill)?
 

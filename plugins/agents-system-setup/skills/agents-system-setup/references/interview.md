@@ -89,6 +89,11 @@ Use [security-audit-architecture](./security-audit-architecture.md). Ask only qu
 - Q: "Any architecture or design anti-patterns to avoid?"
 - Freeform. Allow blank.
 
+### 11h. Output profile / context budget
+- Q: "How much detail should generated agent files include?"
+- Choices: `["Balanced (Recommended)", "Compact", "Full"]`
+- Record as `output_profile`. If the user is unsure, choose `Balanced`.
+
 ## 12. Git
 - Only if no `.git/` present.
 - Q: "No git repo detected. Run `git init` + `.gitignore` + initial commit?"

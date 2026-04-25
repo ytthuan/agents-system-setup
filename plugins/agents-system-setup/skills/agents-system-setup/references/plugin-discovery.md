@@ -10,6 +10,7 @@ Per-platform install commands: see [platforms.md](./platforms.md).
 3. **Mandatory rationale fields** for every candidate. Empty `why_recommended` or `tradeoffs` ⇒ drop the candidate.
 4. **Per-capability `ask_user`** — present at most 3 candidates with rationale and let the user pick or skip.
 5. **MCP candidates flow into the Phase 3.5 approval gate** — selection here is necessary but not sufficient.
+6. **Compact by default.** Render one-line `why` and `tradeoffs` in the prompt; move long README notes to an overflow reference or omit them.
 
 ## Candidate Schema (must populate every field)
 
@@ -121,6 +122,7 @@ Then ask:
 ## Anti-patterns
 
 - Recommending without `why_recommended` / `tradeoffs`.
+- Rendering full README summaries in the comparison table.
 - Auto-installing instead of presenting a choice.
 - Mixing platforms in a single proposed file (Copilot/Claude share `.mcp.json`; OpenCode is separate).
 - Forgetting that "skip this capability" is always a valid choice.

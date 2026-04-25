@@ -1,6 +1,6 @@
 {
   "name": "agents-system-setup",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Bootstrap, update, improve, or replicate multi-agent systems across Copilot CLI, Claude Code, OpenCode, and Codex CLI.",
   "skills": "./skills/"
 }

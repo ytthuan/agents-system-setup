@@ -11,6 +11,13 @@ description: 'Use when {{TRIGGER_PHRASES}}. {{ONE_LINE_RESPONSIBILITY}}.'
 ## Role
 {{ROLE_PARAGRAPH}}
 
+## Context Load Order
+
+1. `AGENTS.md` › Read First.
+2. My Directory Boundaries below.
+3. Only relevant Security & Audit / Architecture rows.
+4. Task-specific files.
+
 ## Directory Boundaries
 **Owned paths** (I am the sole writer):
 {{OWNED_PATHS}}
@@ -27,7 +34,7 @@ description: 'Use when {{TRIGGER_PHRASES}}. {{ONE_LINE_RESPONSIBILITY}}.'
 - **Approval required before:** {{APPROVAL_REQUIRED_FOR}}
 - **Evidence I must return:** {{AUDIT_EVIDENCE}}
 
-Before touching auth, secrets, MCP/tool config, dependency manifests, CI/release config, generated scripts, or deployment settings, re-read `AGENTS.md` › **Security & Audit Matrix** and **Threat Model**. If the task exceeds my boundary, return control to `@orchestrator`.
+Before touching auth, secrets, MCP/tool config, dependency manifests, CI/release config, generated scripts, or deployment settings, re-read only the relevant rows from `AGENTS.md` › **Security & Audit Matrix** and **Threat Model**. If the task exceeds my boundary, return control to `@orchestrator`.
 
 ## Architecture & Design Expectations
 
@@ -51,6 +58,7 @@ If implementation would change a public API, module boundary, data model, servic
 - {{OUTPUT_DESCRIPTION}}
 - Security/audit evidence: {{AUDIT_OUTPUT_DESCRIPTION}}
 - Architecture/design notes: {{ARCHITECTURE_OUTPUT_DESCRIPTION}}
+- Keep the response concise: outcome first, evidence only for gates I touched, risks/escalations only when present.
 
 ## Out of scope
 - {{OUT_OF_SCOPE_1}}

@@ -1,6 +1,6 @@
 ---
 name: agents-system-setup
-description: 'Bootstrap, update, improve, or replicate a multi-agent system across GitHub Copilot CLI, Claude Code, OpenCode, and OpenAI Codex CLI. Generates AGENTS.md (Directory Architecture, Agent Roster, Capability Matrix, Security & Audit Matrix, Threat Model, Architecture/Design Decisions), an orchestrator + N subagents, project-scoped skills, and opt-in plugin/MCP recommendations sourced from vendor-official catalogs. Detects existing systems on entry; bidirectional replication via a single Canonical IR (no pairwise rewrites). Cross-OS (Linux/macOS/Windows). Mandatory MCP approval gate, security/audit baseline, and architecture/design-pattern rationale. Recommends GitHub Spec-Kit for software-dev domains. USE FOR: "set up agents", "scaffold AGENTS.md", "init agents system", "improve my agents", "audit agent setup", "architecture review", "security audit agents", "port agents from copilot to claude code", "replicate agents", "configure copilot/claude/opencode/codex for this repo", "discover plugins/MCP servers". DO NOT USE FOR: editing a single existing agent file, unrelated coding work, MCP server implementation.'
+description: 'Bootstrap, improve, or replicate compact multi-agent systems across Copilot CLI, Claude Code, OpenCode, and Codex CLI. Generates AGENTS.md, orchestrator/subagents, skills, governance matrices, and opt-in plugin/MCP recommendations. Uses Canonical IR, MCP approval gates, platform-correct formats, and context-optimized output profiles. Triggers: "set up agents", "scaffold AGENTS.md", "improve my agents", "audit agent setup", "architecture review", "security audit agents", "replicate agents", "configure copilot/claude/opencode/codex", "discover plugins/MCP".'
 argument-hint: '[init | update | improve | replicate] (omit to auto-detect)'
 ---
 
@@ -35,6 +35,7 @@ Scaffold or update a complete agent system for the current project across **Copi
 15. **Security, audit, architecture, and design-pattern governance are mandatory.** Every plan and generated `AGENTS.md` must include the baseline from [security-audit-architecture](./references/security-audit-architecture.md): Security & Audit Matrix, Threat Model, Architecture / Design Pattern Matrix, ADR plan, and Quality Gates. Small projects may merge roles, but not omit the concerns.
 16. **Security-sensitive writes require evidence.** MCP config, secrets-adjacent paths, CI/release config, and generated scripts must have an owner, approval state, and verification evidence in the output contract. No broad write permissions without rationale.
 17. **Improve mode is evidence-based.** Existing systems are scored for security boundaries, secrets, audit evidence, architecture ownership, design-pattern consistency, and supply-chain source trust before any delta is applied.
+18. **Context budget is a feature.** Default to the `Balanced` output profile from [context optimization](./references/context-optimization.md): keep routing and gates inline, move deep detail behind explicit references, and never duplicate long policy prose in every agent.
 
 ## Procedure
 
@@ -121,6 +122,24 @@ Ask only questions not already answered by detection:
 
 Record the answers in the plan. If the user is unsure, choose safe defaults: least privilege, no silent MCP writes, no secrets in code, architecture decisions documented in `AGENTS.md`, and dedicated security/architecture ownership when the project handles sensitive data or external tools.
 
+### Phase 1.9 — Output Profile & Context Budget
+
+Run after Phase 1.8 and before Phase 2. Use [context optimization](./references/context-optimization.md).
+
+Ask once:
+
+> "How much detail should generated agent files include?"
+> Choices: `["Balanced (Recommended)", "Compact", "Full"]`
+
+Record:
+
+- `output_profile`: `balanced | compact | full`
+- `inline_sections`: which sections stay in `AGENTS.md`
+- `overflow_targets`: where long details should be written or proposed (for example `docs/agents/security-audit.md`)
+- `context_budget_notes`: any user constraints on verbosity
+
+If the user is unsure, choose `Balanced`. This keeps all routing, ownership, governance, and quality gates inline while moving long rationale and overflow candidate lists to references.
+
 ### Phase 2 — Plan (Directory Architecture, Roster, Matrix, Waves)
 
 Build the plan and show it before writing anything. The plan must include:
@@ -133,6 +152,7 @@ Build the plan and show it before writing anything. The plan must include:
 - Plugin/MCP candidates **per capability** (Phase 3 fills this).
 - Per-platform file plan (Copilot/Claude/OpenCode/Codex paths the user will actually get).
 - Git actions (if any).
+- **Output profile & context budget** — `balanced|compact|full`, sections kept inline, overflow targets, and biggest expected agent-memory file.
 - **Security & Audit Matrix** — controls, owner agents, affected paths, evidence required, and source reference.
 - **Threat Model Summary** — assets, trust boundaries, threats, mitigations, owners, and status.
 - **Architecture & Design Pattern Matrix** — selected patterns, alternatives, rationale, risks/guardrails, and ADR refs.
@@ -174,7 +194,7 @@ If any user-selected candidate from Phase 3 includes an MCP server:
 
 For each selected platform, look up paths and frontmatter in [platforms.md](./references/platforms.md), then render:
 
-- `AGENTS.md` at repo root → [template](./assets/AGENTS.md.template). Fill **Directory Architecture**, **Agent Roster**, **Capability Matrix**, **Security & Audit Matrix**, **Threat Model**, **Architecture / Design Pattern Decisions**, **ADR Index**, **Quality Gates**, **Skills**, **Plugins/MCP** tables.
+- `AGENTS.md` at repo root → [template](./assets/AGENTS.md.template). Fill **Read First**, **Context Loading Policy**, **Directory Architecture**, **Agent Roster**, **Capability Matrix**, **Security & Audit Matrix**, **Threat Model**, **Architecture / Design Pattern Decisions**, **ADR Index**, **Quality Gates**, **Skills**, **Plugins/MCP** tables. Use the selected output profile from Phase 1.9; summarize long sections and link overflow details instead of dumping exhaustive prose inline.
 - Orchestrator → [template](./assets/orchestrator.agent.md.template) at the platform's agents path.
 - Each subagent → [template](./assets/subagent.agent.md.template) at the platform's agents path. Fill `{{OWNED_PATHS}}` / `{{READONLY_PATHS}}` from the Directory Architecture.
   - **Codex CLI exception:** subagents are NOT rendered as `## <Name>` headings in `AGENTS.md`. Instead, emit one `.codex/agents/<kebab-name>.toml` per subagent with required fields `name`, `description`, `developer_instructions` (use TOML triple-quoted basic string). Carry the IR's `tool_allowlist` only if explicitly set (otherwise inherit from parent session). Map IR `model` → `model` and `model` reasoning hints → `model_reasoning_effort` (`low`|`medium`|`high`). Set `sandbox_mode = "read-only"` for read-only subagents. Per-agent MCP servers go under `[mcp_servers.<id>]` in the same file. `AGENTS.md` keeps only the orchestrator section + Directory Architecture / Capability Matrix / Waves. See [Codex layout](./references/platforms.md#openai-codex-cli--split-layout) and [openai docs](https://developers.openai.com/codex/subagents). Also emit/upsert `.codex/config.toml` with `[agents] max_threads = 6` and `max_depth = 1` unless the user supplied other values.
@@ -183,6 +203,7 @@ For each selected platform, look up paths and frontmatter in [platforms.md](./re
 - Drop the [directory-architecture snippet](./assets/directory-architecture.snippet.md) into any agent missing the boundary block.
 - **Orchestrator parallelism clause** — render the wave-aware fan-out instructions per [parallelism](./references/parallelism.md). The orchestrator must invoke all parallel-safe subagents of a wave in a single response (multiple Task-tool calls), await all results, then start the next wave.
 - **Governance baseline** — render the security, audit, architecture, design-pattern, ADR, and quality-gate sections from Phase 1.8 / Phase 2. Subagents that touch sensitive paths, MCP/tool config, CI/release config, dependency manifests, or architecture boundaries must include explicit security boundaries and audit evidence expectations.
+- **Context optimization** — apply [context optimization](./references/context-optimization.md): compact inline summaries, links for overflow details, concise delegation packets, and no duplicated long policy prose across subagents.
 - **Spec-Kit block** — if Phase 1.7 recorded `spec_kit_installed = true`, render `assets/spec-kit-block.snippet.md` into the `{{SPEC_KIT_BLOCK}}` placeholder of `AGENTS.md` (substituting `{{RUNTIME}}` per platform: `copilot|claude|codex|opencode`). If `false`, replace the placeholder with an empty string. See [spec-kit](./references/spec-kit.md).
 - **Claude Code AGENT-TEAMS.md** — when Claude Code is among the selected platforms AND the Agent Roster has 3+ subagents marked `team-suitable` (independent + benefits from peer challenge), emit `AGENT-TEAMS.md` documenting: opt-in env var (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), settings.json snippet, suggested teammate roster, token-cost warning, and when to fall back to parallel subagents.
 
@@ -210,21 +231,7 @@ For every existing target file:
 
 ### Phase 6 — Optional Git Init
 
-Only if user confirmed in Phase 1 AND no `.git/` exists. Pick the script that matches the host OS — see [cross-platform](./references/cross-platform.md):
-
-```bash
-# macOS / Linux / Git Bash / WSL
-bash ./scripts/git-init.sh
-```
-
-```powershell
-# Windows native PowerShell (PowerShell 7+ recommended)
-pwsh -File ./scripts/git-init.ps1
-# or, on stock Windows PowerShell 5.1:
-powershell.exe -ExecutionPolicy Bypass -File ./scripts/git-init.ps1
-```
-
-Both forms initialize `main`, write a stack-aware `.gitignore` (covering `.github/`, `.claude/`, `.opencode/` local state, `.DS_Store`, `Thumbs.db`, `desktop.ini`), drop a `.gitattributes` for line endings, stage, and commit.
+Only if user confirmed in Phase 1 AND no `.git/` exists. Pick the script that matches the host OS — see [cross-platform](./references/cross-platform.md). The bundled scripts initialize `main`, write `.gitignore` and `.gitattributes`, stage, and commit.
 
 ### Phase 7 — Verify & Summarize
 
@@ -233,17 +240,13 @@ Both forms initialize `main`, write a stack-aware `.gitignore` (covering `.githu
 3. Verify `AGENTS.md` contains non-empty **Directory Architecture**, **Agent Roster**, **Capability Matrix**.
 4. Verify `AGENTS.md` contains non-empty **Security & Audit Matrix**, **Threat Model**, **Architecture / Design Pattern Decisions**, **ADR Index**, and **Quality Gates**. If a concern is not applicable, it must still have an explicit `n/a` rationale.
 5. Verify security-sensitive files (`.mcp.json`, `opencode.json`, `.env*`, CI/release config, lockfiles, generated scripts) have an owner and evidence requirement in the governance sections.
-6. Print "Try it" examples per selected platform (`copilot`, `claude`, `opencode`).
-7. Suggest 2–3 next customizations.
+6. Verify `AGENTS.md` contains **Context Loading Policy** and records the selected output profile.
+7. Print "Try it" examples per selected platform (`copilot`, `claude`, `opencode`, `codex`).
+8. Suggest 2–3 next customizations.
 
 ### Phase 8 — Final Wrap-Up (single consolidated ask)
 
-Run after Phase 7, **before** exiting. One multi-select question presents a curated, source-cited menu of well-known add-ons (Spec-Kit, evals, OpenTelemetry GenAI, OWASP LLM Top-10, Claude Code hooks, prompt versioning, cost budgets, additional subagent catalogs). Filtered by signals from Phase 1.7 (domain), Phase 3 (plugins), Phase 3.5 (MCP), and selected target platforms — never show items already installed. Each selected item dispatches to a dedicated skill if available, else runs the inline action documented in [wrap-up](./references/wrapup.md).
-
-1. Build the candidate list per the filter matrix in [wrap-up](./references/wrapup.md#filter-matrix).
-2. Present a **single** multi-select via the runtime's ask-user tool (never per-item round-robin).
-3. For each selection: re-confirm only if the action edits config outside `AGENTS.md`; then execute.
-4. Append `✅ Wrap-up add-ons selected/skipped` lines to the Output Contract.
+Run after Phase 7, **before** exiting. Present one compact multi-select menu from [wrap-up](./references/wrapup.md), filtered by domain/plugins/MCP/platform signals. Never show installed items; never ask one item at a time. Re-confirm only if an action edits config outside `AGENTS.md`.
 
 Skip the entire phase only when `mode == update` and no agents/plugins/MCP changed.
 
@@ -253,6 +256,7 @@ Skip the entire phase only when `mode == update` and no agents/plugins/MCP chang
 - **Skill vs Subagent?** Reusable workflow with assets → Skill. Context isolation / different tool restrictions → Subagent.
 - **Plugin vs MCP?** Plugins extend the runtime; MCP servers expose tools to agents. External-system integrations are usually MCP.
 - **Dedicated security/architecture agent or merged role?** Dedicated when the repo handles sensitive data, external tools/MCP, CI/release, regulated domains, monorepos, or user-requested architecture work. Merge into `@reviewer` only for small projects, and keep explicit ownership in the Security & Audit Matrix.
+- **Compact vs balanced vs full output?** Balanced by default. Compact for experienced teams or small repos. Full only for onboarding, audit, or when the user explicitly asks for exhaustive detail. See [context optimization](./references/context-optimization.md).
 - **Which platform?** Copilot CLI for GitHub-tight teams; Claude Code for Anthropic-first; OpenCode for vendor-neutral / self-hosted; Codex CLI for OpenAI-first (uses split layout: `AGENTS.md` for orchestrator + rules, `.codex/agents/*.toml` for specialized subagents). Multi-target if uncertain — files coexist cleanly via shared `AGENTS.md` + `.mcp.json`.
 - **`update` vs `improve` vs `replicate`?**
   - `update` regenerates managed blocks against the current plan (still asks before writing).
@@ -284,52 +288,9 @@ Skip the entire phase only when `mode == update` and no agents/plugins/MCP chang
 - **Treating security or architecture as optional wrap-up only** — the governance baseline is part of planning and generation, not a postscript.
 - **Generating pattern names without rationale** — every architecture/design-pattern decision needs alternatives, guardrails, and an ADR reference or `n/a` rationale.
 - **Creating a security auditor with broad write access** — security review is read-mostly unless the plan grants tightly scoped remediation paths.
+- **Using verbosity as safety** — long repeated prompts do not make agents safer. Keep gates and ownership inline, link detail, and require evidence.
+- **Hiding overflow details** — any moved detail must be linked from `AGENTS.md` or listed in the output contract.
 
 ## Output Contract
 
-```
-✅ Mode: <init|update|improve|replicate>
-✅ Platforms: <copilot-cli, claude-code, opencode, codex-cli>
-✅ Detected footprint: <list of pre-existing artifacts, or "none">
-✅ Files created: <count>     (per platform: <breakdown>)
-✅ Files updated (with .bak): <count>
-✅ Subagents: <list>
-✅ Skills: <list>
-✅ Plugins selected: <list with [Tier · Vendor] and /plugin install (or platform-equivalent)>
-✅ Plugins skipped: <list>
-✅ MCP servers: <selected list> (approval: <approve-all | selective | skipped>)
-✅ Security & audit baseline: <present | n/a with rationale>
-✅ Threat model: <present | n/a with rationale>
-✅ Architecture decisions: <count + ADR refs, or n/a with rationale>
-✅ Quality gates: <build/test/lint/security/supply-chain/architecture evidence>
-✅ Project memory link: <symlink | copy | n/a>
-✅ Git: <initialized | left untouched | already present>
-✅ Wrap-up add-ons selected: <list with source URL, or "none">
-✅ Wrap-up add-ons skipped: <list, or "none">
-✅ Codex subagent files (if codex-cli target): <list of .codex/agents/*.toml, or "none">
-
-# replicate mode adds:
-✅ Source runtime: <copilot-cli | claude-code | opencode | codex-cli>
-✅ Target runtimes: <list>
-✅ Lossy field drops: <list per target>
-✅ Round-trip verify: <pass | drift on <fields>>
-✅ Replication ledger: <path>
-
-# improve mode adds:
-✅ Audit findings: <ok / warn / fail counts>
-✅ Security findings: <ok / warn / fail / requires-human counts>
-✅ Architecture findings: <ok / warn / fail / requires-human counts>
-✅ Deltas applied: <count>
-✅ Deltas skipped: <count>
-✅ Requires-human: <count>
-
-Try it:
-  copilot          # then: "@orchestrator <task>"
-  claude           # then: invoke a subagent
-  opencode         # then: pick an agent
-  codex            # then: /agent to switch threads; orchestrator + rules in AGENTS.md, subagents in .codex/agents/*.toml
-
-Suggested next customizations:
-  - <suggestion 1>
-  - <suggestion 2>
-```
+Use [output-contract](./references/output-contract.md). Always include `Context profile`, `Context split`, and largest memory file. For `Compact` and `Balanced`, lead with counts, changed paths, security/architecture evidence, and "Try it" commands; expand full lists only for failures, warnings, or explicit user requests.

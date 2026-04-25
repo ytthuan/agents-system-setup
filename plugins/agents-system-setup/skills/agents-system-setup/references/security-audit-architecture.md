@@ -2,6 +2,8 @@
 
 This reference is mandatory for `init`, `update`, `improve`, and `replicate` flows. The goal is not to make every project heavy-weight; it is to ensure every generated agent system has explicit ownership, boundaries, audit evidence, and architecture rationale.
 
+Use [context optimization](./context-optimization.md) when rendering this baseline. The sections below are mandatory as concerns, not always exhaustive inline tables. In `Balanced` and `Compact` profiles, keep the owner/control/gate summaries in `AGENTS.md` and move long rationale or full checklists to linked references.
+
 ## 1. Source-backed framework map
 
 Use these sources when generating recommendations. Do not cite unsourced blog posts or invented frameworks.
@@ -37,6 +39,8 @@ Ask only what is not already detectable. Use one `ask_user` call per question.
 ## 3. Required plan outputs
 
 Every plan must include these sections before file writes:
+
+For generated `AGENTS.md`, cap each table to the rows needed for safe routing and verification. If the source analysis has more detail, add an overflow link such as `docs/agents/security-audit.md`.
 
 ### Security & Audit Matrix
 
@@ -137,11 +141,12 @@ When parsing to Canonical IR, preserve governance fields when present:
 | `quality_gates[]` | Build/test/lint/security/architecture checks. |
 | `sensitive_paths[]` | Paths with stricter ownership or read-only requirements. |
 
-If a target runtime cannot represent a field directly, emit it into `AGENTS.md` managed sections and include the drop in the lossiness report.
+If a target runtime cannot represent a field directly, emit a compact summary into `AGENTS.md` managed sections, link overflow details when needed, and include any true drop in the lossiness report.
 
 ## 7. Anti-patterns
 
 - Treating security as a final optional wrap-up item only.
+- Treating compact output as permission to omit mandatory governance concerns.
 - Writing MCP config before the approval gate.
 - Creating "security-auditor" with broad write access by default.
 - Generating architecture diagrams or ADRs that are not tied to path ownership or agent responsibilities.

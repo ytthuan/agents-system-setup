@@ -8,6 +8,8 @@ This skill can replicate an agent system from one runtime to another (and back) 
 
 Every agent, skill, and MCP server is parsed into a single in-memory record. Every emitter renders from this — never from another platform's serialized form.
 
+For generated output, apply [context optimization](./context-optimization.md): preserve IR fidelity, but render compact governance summaries inline and link overflow details when the selected profile is `Balanced` or `Compact`.
+
 ### 1a. AgentIR
 ```yaml
 name: <kebab-case>                    # MUST equal filename basename
@@ -110,7 +112,8 @@ Triggered when the user picks **mode: `replicate`** in Phase 1, or when Phase 1 
 3. PARSE source files  → AgentIR / SkillIR / MCPServerIR records (in memory)
 4. NORMALIZE          → canonical tool names, expand `tools: omitted` to all-true
 5. LOSSINESS REPORT   → for each (target × IR field), flag: kept | mapped | dropped
-                        Render table; ask_user approval per dropped field.
+                        Render a compact table; ask_user approval per dropped field.
+                        Link overflow details if the table exceeds the chosen profile.
 6. MCP APPROVAL GATE  → re-run Phase 3.5 against any MCPServerIR that will be
                         emitted into a target the user hasn't approved before.
 7. EMIT per target    → write per-platform paths + frontmatter (platforms.md)
@@ -158,7 +161,7 @@ Common improve targets:
 - `tools:` omitted on a read-only agent → restrict to read+grep+glob.
 - MCP server in `.mcp.json` not referenced by any agent → flag for removal.
 - `AGENTS.md` missing Directory Architecture or Capability Matrix → regenerate sections inside managed block.
-- `AGENTS.md` missing Security & Audit Matrix, Threat Model, Architecture / Design Pattern Matrix, ADR Index, or Quality Gates → regenerate sections inside managed block.
+- `AGENTS.md` missing Context Loading Policy, Security & Audit Matrix, Threat Model, Architecture / Design Pattern Matrix, ADR Index, or Quality Gates → regenerate sections inside managed block.
 - Agent can write secrets/MCP/CI/release/dependency paths without a security owner → downgrade tools or require orchestrator/security review.
 - Plugin/MCP/skill recommendation has no source URL or untrusted source → remove or replace with a tiered marketplace candidate.
 - Design-pattern guidance is absent or contradictory → add architecture reviewer delta and ADR plan.
