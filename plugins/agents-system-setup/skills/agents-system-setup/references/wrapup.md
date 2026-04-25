@@ -53,14 +53,14 @@ Every item below cites a vendor-official doc or a well-known curated catalog. Up
    - Source: <https://csrc.nist.gov/Projects/ssdf>
    - Action: add an SSDF crosswalk to `AGENTS.md` Quality Gates (PO/PS/PW/RV groups) with owner and evidence columns.
 10. **GitHub Code Security baseline** — secret scanning, code scanning, dependency review, Dependabot.
-   - Source: <https://docs.github.com/en/code-security>
-   - Action (GitHub repos): add a `## GitHub Code Security` checklist to `AGENTS.md`; optionally scaffold a CodeQL workflow only after explicit approval.
+    - Source: <https://docs.github.com/en/code-security>
+    - Action (GitHub repos): add a `## GitHub Code Security` checklist to `AGENTS.md`; optionally scaffold a CodeQL workflow only after explicit approval.
 11. **SLSA provenance review** — build/release supply-chain integrity.
-   - Source: <https://slsa.dev/spec/v1.1/>
-   - Action (release-producing projects): append SLSA provenance / artifact verification notes to Quality Gates.
+    - Source: <https://slsa.dev/spec/v1.1/>
+    - Action (release-producing projects): append SLSA provenance / artifact verification notes to Quality Gates.
 12. **OPA policy-as-code** — explicit, testable policy decisions.
-   - Source: <https://www.openpolicyagent.org/docs/latest/>
-   - Action (infra/platform/API gateway projects): add a policy-as-code section with candidate policy boundaries and test evidence.
+    - Source: <https://www.openpolicyagent.org/docs/latest/>
+    - Action (infra/platform/API gateway projects): add a policy-as-code section with candidate policy boundaries and test evidence.
 
 ### Architecture & design patterns
 

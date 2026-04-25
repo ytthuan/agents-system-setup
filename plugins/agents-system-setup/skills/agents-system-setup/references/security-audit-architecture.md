@@ -54,7 +54,7 @@ Use this compact structure:
 
 | Asset | Trust boundary | Threat | Mitigation | Owner | Status |
 |---|---|---|---|---|---|
-| `<data/tool/system>` | `<boundary>` | `<abuse case>` | `<control>` | `@agent` | `planned|done|deferred` |
+| `<data/tool/system>` | `<boundary>` | `<abuse case>` | `<control>` | `@agent` | `planned\|done\|deferred` |
 
 Minimum threats to consider:
 - Prompt injection and instruction smuggling.
@@ -82,7 +82,7 @@ Do not create ADR files unless the user approves docs writes, but always include
 
 | ADR | Decision | Owner | Status |
 |---|---|---|---|
-| `ADR-0001` | `<decision>` | `@architecture-reviewer` | `planned|accepted|deferred` |
+| `ADR-0001` | `<decision>` | `@architecture-reviewer` | `planned\|accepted\|deferred` |
 
 ### Quality Gates
 
