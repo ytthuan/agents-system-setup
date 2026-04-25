@@ -14,12 +14,14 @@
 - **Deployment:** {{DEPLOYMENT}}
 - **Target platforms:** {{TARGET_PLATFORMS}}  <!-- e.g., copilot-cli, claude-code, opencode, codex-cli -->
 - **Output profile:** {{CONTEXT_PROFILE}}  <!-- balanced | compact | full -->
+- **Agent artifact tracking:** {{ARTIFACT_TRACKING}}  <!-- project-tracked | project-local | personal-global -->
 
 ## Read First
 
 1. Route by [Directory Architecture](#directory-architecture) and [Agent Roster](#agent-roster).
 2. Check [Security & Audit Matrix](#security--audit-matrix) and [Quality Gates](#quality-gates) before risky writes.
 3. Load overflow details only when the task needs them: {{DETAIL_REFERENCES}}.
+4. Respect artifact tracking: {{ARTIFACT_TRACKING_NOTES}}.
 
 ## How Agents Should Work Here
 

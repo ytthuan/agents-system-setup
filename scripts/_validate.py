@@ -11,8 +11,9 @@ Checks (per the CONTRIBUTING.md contract):
   6. Internal markdown link resolution (./relative paths only)
   7. Codex TOML subagents parse and include required fields
   8. Replication ledger/logs do not live inside agents/ directories
-  9. Governance baseline references and templates are present
- 10. Context optimization policy and generated-template markers are present
+ 9. Governance baseline references and templates are present
+10. Context optimization policy and generated-template markers are present
+ 11. Local-vs-git-tracked artifact policy is present
 
 Exits non-zero on any failure. Designed to be invoked from CI on
 Linux / macOS / Windows runners with only Python 3.10+ available
@@ -483,6 +484,53 @@ def check_context_optimization() -> None:
         warn(f"{skill_path.relative_to(REPO).as_posix()}: SKILL.md is {line_count} lines; target is about 250. Consider moving more detail to references.")
 
 
+# ---------- 11: local-vs-git-tracked artifact policy ----------
+
+def check_local_tracking_policy() -> None:
+    require_contains(
+        SKILL_ROOT / "references" / "local-tracking.md",
+        (
+            "project-tracked",
+            "project-local",
+            "personal-global",
+            ".git/info/exclude",
+            "git check-ignore",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "Phase 1.6 — Artifact Scope & Tracking",
+            "artifact_tracking",
+            ".git/info/exclude",
+            "git check-ignore",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "interview.md",
+        (
+            "Project files, git-tracked",
+            "Project files, local-only / untracked",
+            "Personal/global outside this repo",
+            "artifact_tracking",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "{{ARTIFACT_TRACKING}}",
+            "{{ARTIFACT_TRACKING_NOTES}}",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "output-contract.md",
+        (
+            "Artifact tracking",
+            "Local exclude",
+        ),
+    )
+
+
 # ---------- main ----------
 
 def main() -> int:
@@ -495,6 +543,7 @@ def main() -> int:
     check_replication_ledger()
     check_governance_baseline()
     check_context_optimization()
+    check_local_tracking_policy()
 
     if WARNINGS:
         print("\nWARNINGS:")

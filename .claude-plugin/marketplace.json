@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Marketplace for the agents-system-setup plugin: bootstrap, update, improve, and replicate multi-agent systems across Copilot CLI, Claude Code, OpenCode, and Codex CLI.",
-    "version": "0.2.3"
+    "version": "0.6.1"
   },
   "plugins": [
     {
       "name": "agents-system-setup",
       "source": "./plugins/agents-system-setup",
       "description": "Bootstrap, update, improve, or replicate multi-agent systems across Copilot CLI, Claude Code, OpenCode, and Codex CLI. Encourages parallel subagents and Claude Code agent teams.",
-      "version": "0.2.3",
+      "version": "0.6.1",
       "author": {
         "name": "ytthuan",
         "url": "https://github.com/ytthuan"

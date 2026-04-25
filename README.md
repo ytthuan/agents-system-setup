@@ -19,6 +19,7 @@ A multi-runtime plugin that **bootstraps**, **updates**, **improves**, or **repl
 - **Mandatory MCP approval gate** — no MCP config is ever written without explicit user approval.
 - **Source-backed governance baseline** — OWASP GenAI, NIST SSDF, MCP Security Best Practices, GitHub Code Security, SLSA, OPA, Azure Well-Architected, C4, and TOGAF (enterprise only).
 - **Context-optimized output profiles** — `Balanced` by default, with `Compact` and `Full` options for generated files and summaries.
+- **Artifact tracking choice** — generated systems can be team-shared in git, local-only via `.git/info/exclude`, or written to personal/global runtime paths.
 - Cross-OS scripts (`.sh` + `.ps1`), `.gitattributes` for line-ending safety.
 
 ## Modes
@@ -111,6 +112,10 @@ For Claude Code, when 3+ subagents are independent and would benefit from peer-t
 ## Context optimization
 
 Generated output is **compact by default**. The skill asks for an output profile (`Balanced`, `Compact`, or `Full`) and records where long detail lives. `AGENTS.md` stays the routing and policy index; exhaustive marketplace research, long threat rationale, full ADR text, and platform schema detail are linked as references instead of repeated in every agent file.
+
+## Local-only vs git-tracked agents
+
+Before writing project-scoped agent files, the skill asks whether artifacts should be git-tracked, local-only, or personal/global. Local-only project artifacts are hidden through `.git/info/exclude` in the current checkout, not `.gitignore`, so team ignore rules are not changed accidentally.
 
 ## Why a plugin (not a bare skill)?
 

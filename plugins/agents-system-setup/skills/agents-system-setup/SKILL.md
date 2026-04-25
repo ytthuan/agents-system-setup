@@ -36,6 +36,7 @@ Scaffold or update a complete agent system for the current project across **Copi
 16. **Security-sensitive writes require evidence.** MCP config, secrets-adjacent paths, CI/release config, and generated scripts must have an owner, approval state, and verification evidence in the output contract. No broad write permissions without rationale.
 17. **Improve mode is evidence-based.** Existing systems are scored for security boundaries, secrets, audit evidence, architecture ownership, design-pattern consistency, and supply-chain source trust before any delta is applied.
 18. **Context budget is a feature.** Default to the `Balanced` output profile from [context optimization](./references/context-optimization.md): keep routing and gates inline, move deep detail behind explicit references, and never duplicate long policy prose in every agent.
+19. **Ask whether agent artifacts are git-tracked or local-only.** Before writing project-scoped agent files, ask the tracking question from [local tracking](./references/local-tracking.md). For local-only project files, write `.git/info/exclude` (never `.gitignore`) and verify with `git check-ignore`.
 
 ## Procedure
 
@@ -77,12 +78,29 @@ If the user picked **replicate** → run the [replication procedure](./reference
 2. `ask_user` for **target** runtimes (multi-select; source excluded).
 3. Parse source → AgentIR / SkillIR / MCPServerIR records.
 4. Render lossiness report; `ask_user` to approve dropped fields per target.
-5. Re-run **Phase 3.5** MCP approval gate against each new target.
-6. Emit per target with `<!-- agents-system-setup:replicated-from: <source> -->` markers.
-7. Write replication ledger to `.agents-system-setup/replication.jsonl` (one JSON object per line — **never `.md`, never inside any `agents/` directory**, or it will be misread as a malformed agent).
-8. Verify round-trip (re-parse emitted → diff IR → surface drift).
+5. Run **Phase 1.6** before any target write.
+6. Re-run **Phase 3.5** MCP approval gate against each new target.
+7. Emit per target with `<!-- agents-system-setup:replicated-from: <source> -->` markers.
+8. Write replication ledger to `.agents-system-setup/replication.jsonl` (one JSON object per line — **never `.md`, never inside any `agents/` directory**, or it will be misread as a malformed agent).
+9. Verify round-trip (re-parse emitted → diff IR → surface drift).
 
-For both branches, finish with Phase 7 (verify & summarize).
+For **improve**, run Phase 1.6 before applying any selected delta. For both branches, finish with Phase 7 (verify & summarize).
+
+### Phase 1.6 — Artifact Scope & Tracking
+
+Run before Phase 1.7 for init/update, and before Phase 5 writes for improve/replicate. Use [local tracking](./references/local-tracking.md).
+
+Ask:
+
+> "Should the generated agent system be shared through git or kept local to this checkout?"
+> Choices: `["Project files, git-tracked (Recommended for teams)", "Project files, local-only / untracked (Recommended for personal setup)", "Personal/global outside this repo"]`
+
+Record `artifact_tracking` as `project-tracked | project-local | personal-global`.
+
+Rules:
+- `project-tracked`: use project paths; do not commit unless Phase 6 git actions are explicitly approved.
+- `project-local`: use project paths, then add only generated/modified artifact paths to `.git/info/exclude` if `.git/` exists. Do not modify `.gitignore` for this.
+- `personal-global`: use runtime user paths and avoid repo writes unless separately approved.
 
 ### Phase 1.7 — Domain Detection & Spec-Kit Recommendation
 
@@ -151,6 +169,7 @@ Build the plan and show it before writing anything. The plan must include:
 - Skills to create.
 - Plugin/MCP candidates **per capability** (Phase 3 fills this).
 - Per-platform file plan (Copilot/Claude/OpenCode/Codex paths the user will actually get).
+- **Artifact tracking** — `project-tracked | project-local | personal-global`, plus exclude plan for local-only mode.
 - Git actions (if any).
 - **Output profile & context budget** — `balanced|compact|full`, sections kept inline, overflow targets, and biggest expected agent-memory file.
 - **Security & Audit Matrix** — controls, owner agents, affected paths, evidence required, and source reference.
@@ -204,6 +223,7 @@ For each selected platform, look up paths and frontmatter in [platforms.md](./re
 - **Orchestrator parallelism clause** — render the wave-aware fan-out instructions per [parallelism](./references/parallelism.md). The orchestrator must invoke all parallel-safe subagents of a wave in a single response (multiple Task-tool calls), await all results, then start the next wave.
 - **Governance baseline** — render the security, audit, architecture, design-pattern, ADR, and quality-gate sections from Phase 1.8 / Phase 2. Subagents that touch sensitive paths, MCP/tool config, CI/release config, dependency manifests, or architecture boundaries must include explicit security boundaries and audit evidence expectations.
 - **Context optimization** — apply [context optimization](./references/context-optimization.md): compact inline summaries, links for overflow details, concise delegation packets, and no duplicated long policy prose across subagents.
+- **Artifact tracking** — apply [local tracking](./references/local-tracking.md). In `project-local` mode, update `.git/info/exclude` after writes and verify at least `AGENTS.md` with `git check-ignore -v`.
 - **Spec-Kit block** — if Phase 1.7 recorded `spec_kit_installed = true`, render `assets/spec-kit-block.snippet.md` into the `{{SPEC_KIT_BLOCK}}` placeholder of `AGENTS.md` (substituting `{{RUNTIME}}` per platform: `copilot|claude|codex|opencode`). If `false`, replace the placeholder with an empty string. See [spec-kit](./references/spec-kit.md).
 - **Claude Code AGENT-TEAMS.md** — when Claude Code is among the selected platforms AND the Agent Roster has 3+ subagents marked `team-suitable` (independent + benefits from peer challenge), emit `AGENT-TEAMS.md` documenting: opt-in env var (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), settings.json snippet, suggested teammate roster, token-cost warning, and when to fall back to parallel subagents.
 
@@ -227,7 +247,8 @@ For every existing target file:
 1. `cp <file> <file>.bak` via bash before any edit.
 2. Parse existing frontmatter; preserve user-authored sections.
 3. Merge new content under `<!-- agents-system-setup:managed:start -->` … `<!-- agents-system-setup:managed:end -->` markers — replace the block, never duplicate.
-4. Print a diff summary at the end.
+4. If `artifact_tracking == project-local`, add only generated/modified artifact paths to `.git/info/exclude` and verify with `git check-ignore -v`.
+5. Print a diff summary at the end.
 
 ### Phase 6 — Optional Git Init
 
@@ -241,8 +262,9 @@ Only if user confirmed in Phase 1 AND no `.git/` exists. Pick the script that ma
 4. Verify `AGENTS.md` contains non-empty **Security & Audit Matrix**, **Threat Model**, **Architecture / Design Pattern Decisions**, **ADR Index**, and **Quality Gates**. If a concern is not applicable, it must still have an explicit `n/a` rationale.
 5. Verify security-sensitive files (`.mcp.json`, `opencode.json`, `.env*`, CI/release config, lockfiles, generated scripts) have an owner and evidence requirement in the governance sections.
 6. Verify `AGENTS.md` contains **Context Loading Policy** and records the selected output profile.
-7. Print "Try it" examples per selected platform (`copilot`, `claude`, `opencode`, `codex`).
-8. Suggest 2–3 next customizations.
+7. Verify artifact tracking: project-tracked files are visible to git; project-local files are ignored via `.git/info/exclude`; personal-global mode wrote no repo artifacts unless approved.
+8. Print "Try it" examples per selected platform (`copilot`, `claude`, `opencode`, `codex`).
+9. Suggest 2–3 next customizations.
 
 ### Phase 8 — Final Wrap-Up (single consolidated ask)
 
@@ -257,6 +279,7 @@ Skip the entire phase only when `mode == update` and no agents/plugins/MCP chang
 - **Plugin vs MCP?** Plugins extend the runtime; MCP servers expose tools to agents. External-system integrations are usually MCP.
 - **Dedicated security/architecture agent or merged role?** Dedicated when the repo handles sensitive data, external tools/MCP, CI/release, regulated domains, monorepos, or user-requested architecture work. Merge into `@reviewer` only for small projects, and keep explicit ownership in the Security & Audit Matrix.
 - **Compact vs balanced vs full output?** Balanced by default. Compact for experienced teams or small repos. Full only for onboarding, audit, or when the user explicitly asks for exhaustive detail. See [context optimization](./references/context-optimization.md).
+- **Git-tracked or local-only?** Teams usually want `project-tracked`; personal experimentation should use `project-local` with `.git/info/exclude`; reusable private agents should use `personal-global`.
 - **Which platform?** Copilot CLI for GitHub-tight teams; Claude Code for Anthropic-first; OpenCode for vendor-neutral / self-hosted; Codex CLI for OpenAI-first (uses split layout: `AGENTS.md` for orchestrator + rules, `.codex/agents/*.toml` for specialized subagents). Multi-target if uncertain — files coexist cleanly via shared `AGENTS.md` + `.mcp.json`.
 - **`update` vs `improve` vs `replicate`?**
   - `update` regenerates managed blocks against the current plan (still asks before writing).
@@ -290,6 +313,8 @@ Skip the entire phase only when `mode == update` and no agents/plugins/MCP chang
 - **Creating a security auditor with broad write access** — security review is read-mostly unless the plan grants tightly scoped remediation paths.
 - **Using verbosity as safety** — long repeated prompts do not make agents safer. Keep gates and ownership inline, link detail, and require evidence.
 - **Hiding overflow details** — any moved detail must be linked from `AGENTS.md` or listed in the output contract.
+- **Assuming agent artifacts should be committed** — always ask tracking mode before writing project files.
+- **Using `.gitignore` for local-only project agents without approval** — local-only mode belongs in `.git/info/exclude`.
 
 ## Output Contract
 

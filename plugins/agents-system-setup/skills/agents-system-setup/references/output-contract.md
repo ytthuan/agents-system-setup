@@ -16,6 +16,8 @@ Use this contract at the end of `init`, `update`, `improve`, and `replicate` flo
 ✅ Context profile: <balanced | compact | full>
 ✅ Context split: <inline sections + overflow reference paths>
 ✅ Largest memory file: <path + approximate line count>
+✅ Artifact tracking: <project-tracked | project-local | personal-global>
+✅ Local exclude: <.git/info/exclude updated | n/a>
 ✅ Security & audit baseline: <present | n/a with rationale>
 ✅ Threat model: <present | n/a with rationale>
 ✅ Architecture decisions: <count + ADR refs, or n/a with rationale>

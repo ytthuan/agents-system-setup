@@ -36,8 +36,9 @@ Use `ask_user` for **every** question. One question per call. Multiple-choice wh
 - Choices: `["Cloud (Azure)", "Cloud (AWS)", "Cloud (GCP)", "Container registry", "npm / PyPI / NuGet / Crates", "App Store / Play Store", "Static host (Pages/Netlify/Vercel)", "Internal / N/A"]`
 
 ## 8. Customization Scope
-- Q: "Where should the agents/skills live?"
-- Choices: `["Project (team-shared) (Recommended)", "Personal (only for me)"]`
+- Q: "Should the generated agent system be shared through git or kept local to this checkout?"
+- Choices: `["Project files, git-tracked (Recommended for teams)", "Project files, local-only / untracked (Recommended for personal setup)", "Personal/global outside this repo"]`
+- Record as `artifact_tracking`: `project-tracked`, `project-local`, or `personal-global`.
 
 ## 9. Subagent Topology
 - Show the suggestion derived from project type via [topology.md](./topology.md).

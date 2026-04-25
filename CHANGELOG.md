@@ -2,6 +2,21 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [0.6.1] - 2026-04-25
+
+### Added
+
+- New `references/local-tracking.md` documents `project-tracked`, `project-local`, and `personal-global` artifact modes.
+- Interview flow now asks whether generated agent artifacts should be git-tracked, local-only for the current checkout, or written to personal/global runtime paths.
+- Generated `AGENTS.md` template records artifact tracking mode and local-tracking notes.
+- Output contract now reports artifact tracking and local exclude status.
+- Validator guardrail `check_local_tracking_policy` prevents removing the local-vs-git-tracked policy, interview question, template placeholders, and output markers.
+
+### Changed
+
+- `SKILL.md`, README, and DESIGN now make artifact tracking an explicit write-time decision.
+- Local-only project artifacts use `.git/info/exclude` instead of `.gitignore`, with `git check-ignore` verification.
+
 ## [0.6.0] - 2026-04-25
 
 ### Added

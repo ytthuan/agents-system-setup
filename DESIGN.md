@@ -24,6 +24,7 @@ This document explains **why** each phase and hard rule of `agents-system-setup`
 | 16. Security-sensitive writes require evidence | Risky changes need proof, not just a success-shaped summary | "Done" reports with no build/test/security/audit trail |
 | 17. Evidence-based improve mode | Audits should prioritize real findings with sources and severity | Cosmetic rewrites that miss security, architecture, or supply-chain risk |
 | 18. Context budget is a feature | Generated agent systems become less useful when every file repeats every rule | Prompt bloat, missed routing facts, expensive/noisy subagent delegation |
+| 19. Artifact tracking is explicit | Agent systems may be team infrastructure or personal local memory; the write behavior must match user intent | Accidentally committing private prompts, or hiding team-owned agent files |
 
 ## Phase-by-phase reasoning
 
@@ -44,6 +45,12 @@ This document explains **why** each phase and hard rule of `agents-system-setup`
 **Why a separate branch?** Improve and replicate share none of the generation pipeline (Phases 2–4). They reuse only the write-side mechanics (Phase 5) and verification (Phase 7). Branching keeps the main path simple.
 
 **Why score (ok/warn/fail) before proposing?** Without a numeric prior, every audit finding looks equally important. Scoring lets the user triage the checklist.
+
+### Phase 1.6 — Artifact Scope & Tracking
+
+**Why ask before writing?** `AGENTS.md`, subagents, skills, and MCP config can be either team-owned project infrastructure or personal local working memory. Asking first prevents a private local setup from being committed accidentally.
+
+**Why `.git/info/exclude` for local-only project files?** It is local to the checkout. Updating `.gitignore` would change team behavior and can hide files other contributors expect to review.
 
 ### Phase 1.8 — Security, Audit, Architecture Intake
 
@@ -145,6 +152,7 @@ MCP approval is per-target, not global. Approving a server for Copilot CLI tells
 - **Security auditor with broad write access** — review roles should be read-mostly unless a scoped remediation is explicitly approved.
 - **Pattern names without rationale** — "use clean architecture" is not an architecture decision unless alternatives, risks, and boundaries are recorded.
 - **Using verbosity as safety** — repeated long policy prose hides the actual routing and quality gates.
+- **Assuming generated agents should be committed** — always ask artifact tracking first; use `.git/info/exclude` for local-only project artifacts.
 
 ## Open questions / future work
 
