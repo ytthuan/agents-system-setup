@@ -16,6 +16,8 @@ Use this contract at the end of `init`, `update`, `improve`, and `replicate` flo
 ✅ Context profile: <balanced | compact | full>
 ✅ Context split: <inline sections + overflow reference paths>
 ✅ Largest memory file: <path + approximate line count>
+✅ Plan handoff: <present | n/a with rationale> (source: <VS Code plan prompt | Spec-Kit /plan | user plan | none>)
+✅ Runtime format targets: <copilot .agent.md | claude .md | opencode .md | codex .toml | n/a>
 ✅ Artifact tracking: <project-tracked | project-local | personal-global>
 ✅ Local exclude: <.git/info/exclude updated | n/a>
 ✅ Security & audit baseline: <present | n/a with rationale>
@@ -57,3 +59,5 @@ Suggested next customizations:
 ## Compact summary rule
 
 For `Compact` and `Balanced` output profiles, summarize counts and paths first. Expand full lists only when the user asked for detail or when a warning/failure needs evidence.
+
+Always include plan handoff status when a generated system used or produced a plan. If there was no upstream plan, write `n/a — direct user request`.

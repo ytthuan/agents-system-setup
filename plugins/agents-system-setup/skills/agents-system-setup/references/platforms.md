@@ -1,6 +1,6 @@
 # Multi-Platform Emission Reference
 
-This skill targets three agent runtimes. The user picks one or more in **Phase 0** of the interview; the generator loops over the selection.
+This skill targets four agent runtimes. The user picks one or more in **Phase 0** of the interview; the generator loops over the selection.
 
 ## Supported Platforms
 
@@ -149,6 +149,17 @@ Codex reads `.mcp.json` at repo root (shared with Copilot/Claude). Per-agent MCP
 }
 ```
 > OpenCode merges `opencode.json` non-destructively when other config keys exist — preserve them.
+
+## Plan Handoff Placement
+
+Plan prompt output is normalized to HandoffIR before emission; never copy the source prompt frontmatter into runtime agent files.
+
+| Runtime | Handoff placement |
+|---|---|
+| Copilot CLI | Markdown body section inside `.github/agents/<name>.agent.md`; frontmatter remains Copilot-only. |
+| Claude Code | Markdown body section inside `.claude/agents/<name>.md`; frontmatter remains Claude-only. |
+| OpenCode | Markdown body section inside `.opencode/agents/<name>.md`; frontmatter remains OpenCode-only and MCP stays in `opencode.json`. |
+| OpenAI Codex CLI | TOML `developer_instructions` in `.codex/agents/<name>.toml`; `AGENTS.md` keeps only orchestrator/project-level handoff summary. |
 
 ## Project-Memory Linking
 

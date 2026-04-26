@@ -50,6 +50,7 @@ Keep inline:
 - Architecture decisions with ADR refs.
 - Quality gates.
 - Runtime "try it" commands.
+- Plan Handoff Contract summary.
 
 Move or link when large:
 - Full marketplace candidate research.
@@ -85,9 +86,11 @@ The orchestrator should pass subagents enough context to act without dumping the
 
 ```text
 Task: <one sentence>
+Source plan: <user request | VS Code plan prompt | Spec-Kit /plan | other>
 Owned paths: <paths from Directory Architecture>
 Relevant gates: <quality/security gates>
 Constraints: <security/architecture constraints>
+Runtime format target: <none | target platform path/schema>
 Expected output: <files changed, evidence, risks>
 ```
 

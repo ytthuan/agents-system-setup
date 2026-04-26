@@ -11,9 +11,10 @@ Checks (per the CONTRIBUTING.md contract):
   6. Internal markdown link resolution (./relative paths only)
   7. Codex TOML subagents parse and include required fields
   8. Replication ledger/logs do not live inside agents/ directories
- 9. Governance baseline references and templates are present
-10. Context optimization policy and generated-template markers are present
+  9. Governance baseline references and templates are present
+ 10. Context optimization policy and generated-template markers are present
  11. Local-vs-git-tracked artifact policy is present
+ 12. Plan handoff policy is present and platform-specific
 
 Exits non-zero on any failure. Designed to be invoked from CI on
 Linux / macOS / Windows runners with only Python 3.10+ available
@@ -531,6 +532,115 @@ def check_local_tracking_policy() -> None:
     )
 
 
+# ---------- 12: plan handoff policy ----------
+
+def check_plan_handoff_policy() -> None:
+    require_contains(
+        SKILL_ROOT / "references" / "handoff.md",
+        (
+            "Plan Handoff Contract",
+            "HandoffIR",
+            "agent: Plan",
+            "Copilot CLI",
+            "Claude Code",
+            "OpenCode",
+            "OpenAI Codex CLI",
+            "developer_instructions",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "Plan handoff is normalized before emission",
+            "Plan Handoff Contract",
+            "HandoffIR",
+            "references/handoff.md",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "## Plan Handoff Contract",
+            "{{HANDOFF_SOURCES}}",
+            "{{PLATFORM_FORMAT_NOTES}}",
+            "{{HANDOFF_EVIDENCE}}",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "orchestrator.agent.md.template",
+        (
+            "Plan Handoff Contract",
+            "Source plan:",
+            "Runtime format target:",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "orchestrator.claude.md.template",
+        (
+            "agents-system-setup:platform: claude-code",
+            "Plan Handoff Contract",
+            "Runtime format target:",
+            "Claude Code frontmatter schema",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "orchestrator.opencode.md.template",
+        (
+            "agents-system-setup:platform: opencode",
+            "mode: primary",
+            "Runtime format target:",
+            "OpenCode frontmatter schema",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "subagent.agent.md.template",
+        (
+            "## Handoff Input",
+            "{{HANDOFF_SOURCE}}",
+            "{{RUNTIME_FORMAT_TARGET}}",
+            "Handoff status",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "subagent.claude.md.template",
+        (
+            "agents-system-setup:platform: claude-code",
+            "## Handoff Input",
+            "Claude Code frontmatter schema",
+            "comma-separated string",
+            "Do not use a YAML list",
+            "Handoff status",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "subagent.opencode.md.template",
+        (
+            "agents-system-setup:platform: opencode",
+            "mode: subagent",
+            "OpenCode frontmatter schema",
+            "No `name:` key",
+            "opencode.json",
+            "Handoff status",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "subagent.codex.toml.template",
+        (
+            "Plan Handoff:",
+            "{{HANDOFF_SOURCE}}",
+            "{{RUNTIME_FORMAT_TARGET}}",
+            "Handoff status",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "output-contract.md",
+        (
+            "Plan handoff",
+            "Runtime format targets",
+        ),
+    )
+
+
 # ---------- main ----------
 
 def main() -> int:
@@ -544,6 +654,7 @@ def main() -> int:
     check_governance_baseline()
     check_context_optimization()
     check_local_tracking_policy()
+    check_plan_handoff_policy()
 
     if WARNINGS:
         print("\nWARNINGS:")

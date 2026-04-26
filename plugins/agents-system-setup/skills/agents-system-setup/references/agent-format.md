@@ -1,6 +1,6 @@
 # Custom Agent Format — per platform
 
-This skill targets three runtimes. **Use the right schema for each** — agents written in Copilot frontmatter will be silently ignored by Claude Code, and vice versa.
+This skill targets four runtimes. **Use the right schema for each** — agents written in Copilot frontmatter will be silently ignored by Claude Code, and vice versa.
 
 For path matrix and full examples, see [platforms.md](./platforms.md).
 
@@ -147,6 +147,13 @@ The router/orchestrator picks a subagent based on the **`description`** field (o
 - Always start with `"Use when ..."`
 - Include concrete trigger keywords from the user's domain
 - Quote any description containing colons
+
+## Plan Handoff Surface
+
+The VS Code `plan` prompt (`agent: Plan`) and Spec-Kit `/plan` output are planning inputs, not agent file formats. Normalize them to HandoffIR (see [handoff](./handoff.md)), then place the handoff in the target runtime's supported surface:
+
+- Copilot CLI / Claude Code / OpenCode: Markdown body section after valid YAML frontmatter.
+- Codex CLI: `developer_instructions` inside `.codex/agents/<name>.toml`, plus project-level summary in `AGENTS.md`.
 
 ## Common Pitfalls
 

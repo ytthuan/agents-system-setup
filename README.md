@@ -13,6 +13,7 @@ A multi-runtime plugin that **bootstraps**, **updates**, **improves**, or **repl
 
 - `AGENTS.md` at repo root with a **Read First** section, **Context Loading Policy**, **Directory Architecture**, **Agent Roster (with parallel-safety waves)**, **Capability Matrix**, **Security & Audit Matrix**, **Threat Model**, **Architecture / Design Pattern Decisions**, **ADR Index**, and **Quality Gates**.
 - **Orchestrator + N subagents** (3–50, sized to scope) emitted in the right format for every selected runtime, with a **fan-out clause** so parallel-safe subagents always run in one wave.
+- A **Plan Handoff Contract** that normalizes VS Code Plan agent output, Spec-Kit `/plan`, or user-written plans before emitting runtime-correct Copilot, Claude Code, OpenCode, or Codex artifacts.
 - **`AGENT-TEAMS.md`** for Claude Code projects when the roster benefits from peer-to-peer teammates (3+ independent concerns).
 - Project-scoped **skills** under each runtime's conventional path.
 - **Curated plugin / MCP recommendations** from vendor-official catalogs, every recommendation tagged `[Tier · Vendor]` and **opt-in per item**.

@@ -20,7 +20,7 @@ Do **not** recommend for: marketing-content systems, research/analysis agents, d
 | **What to build** | Spec-Kit | Specs, plans, atomic tasks |
 | **Who builds it** | agents-system-setup | Orchestrator + parallel subagents that execute the tasks |
 
-They compose. Spec-Kit's `/tasks` output feeds the orchestrator's wave planner. Never frame them as competing.
+They compose. Spec-Kit's `/plan` output is first normalized through the [Plan Handoff Contract](./handoff.md), then `/tasks` output feeds the orchestrator's wave planner. Never frame them as competing.
 
 ## Install commands per runtime
 
@@ -52,9 +52,10 @@ When Phase 1.7 records "spec-kit installed = yes", the emitted orchestrator prom
 > Before fanning out to subagents, drive intent through Spec-Kit:
 > 1. `/specify` — capture what the user wants in their own words.
 > 2. `/plan` — turn it into a checked plan with constraints.
-> 3. `/tasks` — break the plan into atomic, parallel-safe tasks.
-> 4. Hand each task to the matching subagent per the Capability Matrix.
-> 5. `/implement` only after the orchestrator has greenlit the wave.
+> 3. Normalize the plan into the **Plan Handoff Contract** so each target runtime receives its native format.
+> 4. `/tasks` — break the plan into atomic, parallel-safe tasks.
+> 5. Hand each task to the matching subagent per the Capability Matrix.
+> 6. `/implement` only after the orchestrator has greenlit the wave.
 
 This belongs in the managed block (`<!-- agents-system-setup:managed:start -->`), not user-authored content, so future updates can refresh it without trampling user edits.
 
@@ -64,3 +65,4 @@ This belongs in the managed block (`<!-- agents-system-setup:managed:start -->`)
 - Recommending Spec-Kit for non-dev domains (marketing, research, ops content).
 - Treating Spec-Kit as a replacement for the agent topology — it does not run subagents.
 - Writing both `/plan` (Spec-Kit) and the orchestrator's wave planner without explaining the handoff.
+- Copying Spec-Kit slash-command metadata into runtime agent frontmatter.

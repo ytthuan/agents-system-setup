@@ -25,6 +25,7 @@ This document explains **why** each phase and hard rule of `agents-system-setup`
 | 17. Evidence-based improve mode | Audits should prioritize real findings with sources and severity | Cosmetic rewrites that miss security, architecture, or supply-chain risk |
 | 18. Context budget is a feature | Generated agent systems become less useful when every file repeats every rule | Prompt bloat, missed routing facts, expensive/noisy subagent delegation |
 | 19. Artifact tracking is explicit | Agent systems may be team infrastructure or personal local memory; the write behavior must match user intent | Accidentally committing private prompts, or hiding team-owned agent files |
+| 20. Plan handoff normalized before emission | Planning prompts and slash commands have their own metadata, not runtime agent schemas | Copying `agent: Plan`, Spec-Kit metadata, or Copilot frontmatter into Claude/OpenCode/Codex artifacts |
 
 ## Phase-by-phase reasoning
 
@@ -77,6 +78,7 @@ This document explains **why** each phase and hard rule of `agents-system-setup`
 - *Architecture / Design Pattern Matrix* — documents pattern decisions, alternatives, guardrails, and ADR refs.
 - *Quality Gates* — defines what proof is required before agents can claim completion.
 - *Context Loading Policy* — tells agents what to read first and what to load only when needed.
+- *Plan Handoff Contract* — turns upstream planning output into a compact HandoffIR before any platform-specific artifact is emitted.
 
 ### Phase 3 — Marketplace Lookup with per-item opt-in
 
@@ -153,6 +155,7 @@ MCP approval is per-target, not global. Approving a server for Copilot CLI tells
 - **Pattern names without rationale** — "use clean architecture" is not an architecture decision unless alternatives, risks, and boundaries are recorded.
 - **Using verbosity as safety** — repeated long policy prose hides the actual routing and quality gates.
 - **Assuming generated agents should be committed** — always ask artifact tracking first; use `.git/info/exclude` for local-only project artifacts.
+- **Copying planner metadata into agent files** — plan prompts are input surfaces; generated files must use each target runtime's native schema.
 
 ## Open questions / future work
 

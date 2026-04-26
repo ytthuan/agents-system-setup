@@ -2,6 +2,18 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [Unreleased]
+
+### Added
+
+- Plan Handoff Contract guidance normalizes VS Code Plan agent output, Spec-Kit `/plan`, and user-written plans into HandoffIR before runtime-specific emission.
+- Generated `AGENTS.md`, orchestrator, Markdown subagent, and Codex TOML templates now include concise handoff input/output fields.
+- Validator guardrail `check_plan_handoff_policy` keeps the handoff reference, template markers, and output contract from regressing.
+
+### Changed
+
+- Platform references now consistently describe four runtimes and clarify OpenCode's `permission:`-based agent schema.
+
 ## [0.6.1] - 2026-04-25
 
 ### Added
