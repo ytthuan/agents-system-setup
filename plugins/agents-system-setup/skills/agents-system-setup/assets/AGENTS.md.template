@@ -76,6 +76,14 @@ Legend: ✅ primary owner · 🟡 assists · *(blank)* not involved.
 
 > If this matrix is abbreviated, full detail lives in: {{CAPABILITY_MATRIX_DETAILS}}
 
+## Plan Handoff Contract
+
+- **Accepted planning sources:** {{HANDOFF_SOURCES}}.
+- **Canonical fields:** task, source plan, owning agent, owned paths, read-only paths, relevant gates, dependencies/wave, required approvals, runtime format target, expected output, evidence.
+- **Format rule:** generated artifacts must use the selected runtime's native schema; never copy prompt frontmatter or another runtime's frontmatter into this project.
+- **Platform format targets:** {{PLATFORM_FORMAT_NOTES}}
+- **Handoff evidence:** {{HANDOFF_EVIDENCE}}
+
 ## Security & Audit Matrix
 
 | Risk / control | Owner agent | Applies to paths | Evidence required | Source |

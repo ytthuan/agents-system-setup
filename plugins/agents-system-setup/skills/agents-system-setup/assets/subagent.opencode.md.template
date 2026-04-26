@@ -1,12 +1,14 @@
 ---
-name: {{AGENT_NAME}}
 description: 'Use when {{TRIGGER_PHRASES}}. {{ONE_LINE_RESPONSIBILITY}}.'
-{{OPTIONAL_TOOLS_BLOCK}}
+mode: subagent
 {{OPTIONAL_MODEL_LINE}}
-{{OPTIONAL_MCP_SERVERS_BLOCK}}
+{{OPTIONAL_TEMPERATURE_LINE}}
+{{OPTIONAL_STEPS_LINE}}
+{{OPTIONAL_HIDDEN_LINE}}
+{{OPTIONAL_PERMISSION_BLOCK}}
 ---
 
-<!-- agents-system-setup:platform: copilot-cli -->
+<!-- agents-system-setup:platform: opencode -->
 <!-- agents-system-setup:replicated-from: {{REPLICATION_SOURCE}} -->
 
 # {{AGENT_DISPLAY_NAME}}
@@ -53,12 +55,13 @@ If implementation would change a public API, module boundary, data model, servic
 - {{TRIGGER_3}}
 
 ## Handoff Input
+
 - Source plan: {{HANDOFF_SOURCE}}
-- Runtime format target: {{RUNTIME_FORMAT_TARGET}}
+- Runtime format target: `opencode` — `.opencode/agents/{{AGENT_NAME}}.md` — OpenCode frontmatter schema
 - Dependencies / wave: {{HANDOFF_DEPENDENCIES}}
 - Required approvals: {{HANDOFF_APPROVALS}}
 
-> Note (Copilot CLI): `tools:` is a **YAML list** (e.g., `[view, grep, bash]`). MCP servers are declared under `mcp-servers:` (hyphenated key) in agent frontmatter or in `.mcp.json` at repo root. Do not use Claude tool names (`Read`, `Edit`) here.
+> Note: OpenCode agent filename is the agent name (`{{AGENT_NAME}}.md` → agent `{{AGENT_NAME}}`). No `name:` key in frontmatter. MCP servers are **not** configured here — they belong in `opencode.json` › `mcp`. Use `permission:` for tool gating (not the deprecated `tools:` map). Model must use `provider/model-id` format (e.g., `anthropic/claude-sonnet-4-20250514`).
 
 ## How I work
 1. {{STEP_1}}

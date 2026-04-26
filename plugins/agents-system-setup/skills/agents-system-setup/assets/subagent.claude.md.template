@@ -2,11 +2,17 @@
 name: {{AGENT_NAME}}
 description: 'Use when {{TRIGGER_PHRASES}}. {{ONE_LINE_RESPONSIBILITY}}.'
 {{OPTIONAL_TOOLS_BLOCK}}
+{{OPTIONAL_DISALLOWED_TOOLS_BLOCK}}
 {{OPTIONAL_MODEL_LINE}}
+{{OPTIONAL_PERMISSION_MODE_LINE}}
+{{OPTIONAL_MAX_TURNS_LINE}}
+{{OPTIONAL_EFFORT_LINE}}
+{{OPTIONAL_ISOLATION_LINE}}
+{{OPTIONAL_SKILLS_BLOCK}}
 {{OPTIONAL_MCP_SERVERS_BLOCK}}
 ---
 
-<!-- agents-system-setup:platform: copilot-cli -->
+<!-- agents-system-setup:platform: claude-code -->
 <!-- agents-system-setup:replicated-from: {{REPLICATION_SOURCE}} -->
 
 # {{AGENT_DISPLAY_NAME}}
@@ -53,12 +59,13 @@ If implementation would change a public API, module boundary, data model, servic
 - {{TRIGGER_3}}
 
 ## Handoff Input
+
 - Source plan: {{HANDOFF_SOURCE}}
-- Runtime format target: {{RUNTIME_FORMAT_TARGET}}
+- Runtime format target: `claude-code` — `.claude/agents/{{AGENT_NAME}}.md` — Claude Code frontmatter schema
 - Dependencies / wave: {{HANDOFF_DEPENDENCIES}}
 - Required approvals: {{HANDOFF_APPROVALS}}
 
-> Note (Copilot CLI): `tools:` is a **YAML list** (e.g., `[view, grep, bash]`). MCP servers are declared under `mcp-servers:` (hyphenated key) in agent frontmatter or in `.mcp.json` at repo root. Do not use Claude tool names (`Read`, `Edit`) here.
+> Note: `tools:` in Claude Code frontmatter is a **comma-separated string** (e.g., `Read, Grep, Bash`). Do not use a YAML list. `mcp-servers:` is not valid here — MCP is configured in `.mcp.json` at repo root or via `mcpServers:` key. Never copy Copilot CLI tool names verbatim.
 
 ## How I work
 1. {{STEP_1}}

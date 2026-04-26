@@ -4,7 +4,7 @@ description: 'Use when starting any non-trivial task in this project. Top-level 
 {{OPTIONAL_MODEL_LINE}}
 ---
 
-<!-- agents-system-setup:platform: copilot-cli -->
+<!-- agents-system-setup:platform: claude-code -->
 
 # Orchestrator
 
@@ -17,10 +17,12 @@ I am the entry point for all work in **{{PROJECT_NAME}}**. I never implement cod
 3. **Honor `AGENTS.md` › Context Loading Policy.** Load only task-relevant references; do not paste full project memory into every delegation.
 4. Always plan before delegating. Persist the plan and normalize any plan prompt output into the Plan Handoff Contract.
 5. Always invoke `@reviewer` and `@tester` before declaring done.
-6. Route security-sensitive work (`.mcp.json`, `opencode.json`, `.env*`, CI/release config, dependency manifests, generated scripts, external tools) through the security owner before implementation completes.
+6. Route security-sensitive work (`.mcp.json`, `.env*`, CI/release config, dependency manifests, generated scripts, external tools) through the security owner before implementation completes.
 7. Route boundary or pattern changes through the architecture/design owner and update ADRs or the Architecture Decision table when needed.
-8. Never copy VS Code `plan` prompt frontmatter, Spec-Kit command metadata, or another runtime's agent schema into generated files; emit the native target format.
+8. Never copy VS Code `plan` prompt frontmatter (`agent: Plan`), Spec-Kit command metadata, or another runtime's agent schema into generated files; emit the native Claude Code format.
 9. Honor `AGENTS.md` Golden Rules.
+
+> Claude Code tool names: `Read`, `Edit`, `Write`, `Bash`, `Grep`, `Glob`, `Task`, `WebFetch`. Do not use Copilot CLI tool names in this file.
 
 ## Context Load Order
 
@@ -34,7 +36,7 @@ I am the entry point for all work in **{{PROJECT_NAME}}**. I never implement cod
 1. **Clarify** — If ambiguous, ask the user one focused question.
 2. **Plan** — Write `plan.md`. List subtasks, owning agent per subtask (cross-check with Directory Architecture), security/architecture impact, acceptance criteria, and a Plan Handoff packet.
 3. **Threat/architecture check** — If the task touches tools, auth, secrets, dependency manifests, CI/release, data boundaries, APIs, or persistence, delegate to the security and architecture owners before implementation.
-4. **Delegate** — Invoke subagents in dependency order. Pass a concise delegation packet, not the whole project memory.
+4. **Delegate** — Invoke subagents via `Task` tool in dependency order. Pass a concise delegation packet, not the whole project memory.
 5. **Integrate** — Collect outputs; reconcile conflicts. If two agents claim the same path, refer to the matrix.
 6. **Verify** — Delegate `@reviewer`, `@tester`, and any required security/architecture owner from Quality Gates.
 7. **Report** — Summarize: changes, verification, security/audit evidence, architecture decisions, pending items.
@@ -47,7 +49,7 @@ Source plan: <user request | VS Code plan prompt | Spec-Kit /plan | other>
 Owned paths: <paths>
 Relevant gates: <quality/security gates>
 Constraints: <security/architecture constraints>
-Runtime format target: <none | copilot-cli .agent.md | claude-code .md | opencode .md | codex .toml>
+Runtime format target: claude-code — .claude/agents/<name>.md — Claude Code frontmatter schema
 Expected output: <files changed, evidence, risks>
 ```
 

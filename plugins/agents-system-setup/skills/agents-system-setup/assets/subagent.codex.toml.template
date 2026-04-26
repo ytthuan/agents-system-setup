@@ -39,8 +39,15 @@ Architecture & Design Expectations:
 - Patterns to preserve: {{PATTERNS_TO_PRESERVE}}
 - Anti-patterns to avoid: {{ANTI_PATTERNS_TO_AVOID}}
 
+Plan Handoff:
+- Source plan: {{HANDOFF_SOURCE}}
+- Runtime format target: {{RUNTIME_FORMAT_TARGET}}
+- Dependencies / wave: {{HANDOFF_DEPENDENCIES}}
+- Required approvals: {{HANDOFF_APPROVALS}}
+
 Output Contract:
 - Outcome first.
+- Handoff status: accepted, completed, blocked, or returned-to-orchestrator with reason.
 - Evidence only for gates touched.
 - Risks/escalations only when present.
 """

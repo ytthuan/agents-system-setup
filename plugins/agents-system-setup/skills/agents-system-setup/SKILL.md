@@ -37,6 +37,7 @@ Scaffold or update a complete agent system for the current project across **Copi
 17. **Improve mode is evidence-based.** Existing systems are scored for security boundaries, secrets, audit evidence, architecture ownership, design-pattern consistency, and supply-chain source trust before any delta is applied.
 18. **Context budget is a feature.** Default to the `Balanced` output profile from [context optimization](./references/context-optimization.md): keep routing and gates inline, move deep detail behind explicit references, and never duplicate long policy prose in every agent.
 19. **Ask whether agent artifacts are git-tracked or local-only.** Before writing project-scoped agent files, ask the tracking question from [local tracking](./references/local-tracking.md). For local-only project files, write `.git/info/exclude` (never `.gitignore`) and verify with `git check-ignore`.
+20. **Plan handoff is normalized before emission.** Treat VS Code `plan` prompt output, Spec-Kit `/plan`, and user-written plans as upstream planning input only. Convert them to the [handoff contract](./references/handoff.md) / HandoffIR, then emit each selected runtime's native format. Never copy prompt frontmatter or another runtime's agent schema into generated artifacts.
 
 ## Procedure
 
@@ -166,6 +167,7 @@ Build the plan and show it before writing anything. The plan must include:
 - **Agent Roster** — table of `name | role | owns | triggers | model (optional) | parallel-safe | wave`. Use [topology guide](./references/topology.md). Compute parallel-safety per [parallelism](./references/parallelism.md): a subagent is parallel-safe iff its `owns` glob doesn't overlap any other's, it doesn't write outside `owns`, and it doesn't depend on another subagent's output in the same wave.
 - **Capability Matrix** — capabilities × agents grid (✅ / 🟡).
 - **Wave plan** — grouped list `Wave N → [parallel-safe subagents]`; the orchestrator fans out per wave and awaits each before the next.
+- **Plan Handoff Contract** — accepted planning sources, HandoffIR fields, per-platform format targets, approval boundaries, and verification evidence. Use [handoff](./references/handoff.md).
 - Skills to create.
 - Plugin/MCP candidates **per capability** (Phase 3 fills this).
 - Per-platform file plan (Copilot/Claude/OpenCode/Codex paths the user will actually get).
@@ -213,14 +215,22 @@ If any user-selected candidate from Phase 3 includes an MCP server:
 
 For each selected platform, look up paths and frontmatter in [platforms.md](./references/platforms.md), then render:
 
-- `AGENTS.md` at repo root → [template](./assets/AGENTS.md.template). Fill **Read First**, **Context Loading Policy**, **Directory Architecture**, **Agent Roster**, **Capability Matrix**, **Security & Audit Matrix**, **Threat Model**, **Architecture / Design Pattern Decisions**, **ADR Index**, **Quality Gates**, **Skills**, **Plugins/MCP** tables. Use the selected output profile from Phase 1.9; summarize long sections and link overflow details instead of dumping exhaustive prose inline.
-- Orchestrator → [template](./assets/orchestrator.agent.md.template) at the platform's agents path.
-- Each subagent → [template](./assets/subagent.agent.md.template) at the platform's agents path. Fill `{{OWNED_PATHS}}` / `{{READONLY_PATHS}}` from the Directory Architecture.
-  - **Codex CLI exception:** subagents are NOT rendered as `## <Name>` headings in `AGENTS.md`. Instead, emit one `.codex/agents/<kebab-name>.toml` per subagent with required fields `name`, `description`, `developer_instructions` (use TOML triple-quoted basic string). Carry the IR's `tool_allowlist` only if explicitly set (otherwise inherit from parent session). Map IR `model` → `model` and `model` reasoning hints → `model_reasoning_effort` (`low`|`medium`|`high`). Set `sandbox_mode = "read-only"` for read-only subagents. Per-agent MCP servers go under `[mcp_servers.<id>]` in the same file. `AGENTS.md` keeps only the orchestrator section + Directory Architecture / Capability Matrix / Waves. See [Codex layout](./references/platforms.md#openai-codex-cli--split-layout) and [openai docs](https://developers.openai.com/codex/subagents). Also emit/upsert `.codex/config.toml` with `[agents] max_threads = 6` and `max_depth = 1` unless the user supplied other values.
+- `AGENTS.md` at repo root → [template](./assets/AGENTS.md.template). Fill **Read First**, **Context Loading Policy**, **Directory Architecture**, **Agent Roster**, **Capability Matrix**, **Plan Handoff Contract**, **Security & Audit Matrix**, **Threat Model**, **Architecture / Design Pattern Decisions**, **ADR Index**, **Quality Gates**, **Skills**, **Plugins/MCP** tables. Use the selected output profile from Phase 1.9; summarize long sections and link overflow details instead of dumping exhaustive prose inline.
+- Orchestrator — use the **platform-specific template**:
+  - **Copilot CLI** → [orchestrator.agent.md.template](./assets/orchestrator.agent.md.template) at `.github/agents/orchestrator.agent.md`.
+  - **Claude Code** → [orchestrator.claude.md.template](./assets/orchestrator.claude.md.template) at `.claude/agents/orchestrator.md`. Frontmatter uses `name` + `description`; `tools:` is a comma-separated string; no `mcp-servers:` key (MCP lives in `.mcp.json`).
+  - **OpenCode** → [orchestrator.opencode.md.template](./assets/orchestrator.opencode.md.template) at `.opencode/agents/orchestrator.md`. Frontmatter has **no `name:`** (filename is the name); `mode: primary`; model uses `provider/model-id` format; MCP stays in `opencode.json`.
+  - **Codex CLI** → `## Orchestrator` heading in `AGENTS.md` (orchestrator and project rules live there; specialized subagents are TOML files).
+- Each subagent — use the **platform-specific template** and fill `{{OWNED_PATHS}}` / `{{READONLY_PATHS}}` from the Directory Architecture:
+  - **Copilot CLI** → [subagent.agent.md.template](./assets/subagent.agent.md.template) at `.github/agents/<name>.agent.md`. Frontmatter: `name`, `description`, optional `tools:` list, optional `mcp-servers:` (hyphenated key).
+  - **Claude Code** → [subagent.claude.md.template](./assets/subagent.claude.md.template) at `.claude/agents/<name>.md`. Frontmatter: `name`, `description`, optional `tools:` as **comma-separated string** (e.g. `Read, Grep, Bash`), optional `disallowedTools:`, `permissionMode:`, `model:`, etc. Do **not** use Copilot tool names or `mcp-servers:`.
+  - **OpenCode** → [subagent.opencode.md.template](./assets/subagent.opencode.md.template) at `.opencode/agents/<name>.md`. Frontmatter: **no `name:`** (filename = agent name), `description`, `mode: subagent`, optional `model:` in `provider/model-id` format, optional `permission:` block. Do **not** embed `mcp-servers:` — MCP belongs in `opencode.json`.
+  - **Codex CLI** → [subagent.codex.toml.template](./assets/subagent.codex.toml.template) at `.codex/agents/<kebab-name>.toml`. Required fields: `name`, `description`, `developer_instructions` (TOML triple-quoted string). Carry the IR's `tool_allowlist` only if explicitly set (otherwise inherit from parent session). Map IR `model` → `model` and reasoning hints → `model_reasoning_effort` (`low`|`medium`|`high`). Set `sandbox_mode = "read-only"` for read-only subagents. Per-agent MCP servers go under `[mcp_servers.<id>]` in the same file. `AGENTS.md` keeps only the orchestrator section + Directory Architecture / Capability Matrix / Waves. See [Codex layout](./references/platforms.md#openai-codex-cli--split-layout) and [openai docs](https://developers.openai.com/codex/subagents). Also emit/upsert `.codex/config.toml` with `[agents] max_threads = 6` and `max_depth = 1` unless the user supplied other values.
 - Each skill → [template](./assets/skill.template.md) at the platform's skills path.
 - MCP config (only if Phase 3.5 approved) at the platform's MCP path.
 - Drop the [directory-architecture snippet](./assets/directory-architecture.snippet.md) into any agent missing the boundary block.
 - **Orchestrator parallelism clause** — render the wave-aware fan-out instructions per [parallelism](./references/parallelism.md). The orchestrator must invoke all parallel-safe subagents of a wave in a single response (multiple Task-tool calls), await all results, then start the next wave.
+- **Plan handoff contract** — render the HandoffIR fields and platform format targets per [handoff](./references/handoff.md). Agent files receive a concise handoff input/output section; Codex subagents receive it inside `developer_instructions`.
 - **Governance baseline** — render the security, audit, architecture, design-pattern, ADR, and quality-gate sections from Phase 1.8 / Phase 2. Subagents that touch sensitive paths, MCP/tool config, CI/release config, dependency manifests, or architecture boundaries must include explicit security boundaries and audit evidence expectations.
 - **Context optimization** — apply [context optimization](./references/context-optimization.md): compact inline summaries, links for overflow details, concise delegation packets, and no duplicated long policy prose across subagents.
 - **Artifact tracking** — apply [local tracking](./references/local-tracking.md). In `project-local` mode, update `.git/info/exclude` after writes and verify at least `AGENTS.md` with `git check-ignore -v`.
@@ -237,7 +247,7 @@ For each selected platform, look up paths and frontmatter in [platforms.md](./re
 - `name` MUST match filename basename (kebab-case).
 - Quote any `description` containing colons.
 - Subagent `description` MUST start with `"Use when..."`.
-- Use the **right frontmatter schema per platform** (see [platforms.md](./references/platforms.md) — Copilot uses `mcp-servers:`, Claude uses comma-string `tools:`, OpenCode uses `mode:` and bool-keyed `tools:` map).
+- Use the **right frontmatter schema per platform** (see [platforms.md](./references/platforms.md) — Copilot uses `mcp-servers:`, Claude uses comma-string `tools:`, OpenCode uses `mode:` plus `permission:`, and Codex subagents use `.toml`).
 - Restrict tools per subagent to the minimum needed.
 - The `model:` line is optional in every platform — emit only if the user specified an override.
 
@@ -257,14 +267,15 @@ Only if user confirmed in Phase 1 AND no `.git/` exists. Pick the script that ma
 ### Phase 7 — Verify & Summarize
 
 1. List every file created/modified with absolute paths, grouped by platform.
-2. Re-read each generated agent/skill: confirm `name` matches filename, `description` present, no unquoted colons, frontmatter parses for the *target platform's* schema.
+2. Re-read each generated agent/skill: confirm `name` matches filename (Copilot, Claude Code), no `name:` key in OpenCode files (filename is the name), `description` present and starts with `"Use when..."`, no unquoted colons, frontmatter parses for the *target platform's* schema. Confirm Claude Code `tools:` is a comma-separated string — not a YAML list. Confirm OpenCode files have no `mcp-servers:` key. Confirm no `agent: Plan` frontmatter was copied into any generated file.
 3. Verify `AGENTS.md` contains non-empty **Directory Architecture**, **Agent Roster**, **Capability Matrix**.
 4. Verify `AGENTS.md` contains non-empty **Security & Audit Matrix**, **Threat Model**, **Architecture / Design Pattern Decisions**, **ADR Index**, and **Quality Gates**. If a concern is not applicable, it must still have an explicit `n/a` rationale.
 5. Verify security-sensitive files (`.mcp.json`, `opencode.json`, `.env*`, CI/release config, lockfiles, generated scripts) have an owner and evidence requirement in the governance sections.
-6. Verify `AGENTS.md` contains **Context Loading Policy** and records the selected output profile.
-7. Verify artifact tracking: project-tracked files are visible to git; project-local files are ignored via `.git/info/exclude`; personal-global mode wrote no repo artifacts unless approved.
-8. Print "Try it" examples per selected platform (`copilot`, `claude`, `opencode`, `codex`).
-9. Suggest 2–3 next customizations.
+6. Verify `AGENTS.md` contains **Plan Handoff Contract**, **Context Loading Policy**, and records the selected output profile.
+7. Verify every generated agent/subagent uses its target runtime's native handoff surface: Markdown body for Copilot/Claude/OpenCode, TOML `developer_instructions` for Codex.
+8. Verify artifact tracking: project-tracked files are visible to git; project-local files are ignored via `.git/info/exclude`; personal-global mode wrote no repo artifacts unless approved.
+9. Print "Try it" examples per selected platform (`copilot`, `claude`, `opencode`, `codex`).
+10. Suggest 2–3 next customizations.
 
 ### Phase 8 — Final Wrap-Up (single consolidated ask)
 
@@ -315,6 +326,7 @@ Skip the entire phase only when `mode == update` and no agents/plugins/MCP chang
 - **Hiding overflow details** — any moved detail must be linked from `AGENTS.md` or listed in the output contract.
 - **Assuming agent artifacts should be committed** — always ask tracking mode before writing project files.
 - **Using `.gitignore` for local-only project agents without approval** — local-only mode belongs in `.git/info/exclude`.
+- **Copying plan prompt frontmatter into agent files** — the VS Code `plan` prompt (`agent: Plan`) is an upstream planning surface, not a runtime agent schema. Normalize to HandoffIR, then emit per-platform formats.
 
 ## Output Contract
 

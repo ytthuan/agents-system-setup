@@ -8,9 +8,10 @@ This project uses [GitHub Spec-Kit](https://github.com/github/spec-kit) for the 
 
 1. `/specify` — capture what the user wants in plain language.
 2. `/plan` — turn the spec into a checked plan with constraints.
-3. `/tasks` — break the plan into atomic, parallel-safe tasks.
-4. The orchestrator routes each task to the matching subagent per the **Capability × Agent Matrix** above.
-5. `/implement` only after the orchestrator greenlights the wave.
+3. Normalize the plan through the **Plan Handoff Contract** above.
+4. `/tasks` — break the plan into atomic, parallel-safe tasks.
+5. The orchestrator routes each task to the matching subagent per the **Capability × Agent Matrix** above.
+6. `/implement` only after the orchestrator greenlights the wave.
 
 Bootstrap (one-time): `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git`
 Init (per project, already done): `specify init --here --ai {{RUNTIME}}`
