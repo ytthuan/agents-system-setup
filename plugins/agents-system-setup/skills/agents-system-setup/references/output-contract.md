@@ -4,7 +4,7 @@ Use this contract at the end of `init`, `update`, `improve`, and `replicate` flo
 
 ```text
 ✅ Mode: <init|update|improve|replicate>
-✅ Platforms: <copilot-cli, claude-code, opencode, codex-cli>
+✅ Platforms: <copilot-cli, claude-code, opencode, codex-cli (OpenAI Codex CLI + App artifacts)>
 ✅ Detected footprint: <list of pre-existing artifacts, or "none">
 ✅ Files created: <count>     (per platform: <breakdown>)
 ✅ Files updated (with .bak): <count>
@@ -17,7 +17,7 @@ Use this contract at the end of `init`, `update`, `improve`, and `replicate` flo
 ✅ Context split: <inline sections + overflow reference paths>
 ✅ Largest memory file: <path + approximate line count>
 ✅ Plan handoff: <present | n/a with rationale> (source: <VS Code plan prompt | Spec-Kit /plan | user plan | none>)
-✅ Runtime format targets: <copilot .agent.md | claude .md | opencode .md | codex .toml | n/a>
+✅ Runtime format targets: <copilot .agent.md | claude .md | opencode .md | codex .toml (CLI + App compatible artifacts) | n/a>
 ✅ Artifact tracking: <project-tracked | project-local | personal-global>
 ✅ Local exclude: <.git/info/exclude updated | n/a>
 ✅ Security & audit baseline: <present | n/a with rationale>
@@ -28,7 +28,7 @@ Use this contract at the end of `init`, `update`, `improve`, and `replicate` flo
 ✅ Git: <initialized | left untouched | already present>
 ✅ Wrap-up add-ons selected: <list with source URL, or "none">
 ✅ Wrap-up add-ons skipped: <list, or "none">
-✅ Codex subagent files (if codex-cli target): <list of .codex/agents/*.toml, or "none">
+✅ Codex subagent files (if codex-cli target): <list of .codex/agents/*.toml, or "none"; generated as CLI + App compatible artifacts>
 
 # replicate mode adds:
 ✅ Source runtime: <copilot-cli | claude-code | opencode | codex-cli>
@@ -49,7 +49,7 @@ Try it:
   copilot          # then: "@orchestrator <task>"
   claude           # then: invoke a subagent
   opencode         # then: pick an agent
-  codex            # then: /agent to switch threads; orchestrator + rules in AGENTS.md, subagents in .codex/agents/*.toml
+  codex            # CLI: /agent to switch threads; CLI + App artifacts: AGENTS.md plus .codex/agents/*.toml
 
 Suggested next customizations:
   - <suggestion 1>
@@ -61,3 +61,5 @@ Suggested next customizations:
 For `Compact` and `Balanced` output profiles, summarize counts and paths first. Expand full lists only when the user asked for detail or when a warning/failure needs evidence.
 
 Always include plan handoff status when a generated system used or produced a plan. If there was no upstream plan, write `n/a — direct user request`.
+
+For Codex targets, keep `codex-cli` as the machine-readable runtime key, but label generated artifacts as **OpenAI Codex CLI + App compatible** when they are shared repo artifacts. Keep plugin install and slash-command examples explicitly CLI-only.

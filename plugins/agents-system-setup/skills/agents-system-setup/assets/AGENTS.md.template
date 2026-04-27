@@ -1,6 +1,6 @@
 # {{PROJECT_NAME}}
 
-> Agents guide — see https://agents.md/ for the spec. This file is the canonical agent memory and is also surfaced to **Claude Code** (via `CLAUDE.md` symlink) and **OpenCode** (native `AGENTS.md` support).
+> Agents guide — see https://agents.md/ for the spec. This file is the canonical agent memory and is also surfaced to **Claude Code** (via `CLAUDE.md` symlink), **OpenCode** (native `AGENTS.md` support), and **OpenAI Codex** (CLI + App project memory when repo artifacts are available).
 
 <!-- agents-system-setup:managed:start -->
 

@@ -7,7 +7,7 @@
 [![Cross-OS](https://img.shields.io/badge/cross--os-linux%20%7C%20macos%20%7C%20windows-blue)](.github/workflows/ci.yml)
 [![Runtimes](https://img.shields.io/badge/runtimes-Copilot%20CLI%20%7C%20Claude%20Code%20%7C%20Codex%20%7C%20OpenCode-purple)](#install--per-runtime)
 
-A multi-runtime plugin that **bootstraps**, **updates**, **improves**, or **replicates** a complete multi-agent system across **GitHub Copilot CLI**, **Claude Code**, **OpenCode**, and **OpenAI Codex CLI** — from a single skill, with a Canonical IR for bidirectional replication, parallel-aware orchestration, mandatory security/audit/architecture governance, and compact-by-default context output baked in.
+A multi-runtime plugin that **bootstraps**, **updates**, **improves**, or **replicates** a complete multi-agent system across **GitHub Copilot CLI**, **Claude Code**, **OpenCode**, and **OpenAI Codex (CLI + App)** — from a single skill, with a Canonical IR for bidirectional replication, parallel-aware orchestration, mandatory security/audit/architecture governance, and compact-by-default context output baked in.
 
 ## What it generates
 
@@ -30,7 +30,7 @@ A multi-runtime plugin that **bootstraps**, **updates**, **improves**, or **repl
 | `init` | Brand-new repo, no agent artifacts |
 | `update` | Existing artifacts, regenerate managed blocks non-destructively |
 | `improve` | Audit existing system → propose checklist of targeted fixes → opt-in apply |
-| `replicate` | Port agents/skills/MCP from one runtime to another (Copilot ↔ Claude ↔ OpenCode ↔ Codex) via Canonical IR |
+| `replicate` | Port agents/skills/MCP from one runtime to another (Copilot ↔ Claude ↔ OpenCode ↔ OpenAI Codex) via Canonical IR |
 
 ## Install — per runtime
 
@@ -56,7 +56,7 @@ claude
 
 Reads `.claude-plugin/plugin.json`. Skills are namespaced as `/<plugin>:<skill>`. Source: <https://docs.anthropic.com/en/docs/claude-code/plugins>.
 
-### OpenAI Codex CLI
+### OpenAI Codex CLI install
 
 ```bash
 codex plugin marketplace add ytthuan/agents-system-setup
@@ -66,6 +66,8 @@ codex
 ```
 
 Reads `.codex-plugin/plugin.json` and the marketplace descriptor at `.agents/plugins/marketplace.json`. Source: <https://developers.openai.com/codex/plugins/build>.
+
+Generated Codex project artifacts are compatible with **OpenAI Codex CLI + App** surfaces that load repo artifacts: `AGENTS.md` contains project/orchestrator memory, `.codex/agents/*.toml` contains specialized subagents, and `.codex/config.toml` contains `[agents]` defaults. Plugin marketplace install and slash-command examples above are CLI-only.
 
 ### OpenCode
 
@@ -122,7 +124,7 @@ Before writing project-scoped agent files, the skill asks whether artifacts shou
 
 - A **skill** is the *unit of capability*.
 - A **plugin** is the *distribution unit*.
-- Wrapping the skill in plugin manifests for each runtime makes it one-line installable on Copilot CLI / Claude Code / Codex, and clone-and-copy installable on OpenCode.
+- Wrapping the skill in plugin manifests for each runtime makes it one-line installable on Copilot CLI / Claude Code / Codex CLI, and clone-and-copy installable on OpenCode.
 
 ## Repo layout
 
@@ -130,7 +132,7 @@ Before writing project-scoped agent files, the skill asks whether artifacts shou
 agents-system-setup/
 ├── plugin.json                  # Copilot CLI manifest
 ├── .claude-plugin/plugin.json   # Claude Code manifest
-├── .codex-plugin/plugin.json    # Codex CLI manifest
+├── .codex-plugin/plugin.json    # Codex CLI plugin manifest
 ├── .agents/plugins/marketplace.json   # Codex marketplace descriptor
 ├── scripts/
 │   ├── install-opencode.sh      # OpenCode installer (POSIX)
@@ -159,7 +161,7 @@ agents-system-setup/
 |---|---|---|---|---|
 | GitHub Copilot CLI | ✅ `/plugin install` | ✅ | ✅ | n/a |
 | Claude Code | ✅ `/plugin install` | ✅ | ✅ | ✅ (opt-in env var) |
-| OpenAI Codex CLI | ✅ `marketplace add` + `/plugins` | ✅ | ✅ | n/a |
+| OpenAI Codex (CLI + App artifacts) | ✅ CLI: `marketplace add` + `/plugins` | ✅ via `AGENTS.md` + `.codex/agents/*.toml` | ✅ | n/a |
 | OpenCode | ⚠️ clone + script copy | ✅ | ✅ | n/a |
 
 Cross-OS: Linux, macOS, Windows (native PowerShell + Git Bash + WSL).

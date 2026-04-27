@@ -1,19 +1,19 @@
 ---
 name: agents-system-setup
-description: 'Bootstrap, improve, or replicate compact multi-agent systems across Copilot CLI, Claude Code, OpenCode, and Codex CLI. Generates AGENTS.md, orchestrator/subagents, skills, governance matrices, and opt-in plugin/MCP recommendations. Uses Canonical IR, MCP approval gates, platform-correct formats, and context-optimized output profiles. Triggers: "set up agents", "scaffold AGENTS.md", "improve my agents", "audit agent setup", "architecture review", "security audit agents", "replicate agents", "configure copilot/claude/opencode/codex", "discover plugins/MCP".'
+description: 'Bootstrap, improve, or replicate compact multi-agent systems across Copilot CLI, Claude Code, OpenCode, and OpenAI Codex (CLI + App). Generates AGENTS.md, orchestrator/subagents, skills, governance matrices, and opt-in plugin/MCP recommendations. Uses Canonical IR, MCP approval gates, platform-correct formats, and context-optimized output profiles. Triggers: "set up agents", "scaffold AGENTS.md", "improve my agents", "audit agent setup", "architecture review", "security audit agents", "replicate agents", "configure copilot/claude/opencode/codex", "discover plugins/MCP".'
 argument-hint: '[init | update | improve | replicate] (omit to auto-detect)'
 ---
 
 # Setup Copilot Agents (multi-platform)
 
-Scaffold or update a complete agent system for the current project across **Copilot CLI**, **Claude Code**, **OpenCode**, and/or **OpenAI Codex CLI**. Produces a canonical `AGENTS.md` (with **Directory Architecture**, **Agent Roster**, **Capability Matrix**, **Security & Audit Matrix**, **Threat Model**, and **Architecture / Design Decisions**), an **orchestrator + N subagents**, project-scoped **skills**, and **approved** plugins/MCP servers — derived from a structured interview.
+Scaffold or update a complete agent system for the current project across **Copilot CLI**, **Claude Code**, **OpenCode**, and/or **OpenAI Codex (CLI + App)**. Produces a canonical `AGENTS.md` (with **Directory Architecture**, **Agent Roster**, **Capability Matrix**, **Security & Audit Matrix**, **Threat Model**, and **Architecture / Design Decisions**), an **orchestrator + N subagents**, project-scoped **skills**, and **approved** plugins/MCP servers — derived from a structured interview.
 
 ## When to Use
 
 - Brand-new repository needs an agent setup from scratch (**init**)
 - Existing project should adopt or extend the orchestrator + subagent pattern (**update**)
 - Existing agent system needs an audit and targeted upgrades (**improve**)
-- Agents authored for one runtime need to be ported to another (**replicate** — Copilot ↔ Claude Code ↔ OpenCode ↔ Codex CLI)
+- Agents authored for one runtime need to be ported to another (**replicate** — Copilot ↔ Claude Code ↔ OpenCode ↔ OpenAI Codex)
 - Discovering relevant plugins / MCP servers from the well-known marketplaces
 
 ## Hard Rules
@@ -46,7 +46,7 @@ Scaffold or update a complete agent system for the current project across **Copi
 First question after detecting cwd. Use `ask_user`:
 
 > "Which agent runtime(s) should I configure?"
-> Choices: `["Copilot CLI only (Recommended for GitHub-centric teams)", "Claude Code only", "OpenCode only", "OpenAI Codex CLI only", "Copilot CLI + Claude Code", "All four (Copilot + Claude Code + OpenCode + Codex)"]`
+> Choices: `["Copilot CLI only (Recommended for GitHub-centric teams)", "Claude Code only", "OpenCode only", "OpenAI Codex only (CLI + App artifacts)", "Copilot CLI + Claude Code", "All four (Copilot + Claude Code + OpenCode + Codex)"]`
 
 Persist the selection. All later phases loop over selected platforms using [platforms.md](./references/platforms.md) as the source of truth for paths and frontmatter.
 
@@ -58,7 +58,7 @@ Persist the selection. All later phases loop over selected platforms using [plat
      - Copilot CLI: `AGENTS.md`, `.github/agents/`, `.github/skills/`, `.mcp.json`
      - Claude Code: `CLAUDE.md`, `.claude/agents/`, `.claude/skills/`, `.claude/settings.json`
      - OpenCode: `opencode.json`, `.opencode/agents/`, `.opencode/skills/`
-     - Codex CLI: `AGENTS.md` (orchestrator + project rules), `.codex/agents/*.toml` (specialized subagents), `.codex/config.toml`, `~/.codex/AGENTS.md`, `~/.codex/agents/`
+     - OpenAI Codex: `AGENTS.md` (orchestrator + project rules), `.codex/agents/*.toml` (specialized subagents), `.codex/config.toml`, `~/.codex/AGENTS.md`, `~/.codex/agents/`; CLI-only plugin/command UX stays documented separately
 2. **Decide mode** with `ask_user` — show what was detected:
 
    | Detected footprint | Default offer | Choices |
@@ -220,12 +220,12 @@ For each selected platform, look up paths and frontmatter in [platforms.md](./re
   - **Copilot CLI** → [orchestrator.agent.md.template](./assets/orchestrator.agent.md.template) at `.github/agents/orchestrator.agent.md`.
   - **Claude Code** → [orchestrator.claude.md.template](./assets/orchestrator.claude.md.template) at `.claude/agents/orchestrator.md`. Frontmatter uses `name` + `description`; `tools:` is a comma-separated string; no `mcp-servers:` key (MCP lives in `.mcp.json`).
   - **OpenCode** → [orchestrator.opencode.md.template](./assets/orchestrator.opencode.md.template) at `.opencode/agents/orchestrator.md`. Frontmatter has **no `name:`** (filename is the name); `mode: primary`; model uses `provider/model-id` format; MCP stays in `opencode.json`.
-  - **Codex CLI** → `## Orchestrator` heading in `AGENTS.md` (orchestrator and project rules live there; specialized subagents are TOML files).
+  - **OpenAI Codex (CLI + App)** → `## Orchestrator` heading in `AGENTS.md` (orchestrator and project rules live there; specialized subagents are TOML files).
 - Each subagent — use the **platform-specific template** and fill `{{OWNED_PATHS}}` / `{{READONLY_PATHS}}` from the Directory Architecture:
   - **Copilot CLI** → [subagent.agent.md.template](./assets/subagent.agent.md.template) at `.github/agents/<name>.agent.md`. Frontmatter: `name`, `description`, optional `tools:` list, optional `mcp-servers:` (hyphenated key).
   - **Claude Code** → [subagent.claude.md.template](./assets/subagent.claude.md.template) at `.claude/agents/<name>.md`. Frontmatter: `name`, `description`, optional `tools:` as **comma-separated string** (e.g. `Read, Grep, Bash`), optional `disallowedTools:`, `permissionMode:`, `model:`, etc. Do **not** use Copilot tool names or `mcp-servers:`.
   - **OpenCode** → [subagent.opencode.md.template](./assets/subagent.opencode.md.template) at `.opencode/agents/<name>.md`. Frontmatter: **no `name:`** (filename = agent name), `description`, `mode: subagent`, optional `model:` in `provider/model-id` format, optional `permission:` block. Do **not** embed `mcp-servers:` — MCP belongs in `opencode.json`.
-  - **Codex CLI** → [subagent.codex.toml.template](./assets/subagent.codex.toml.template) at `.codex/agents/<kebab-name>.toml`. Required fields: `name`, `description`, `developer_instructions` (TOML triple-quoted string). Carry the IR's `tool_allowlist` only if explicitly set (otherwise inherit from parent session). Map IR `model` → `model` and reasoning hints → `model_reasoning_effort` (`low`|`medium`|`high`). Set `sandbox_mode = "read-only"` for read-only subagents. Per-agent MCP servers go under `[mcp_servers.<id>]` in the same file. `AGENTS.md` keeps only the orchestrator section + Directory Architecture / Capability Matrix / Waves. See [Codex layout](./references/platforms.md#openai-codex-cli--split-layout) and [openai docs](https://developers.openai.com/codex/subagents). Also emit/upsert `.codex/config.toml` with `[agents] max_threads = 6` and `max_depth = 1` unless the user supplied other values.
+  - **OpenAI Codex (CLI + App)** → [subagent.codex.toml.template](./assets/subagent.codex.toml.template) at `.codex/agents/<kebab-name>.toml`. Required fields: `name`, `description`, `developer_instructions` (TOML triple-quoted string). Carry the IR's `tool_allowlist` only if explicitly set (otherwise inherit from parent session). Map IR `model` → `model` and reasoning hints → `model_reasoning_effort` (`low`|`medium`|`high`). Set `sandbox_mode = "read-only"` for read-only subagents. Per-agent MCP servers go under `[mcp_servers.<id>]` in the same file. `AGENTS.md` keeps only the orchestrator section + Directory Architecture / Capability Matrix / Waves. See [Codex layout](./references/platforms.md) and [openai docs](https://developers.openai.com/codex/subagents). CLI-only instructions such as `/agent` are usage notes, not requirements for App compatibility. Also emit/upsert `.codex/config.toml` with `[agents] max_threads = 6` and `max_depth = 1` unless the user supplied other values.
 - Each skill → [template](./assets/skill.template.md) at the platform's skills path.
 - MCP config (only if Phase 3.5 approved) at the platform's MCP path.
 - Drop the [directory-architecture snippet](./assets/directory-architecture.snippet.md) into any agent missing the boundary block.
@@ -291,7 +291,7 @@ Skip the entire phase only when `mode == update` and no agents/plugins/MCP chang
 - **Dedicated security/architecture agent or merged role?** Dedicated when the repo handles sensitive data, external tools/MCP, CI/release, regulated domains, monorepos, or user-requested architecture work. Merge into `@reviewer` only for small projects, and keep explicit ownership in the Security & Audit Matrix.
 - **Compact vs balanced vs full output?** Balanced by default. Compact for experienced teams or small repos. Full only for onboarding, audit, or when the user explicitly asks for exhaustive detail. See [context optimization](./references/context-optimization.md).
 - **Git-tracked or local-only?** Teams usually want `project-tracked`; personal experimentation should use `project-local` with `.git/info/exclude`; reusable private agents should use `personal-global`.
-- **Which platform?** Copilot CLI for GitHub-tight teams; Claude Code for Anthropic-first; OpenCode for vendor-neutral / self-hosted; Codex CLI for OpenAI-first (uses split layout: `AGENTS.md` for orchestrator + rules, `.codex/agents/*.toml` for specialized subagents). Multi-target if uncertain — files coexist cleanly via shared `AGENTS.md` + `.mcp.json`.
+- **Which platform?** Copilot CLI for GitHub-tight teams; Claude Code for Anthropic-first; OpenCode for vendor-neutral / self-hosted; OpenAI Codex for OpenAI-first teams (CLI + App compatible artifacts, using split layout: `AGENTS.md` for orchestrator + rules, `.codex/agents/*.toml` for specialized subagents). Multi-target if uncertain — files coexist cleanly via shared `AGENTS.md` + `.mcp.json`.
 - **`update` vs `improve` vs `replicate`?**
   - `update` regenerates managed blocks against the current plan (still asks before writing).
   - `improve` audits the existing system and proposes a checklist of targeted fixes — user picks which to apply.
@@ -313,7 +313,7 @@ Skip the entire phase only when `mode == update` and no agents/plugins/MCP chang
 - Generic descriptions ("helps with code") — kills discovery.
 - Inventing plugin/skill/MCP names. Always cite `[Tier · Vendor]` from [marketplaces](./references/marketplaces.md).
 - **Sequential-only orchestrator** — must fan out parallel-safe subagents (see [parallelism](./references/parallelism.md)).
-- **Treating Codex CLI as `AGENTS.md`-only.** Current Codex (per [openai docs](https://developers.openai.com/codex/subagents)) supports project-scoped subagents at `.codex/agents/<name>.toml`. Reserve `## <Name>` headings inside `AGENTS.md` for the orchestrator + project rules; emit specialized subagents as TOML files.
+- **Treating Codex as `AGENTS.md`-only.** Current Codex (per [openai docs](https://developers.openai.com/codex/subagents)) supports project-scoped subagents at `.codex/agents/<name>.toml`, with subagent activity surfaced in both the Codex app and CLI. Reserve `## <Name>` headings inside `AGENTS.md` for the orchestrator + project rules; emit specialized subagents as TOML files.
 - **Forgetting Codex's required TOML fields.** Every `.codex/agents/<name>.toml` MUST have `name`, `description`, and `developer_instructions`. Missing any of the three = silent skip on load.
 - **Skipping Phase 8 wrap-up** — denies users the curated add-on menu (Spec-Kit, evals, telemetry, security review). See [wrap-up](./references/wrapup.md).
 - **Wrap-up as per-item round-robin** — must be a *single* multi-select prompt.

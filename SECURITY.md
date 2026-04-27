@@ -23,7 +23,7 @@ In scope:
 - The plugin manifests (Copilot, Claude, Codex, marketplace)
 
 Out of scope (report directly to the upstream project):
-- Vulnerabilities in GitHub Copilot CLI, Claude Code, OpenCode, or OpenAI Codex CLI themselves
+- Vulnerabilities in GitHub Copilot CLI, Claude Code, OpenCode, or OpenAI Codex (CLI or App) themselves
 - Vulnerabilities in third-party MCP servers recommended by the skill — those are surfaced for opt-in install but maintained externally
 
 ## Disclosure

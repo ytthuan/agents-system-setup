@@ -2,17 +2,22 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
-## [Unreleased]
+## [0.7.0] - 2026-04-27
 
 ### Added
 
 - Plan Handoff Contract guidance normalizes VS Code Plan agent output, Spec-Kit `/plan`, and user-written plans into HandoffIR before runtime-specific emission.
 - Generated `AGENTS.md`, orchestrator, Markdown subagent, and Codex TOML templates now include concise handoff input/output fields.
 - Validator guardrail `check_plan_handoff_policy` keeps the handoff reference, template markers, and output contract from regressing.
+- Validator guardrail `check_codex_cli_app_compatibility` keeps Codex setup and replication docs compatible with shared CLI + App artifacts without overclaiming App plugin installation.
 
 ### Changed
 
 - Platform references now consistently describe four runtimes and clarify OpenCode's `permission:`-based agent schema.
+- Codex setup, replication, templates, output contract, and README now distinguish shared **OpenAI Codex CLI + App** artifacts from CLI-only plugin and slash-command workflows.
+- `AGENTS.md` templates now name OpenAI Codex as a native project-memory consumer alongside Claude Code and OpenCode.
+
+## [Unreleased]
 
 ## [0.6.1] - 2026-04-25
 

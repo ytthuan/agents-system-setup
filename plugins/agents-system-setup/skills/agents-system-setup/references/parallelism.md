@@ -6,7 +6,7 @@ Generated agent systems must exploit parallelism wherever the work is independen
 
 | Primitive | What it is | Where it lives | Coordination model |
 |---|---|---|---|
-| **Parallel subagents** | Multiple `Task`-tool invocations in **one orchestrator turn**, each in its own context window | Copilot CLI, Claude Code, OpenCode, Codex CLI (any runtime with a Task-equivalent tool) | Fan-out from one orchestrator; results return to the orchestrator only |
+| **Parallel subagents** | Multiple `Task`-tool invocations in **one orchestrator turn**, each in its own context window | Copilot CLI, Claude Code, OpenCode, OpenAI Codex (CLI + App subagent workflows where repo artifacts are available) | Fan-out from one orchestrator; results return to the orchestrator only |
 | **Agent teams** (Claude Code only, experimental) | Independent Claude instances that **message each other directly**, with a shared task list | Claude Code only — requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` | Lead + teammates; teammates communicate peer-to-peer |
 
 Source: https://docs.anthropic.com/en/docs/claude-code/sub-agents · https://docs.anthropic.com/en/docs/claude-code/agent-teams
@@ -45,7 +45,7 @@ The orchestrator prompt (Phase 4) is rendered with explicit fan-out instructions
 
 ## Orchestrator prompt patterns (per runtime)
 
-### Copilot CLI / OpenCode / Codex (parallel subagents)
+### Copilot CLI / OpenCode / OpenAI Codex (parallel subagents)
 
 ```markdown
 ## Coordination protocol

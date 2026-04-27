@@ -1,4 +1,5 @@
-# OpenAI Codex CLI subagent — project-scoped at .codex/agents/{{NAME}}.toml
+# OpenAI Codex custom agent — project-scoped at .codex/agents/{{NAME}}.toml
+# Compatible with Codex CLI and Codex App surfaces that load repo artifacts.
 # Spec: https://developers.openai.com/codex/subagents
 #
 # Required: name, description, developer_instructions
@@ -12,13 +13,14 @@ description = "{{DESCRIPTION}}"
 # model = "{{MODEL}}"
 # model_reasoning_effort = "{{REASONING_EFFORT}}"   # low | medium | high
 # sandbox_mode = "{{SANDBOX_MODE}}"                  # read-only | workspace-write
-# nickname_candidates = ["Atlas", "Delta", "Echo"]
+# nickname_candidates = ["Atlas", "Delta", "Echo"]  # presentation hint in CLI/App activity
 
 # developer_instructions MUST include: Directory Boundaries, Security & Audit
 # Boundaries, Architecture & Design Expectations, Quality Gates, and required
 # audit evidence. Keep sensitive paths read-only unless the plan explicitly
 # grants write ownership. Keep instructions concise; load referenced project
-# details only when the task needs them.
+# details only when the task needs them. Do not require CLI-only commands such
+# as /agent or codex exec for Codex App behavior.
 developer_instructions = """
 {{DEVELOPER_INSTRUCTIONS}}
 

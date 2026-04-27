@@ -4,7 +4,7 @@ Use `ask_user` for **every** question. One question per call. Multiple-choice wh
 
 ## 0. Platform Selection (FIRST question after detection)
 - Q: "Which agent runtime(s) should I configure?"
-- Choices: `["Copilot CLI only (Recommended for GitHub-centric teams)", "Claude Code only", "OpenCode only", "OpenAI Codex CLI only", "Copilot CLI + Claude Code", "All four (Copilot + Claude Code + OpenCode + Codex)"]`
+- Choices: `["Copilot CLI only (Recommended for GitHub-centric teams)", "Claude Code only", "OpenCode only", "OpenAI Codex only (CLI + App artifacts)", "Copilot CLI + Claude Code", "All four (Copilot + Claude Code + OpenCode + Codex)"]`
 
 ## 1. Purpose
 - Q: "In one sentence, what does this project do?"

@@ -9,17 +9,17 @@ This skill targets four agent runtimes. The user picks one or more in **Phase 0*
 | **Copilot CLI** | https://docs.github.com/en/copilot/concepts/agents/copilot-cli/about-custom-agents |
 | **Claude Code** | https://docs.anthropic.com/en/docs/claude-code/sub-agents |
 | **OpenCode** | https://opencode.ai/docs/agents/ · https://opencode.ai/docs/mcp-servers/ |
-| **OpenAI Codex CLI** | https://github.com/openai/codex · https://agents.md |
+| **OpenAI Codex (CLI + App)** | https://github.com/openai/codex · https://agents.md · https://developers.openai.com/codex/subagents |
 
 ## Path / Format Matrix
 
-| Artifact | Copilot CLI | Claude Code | OpenCode | OpenAI Codex CLI |
+| Artifact | Copilot CLI | Claude Code | OpenCode | OpenAI Codex (CLI + App) |
 |---|---|---|---|---|
 | Agents | `.github/agents/<name>.agent.md` | `.claude/agents/<name>.md` | `.opencode/agents/<name>.md` | orchestrator + project rules in `AGENTS.md`; **specialized subagents in `.codex/agents/<name>.toml`** (project) or `~/.codex/agents/` (user) |
 | Skills | `.github/skills/<name>/SKILL.md` | `.claude/skills/<name>/SKILL.md` | `.opencode/skills/<name>/SKILL.md` | not supported natively — describe in `AGENTS.md` |
 | MCP servers | `.mcp.json` (root) | `.mcp.json` (root, shared with Copilot) | `opencode.json` › `"mcp": { ... }` | `.mcp.json` (root, shared) |
 | Hooks | `.github/hooks/*.json` | `.claude/settings.json` › `"hooks"` | `.opencode/hooks/` | not supported |
-| Project memory | `AGENTS.md` (root) | `CLAUDE.md` (symlink → `AGENTS.md` on macOS/Linux; copy on Windows) | `AGENTS.md` (native) | `AGENTS.md` (native — primary consumer) |
+| Project memory | `AGENTS.md` (root) | `CLAUDE.md` (symlink → `AGENTS.md` on macOS/Linux; copy on Windows) | `AGENTS.md` (native) | `AGENTS.md` (native — primary consumer in Codex CLI + App artifact flows) |
 | Personal memory | `~/.copilot/AGENTS.md` | `~/.claude/CLAUDE.md` | `~/.config/opencode/AGENTS.md` | `~/.codex/AGENTS.md` |
 
 ## Agent Frontmatter — per platform
@@ -79,11 +79,19 @@ permission:                                                # preferred over depr
 ```
 > MCP servers live in `opencode.json` › `mcp`, NOT in agent frontmatter. Built-in primaries: `build`, `plan`. Built-in subagents: `general`, `explore`. Extra top-level keys (e.g. `reasoningEffort`) pass through as provider model options.
 
-### OpenAI Codex CLI — split layout
+### OpenAI Codex CLI + App — split layout
+
+Codex uses shared project artifacts that are compatible with both Codex CLI and Codex App surfaces where those artifacts are available. Keep **CLI-only** commands (`codex plugin marketplace add`, `/plugins`, `/agent`, `codex exec`, approval overlays) in install or "Try it" notes; generated project artifacts must not require those commands to be useful in the App.
+
+| Surface | Applies to | Notes |
+|---|---|---|
+| Shared artifacts | `AGENTS.md`, `.codex/agents/*.toml`, `.codex/config.toml`, approved `.mcp.json` where supported | Source of truth for setup and replication. Keep these schema-valid and free of CLI-only requirements. |
+| CLI-only UX | plugin marketplace install, `/plugins`, `/agent`, `codex exec`, interactive approval overlays | Document as CLI usage examples only. Do not claim Codex App plugin installation unless OpenAI documents it. |
+| App-visible UX | subagent activity/thread visibility, display nicknames, consolidated results | Uses the same custom-agent definitions; `nickname_candidates` are presentation hints, not routing keys. |
 
 **Project rules + orchestrator** live in `AGENTS.md` at the repo root (Codex's primary input). `## <Display Name>` headings inside `AGENTS.md` are reserved for **the orchestrator and shared project-wide concerns** (Directory Architecture, Capability Matrix, Waves) — *not* specialized workers.
 
-**Specialized subagents** are standalone TOML files under `.codex/agents/<name>.toml` (project-scoped) or `~/.codex/agents/<name>.toml` (user-scoped). Codex loads each file as a configuration layer for the spawned session, so a custom agent file may override any setting a normal session config sets. Switch threads with `/agent` in the CLI.
+**Specialized subagents** are standalone TOML files under `.codex/agents/<name>.toml` (project-scoped) or `~/.codex/agents/<name>.toml` (user-scoped). Codex loads each file as a configuration layer for the spawned session, so a custom agent file may override any setting a normal session config sets. In the CLI, switch threads with `/agent`; in the App, rely on Codex's surfaced subagent activity rather than embedding CLI-only switching requirements.
 
 **Required fields** (per [openai docs](https://developers.openai.com/codex/subagents)):
 
@@ -93,7 +101,7 @@ permission:                                                # preferred over depr
 | `description`            | string   | Human-facing guidance for when Codex should use this agent.     |
 | `developer_instructions` | string   | Core instructions defining behavior (use TOML triple-quoted string). |
 
-**Optional fields** (inherit from parent session if omitted): `nickname_candidates: string[]`, `model`, `model_reasoning_effort` (`low`|`medium`|`high`), `sandbox_mode` (e.g. `read-only`, `workspace-write`), `[mcp_servers.<id>]` table, `[[skills.config]]` array. Built-in agent names — `default`, `worker`, `explorer` — can be overridden by a custom file using the same `name`.
+**Optional fields** (inherit from parent session if omitted): `nickname_candidates: string[]`, `model`, `model_reasoning_effort` (`low`|`medium`|`high`), `sandbox_mode` (e.g. `read-only`, `workspace-write`), `[mcp_servers.<id>]` table, `[[skills.config]]` array. Built-in agent names — `default`, `worker`, `explorer` — can be overridden by a custom file using the same `name`. `nickname_candidates` are display hints that can help in both Codex CLI and App activity views.
 
 ```toml
 name = "reviewer"
@@ -159,7 +167,7 @@ Plan prompt output is normalized to HandoffIR before emission; never copy the so
 | Copilot CLI | Markdown body section inside `.github/agents/<name>.agent.md`; frontmatter remains Copilot-only. |
 | Claude Code | Markdown body section inside `.claude/agents/<name>.md`; frontmatter remains Claude-only. |
 | OpenCode | Markdown body section inside `.opencode/agents/<name>.md`; frontmatter remains OpenCode-only and MCP stays in `opencode.json`. |
-| OpenAI Codex CLI | TOML `developer_instructions` in `.codex/agents/<name>.toml`; `AGENTS.md` keeps only orchestrator/project-level handoff summary. |
+| OpenAI Codex (CLI + App) | TOML `developer_instructions` in `.codex/agents/<name>.toml`; `AGENTS.md` keeps only orchestrator/project-level handoff summary. CLI-only commands stay in usage notes, not required artifact behavior. |
 
 ## Project-Memory Linking
 

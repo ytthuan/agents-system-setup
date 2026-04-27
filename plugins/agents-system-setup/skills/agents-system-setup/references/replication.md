@@ -2,7 +2,7 @@
 
 This skill can replicate an agent system from one runtime to another (and back) without manual rewrites. The strategy is **Canonical IR (Intermediate Representation) → emit per platform**, not N×N pairwise mappings.
 
-> Supported runtimes: **Copilot CLI**, **Claude Code**, **OpenCode**, **OpenAI Codex CLI**.
+> Supported runtimes: **Copilot CLI**, **Claude Code**, **OpenCode**, **OpenAI Codex (CLI + App)**.
 
 ## 1. Canonical IR
 
@@ -71,9 +71,9 @@ enabled: true
 
 ## 2. Field-Mapping Matrix (lossless / lossy markers)
 
-| IR field | Copilot CLI | Claude Code | OpenCode | OpenAI Codex CLI |
+| IR field | Copilot CLI | Claude Code | OpenCode | OpenAI Codex (CLI + App) |
 |---|---|---|---|---|
-| `name` | frontmatter `name:` ✅ | frontmatter `name:` ✅ | filename only (no `name:`) ⚠️ derive from basename | TOML `name` in `.codex/agents/<name>.toml` ✅ (orchestrator only as `## <Name>` in `AGENTS.md`) |
+| `name` | frontmatter `name:` ✅ | frontmatter `name:` ✅ | filename only (no `name:`) ⚠️ derive from basename | TOML `name` in `.codex/agents/<name>.toml` ✅ (orchestrator only as `## <Name>` in `AGENTS.md`; `name` is source of truth) |
 | `description` | `description:` ✅ | `description:` ✅ | `description:` ✅ | TOML `description` ✅ |
 | `role_prompt` | body ✅ | body ✅ | body ✅ | TOML `developer_instructions` (triple-quoted) ✅ |
 | `model.family` | `model: claude-sonnet-4.6` ✅ | `model: sonnet` ✅ | `model: anthropic/claude-sonnet-4-5` ✅ | TOML `model = "gpt-5.4"` ✅ + optional `model_reasoning_effort = "low\|medium\|high"` |
@@ -83,7 +83,7 @@ enabled: true
 | `permission.bash_deny_patterns` | n/a ❌ | n/a ❌ | `permission.bash:` map ✅ | n/a ❌ |
 | `scope: user` | `~/.copilot/agents/` | `~/.claude/agents/` | `~/.config/opencode/agents/` | `~/.codex/agents/<name>.toml` |
 | `scope: project` | `.github/agents/<name>.agent.md` | `.claude/agents/<name>.md` | `.opencode/agents/<name>.md` | `.codex/agents/<name>.toml` (orchestrator stays in `AGENTS.md`) |
-| `nicknames` | n/a — drop ❌ | n/a — drop ❌ | n/a — drop ❌ | TOML `nickname_candidates = ["Atlas", "Delta"]` ✅ (Codex-only IR field) |
+| `nicknames` | n/a — drop ❌ | n/a — drop ❌ | n/a — drop ❌ | TOML `nickname_candidates = ["Atlas", "Delta"]` ✅ (Codex-only IR field; presentation in CLI + App activity views) |
 | `security_controls`, `audit_requirements`, `architecture_decisions`, `quality_gates`, `sensitive_paths` | body + `AGENTS.md` managed governance sections ✅ | body + `AGENTS.md` / `CLAUDE.md` memory ✅ | body + `AGENTS.md` / `opencode.json` notes ✅ | TOML `developer_instructions` + `AGENTS.md` managed governance sections ✅ |
 
 ### Tool-name canonicalization
@@ -101,6 +101,10 @@ enabled: true
 
 The IR uses the lowercase canonical names. Renderers translate **at emit time only** — never round-trip through another platform's name set.
 
+### Codex CLI + App compatibility rule
+
+When Codex is a target, replication emits shared Codex artifacts, not CLI-only behavior: `AGENTS.md` for project/orchestrator memory, `.codex/agents/<name>.toml` for specialized custom agents, and `.codex/config.toml` for `[agents]` defaults. CLI commands such as `/agent`, `/plugins`, and `codex exec` may appear in "Try it" notes, but the replicated TOML must work without relying on those commands as required App behavior.
+
 ## 3. Replication Procedure
 
 Triggered when the user picks **mode: `replicate`** in Phase 1, or when Phase 1 detects two+ runtime footprints and the user confirms a port.
@@ -112,11 +116,13 @@ Triggered when the user picks **mode: `replicate`** in Phase 1, or when Phase 1 
 3. PARSE source files  → AgentIR / SkillIR / MCPServerIR records (in memory)
 4. NORMALIZE          → canonical tool names, expand `tools: omitted` to all-true
 5. LOSSINESS REPORT   → for each (target × IR field), flag: kept | mapped | dropped
-                        Render a compact table; ask_user approval per dropped field.
-                        Link overflow details if the table exceeds the chosen profile.
+                         Render a compact table; ask_user approval per dropped field.
+                         Link overflow details if the table exceeds the chosen profile.
+                        Also flag surface lossiness, such as source CLI-only usage
+                        instructions that must not become required Codex App behavior.
 6. MCP APPROVAL GATE  → re-run Phase 3.5 against any MCPServerIR that will be
                         emitted into a target the user hasn't approved before.
-7. EMIT per target    → write per-platform paths + frontmatter (platforms.md)
+7. EMIT per target    → write per-platform paths + frontmatter/TOML (platforms.md)
                         with `<!-- agents-system-setup:replicated-from: <source> -->`
                         marker just under the frontmatter.
 8. WRITE ledger       → append one JSON object per line to
@@ -182,6 +188,6 @@ Common improve targets:
 - Copilot CLI custom agents: https://docs.github.com/en/copilot/concepts/agents/copilot-cli/about-custom-agents
 - Claude Code subagents: https://docs.claude.com/en/docs/claude-code/sub-agents
 - OpenCode agents: https://opencode.ai/docs/agents/
-- OpenAI Codex CLI subagents spec: https://developers.openai.com/codex/subagents
+- OpenAI Codex subagents spec (CLI + App activity surfaces): https://developers.openai.com/codex/subagents
 - OpenAI Codex (general) AGENTS.md spec: https://agents.md and https://github.com/openai/codex
 - Security / audit / architecture baseline: ./security-audit-architecture.md

@@ -14,7 +14,9 @@ Checks (per the CONTRIBUTING.md contract):
   9. Governance baseline references and templates are present
  10. Context optimization policy and generated-template markers are present
  11. Local-vs-git-tracked artifact policy is present
- 12. Plan handoff policy is present and platform-specific
+  12. Plan handoff policy is present and platform-specific
+  13. Codex shared artifacts are documented as CLI + App compatible without
+      overclaiming Codex App plugin installation
 
 Exits non-zero on any failure. Designed to be invoked from CI on
 Linux / macOS / Windows runners with only Python 3.10+ available
@@ -544,7 +546,7 @@ def check_plan_handoff_policy() -> None:
             "Copilot CLI",
             "Claude Code",
             "OpenCode",
-            "OpenAI Codex CLI",
+            "OpenAI Codex (CLI + App)",
             "developer_instructions",
         ),
     )
@@ -641,6 +643,81 @@ def check_plan_handoff_policy() -> None:
     )
 
 
+# ---------- 13: Codex CLI + App compatibility ----------
+
+def check_codex_cli_app_compatibility() -> None:
+    """Codex setup/replication emits shared repo artifacts that work across
+    CLI + App surfaces where Codex loads those artifacts. Keep CLI plugin and
+    slash-command UX explicitly CLI-only.
+    """
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "OpenAI Codex (CLI + App)",
+            "CLI-only instructions",
+            ".codex/agents/<kebab-name>.toml",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "platforms.md",
+        (
+            "OpenAI Codex CLI + App",
+            "Shared artifacts",
+            "CLI-only UX",
+            "App-visible UX",
+            "Do not claim Codex App plugin installation",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "agent-format.md",
+        (
+            "OpenAI Codex CLI + App",
+            "CLI-only",
+            "Codex App behavior",
+            "nickname_candidates",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "replication.md",
+        (
+            "Codex CLI + App compatibility rule",
+            "surface lossiness",
+            ".codex/agents/<name>.toml",
+            "must not become required Codex App behavior",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "OpenAI Codex",
+            "CLI + App project memory",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "subagent.codex.toml.template",
+        (
+            "Compatible with Codex CLI and Codex App",
+            "Do not require CLI-only commands",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "output-contract.md",
+        (
+            "codex-cli",
+            "CLI + App compatible artifacts",
+            "plugin install and slash-command examples explicitly CLI-only",
+        ),
+    )
+    require_contains(
+        REPO / "README.md",
+        (
+            "OpenAI Codex (CLI + App)",
+            "OpenAI Codex CLI install",
+            "Plugin marketplace install and slash-command examples above are CLI-only",
+        ),
+    )
+
+
 # ---------- main ----------
 
 def main() -> int:
@@ -655,6 +732,7 @@ def main() -> int:
     check_context_optimization()
     check_local_tracking_policy()
     check_plan_handoff_policy()
+    check_codex_cli_app_compatibility()
 
     if WARNINGS:
         print("\nWARNINGS:")

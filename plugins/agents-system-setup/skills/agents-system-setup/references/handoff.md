@@ -16,7 +16,7 @@ argument-hint: Describe what you want to plan or research
 Plan my task.
 ```
 
-Treat this as an upstream planning surface only. The `agent: Plan` field routes the prompt to a planner; it is not valid Copilot CLI, Claude Code, OpenCode, or Codex subagent frontmatter. Spec-Kit `/plan` and user-written plans follow the same rule: parse the planning output into HandoffIR, then render the selected runtime's native format.
+Treat this as an upstream planning surface only. The `agent: Plan` field routes the prompt to a planner; it is not valid Copilot CLI, Claude Code, OpenCode, or OpenAI Codex subagent frontmatter. Spec-Kit `/plan` and user-written plans follow the same rule: parse the planning output into HandoffIR, then render the selected runtime's native format.
 
 ## HandoffIR
 
@@ -38,6 +38,7 @@ runtime_format_target: "<platform path + schema>"
 expected_output: ["<file or evidence>", "..."]
 evidence_required: ["diff summary", "tests", "security finding", "adr", "..."]
 lossiness: ["<field dropped or mapped>", "..."]
+surface_lossiness: ["<CLI-only instruction not available in app/web UI>", "..."]
 ```
 
 ## Per-runtime handoff surfaces
@@ -47,7 +48,7 @@ lossiness: ["<field dropped or mapped>", "..."]
 | Copilot CLI | Markdown body in `.github/agents/<name>.agent.md` | YAML frontmatter must use `name`, `description`, optional `tools`, and optional `mcp-servers`; handoff fields stay in body sections. |
 | Claude Code | Markdown body in `.claude/agents/<name>.md` | YAML frontmatter must use Claude fields such as `name`, `description`, and comma-string `tools`; do not copy Copilot tool lists. |
 | OpenCode | Markdown body in `.opencode/agents/<name>.md` | Frontmatter has no `name`; filename is the agent name. Use `description`, `mode`, and `permission`; MCP stays in `opencode.json`. |
-| OpenAI Codex CLI | `developer_instructions` in `.codex/agents/<name>.toml`; orchestrator summary in `AGENTS.md` | TOML must include `name`, `description`, and `developer_instructions`. Specialized subagents are not Markdown headings in `AGENTS.md`. |
+| OpenAI Codex (CLI + App) | `developer_instructions` in `.codex/agents/<name>.toml`; orchestrator summary in `AGENTS.md` | TOML must include `name`, `description`, and `developer_instructions`. Specialized subagents are not Markdown headings in `AGENTS.md`. CLI-only instructions such as `/agent` are usage notes, not required App behavior. |
 
 Skills are portable `SKILL.md` files; if a skill consumes handoff data, describe the HandoffIR fields in the skill body rather than inventing runtime-specific frontmatter.
 
@@ -78,6 +79,7 @@ Before declaring done:
 3. Parse each target's frontmatter or TOML with the target schema.
 4. Confirm any lossy field mapping is in the lossiness report or output contract.
 5. Confirm MCP, secrets, CI/release, and user-scope writes still went through their approval gates.
+6. For Codex, confirm shared artifacts (`AGENTS.md`, `.codex/agents/*.toml`, `.codex/config.toml`) do not require CLI-only commands to work in the App.
 
 ## Anti-patterns
 
@@ -86,3 +88,4 @@ Before declaring done:
 - Emitting a Copilot `tools:` list into Claude Code or OpenCode files.
 - Writing OpenCode MCP config into agent frontmatter instead of `opencode.json`.
 - Rendering Codex specialized subagents as Markdown headings in `AGENTS.md`.
+- Treating Codex CLI commands as requirements for Codex App compatibility.

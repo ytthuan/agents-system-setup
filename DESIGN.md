@@ -78,7 +78,7 @@ This document explains **why** each phase and hard rule of `agents-system-setup`
 - *Architecture / Design Pattern Matrix* — documents pattern decisions, alternatives, guardrails, and ADR refs.
 - *Quality Gates* — defines what proof is required before agents can claim completion.
 - *Context Loading Policy* — tells agents what to read first and what to load only when needed.
-- *Plan Handoff Contract* — turns upstream planning output into a compact HandoffIR before any platform-specific artifact is emitted.
+- *Plan Handoff Contract* — turns upstream planning output into a compact HandoffIR before any platform-specific artifact is emitted, including Codex shared artifacts that work across CLI + App surfaces.
 
 ### Phase 3 — Marketplace Lookup with per-item opt-in
 
@@ -162,3 +162,4 @@ MCP approval is per-target, not global. Approving a server for Copilot CLI tells
 - Hooks portability — Copilot CLI uses `.github/hooks/*.json`, Claude uses `.claude/settings.json` › `hooks`, OpenCode uses `.opencode/hooks/`. Round-trip is non-trivial; today the IR doesn't model hooks.
 - Plugin-of-plugins — should this skill be able to install other plugins it recommends? Currently it surfaces install commands only.
 - LSP server discovery — Copilot CLI plugins can ship LSP configs; not yet covered.
+- Codex App capability detection — generated repo artifacts are CLI + App compatible where Codex surfaces load them, but plugin installation remains CLI-documented until OpenAI publishes App plugin-install semantics.

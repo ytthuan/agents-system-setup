@@ -7,6 +7,7 @@
 > - Claude Code plugins: <https://docs.claude.com/en/docs/claude-code/plugins>
 > - Codex CLI plugins (build): <https://developers.openai.com/codex/plugins/build>
 > - Codex CLI plugins (use): <https://developers.openai.com/codex/plugins>
+> - Codex CLI + App subagents: <https://developers.openai.com/codex/subagents>
 > - OpenCode plugins/agents: <https://opencode.ai/docs/agents/>
 
 A "marketplace" is a registry where plugins (which can bundle agents, skills, hooks, MCP server configs, LSP server configs) are published. Always search Tier 1 first, then Tier 2; only fall back to free-text `github-search_repositories` if all of them miss.
@@ -21,7 +22,7 @@ A "marketplace" is a registry where plugins (which can bundle agents, skills, ho
 | `anthropics/claude-code` | <https://github.com/anthropics/claude-code> | Anthropic | Claude Code core repo + sub-agent format source-of-truth |
 | `openai/skills` | <https://github.com/openai/skills> | OpenAI | **Skills Catalog for Codex** (~17k★). Authoritative skill registry. |
 | `openai/plugins` | <https://github.com/openai/plugins> | OpenAI | OpenAI plugins (~900★) |
-| `openai/codex` | <https://github.com/openai/codex> | OpenAI | Codex CLI core (~77k★); consumes `AGENTS.md` + `.codex/agents/*.toml` |
+| `openai/codex` | <https://github.com/openai/codex> | OpenAI | OpenAI Codex core (~77k★); shared artifacts use `AGENTS.md` + `.codex/agents/*.toml` |
 | `openai/codex-plugin-cc` | <https://github.com/openai/codex-plugin-cc> | OpenAI | Use Codex from Claude Code (cross-runtime bridge, ~15k★) |
 | `modelcontextprotocol/servers` | <https://github.com/modelcontextprotocol/servers> | MCP project | Reference MCP servers (filesystem, github, git, fetch, …) |
 | GitHub Code Security docs | <https://docs.github.com/en/code-security> | GitHub | Source-of-truth for secret scanning, code scanning, dependency review, Dependabot, push protection |
@@ -65,7 +66,7 @@ A "marketplace" is a registry where plugins (which can bundle agents, skills, ho
 |---|---|---|
 | `awesome-opencode/awesome-opencode` | <https://github.com/awesome-opencode/awesome-opencode> | Curated OpenCode plugins, themes, agents, projects (~5.5k★) |
 
-### Codex CLI / `AGENTS.md` ecosystem
+### OpenAI Codex / `AGENTS.md` ecosystem
 
 | Source | URL | Notes |
 |---|---|---|
@@ -145,7 +146,7 @@ claude
 # Skills are namespaced as /<plugin>:<skill>
 ```
 
-### OpenAI Codex CLI
+### OpenAI Codex CLI install
 
 ```
 codex plugin marketplace add <owner>/<repo>
@@ -156,7 +157,7 @@ codex
 > @<plugin-name>  # invoke a plugin or its bundled skill
 ```
 
-Codex marketplace sources accept GitHub shorthand, HTTPS/SSH Git URLs, or a local path. Refresh with `codex plugin marketplace upgrade [name]`; remove with `codex plugin marketplace remove <name>`.
+Codex marketplace sources accept GitHub shorthand, HTTPS/SSH Git URLs, or a local path. Refresh with `codex plugin marketplace upgrade [name]`; remove with `codex plugin marketplace remove <name>`. These are CLI plugin commands; do not present them as Codex App plugin installation.
 
 ### OpenCode
 

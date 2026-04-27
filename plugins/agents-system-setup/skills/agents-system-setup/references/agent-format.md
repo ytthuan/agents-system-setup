@@ -104,14 +104,16 @@ You are a <role>...
 
 > **MCP** is NOT configured in agent frontmatter — declare servers globally in `opencode.json` › `mcp`. Per-agent allow/deny is via `permission:`. The `tools:` map (e.g. `{ write: false }`) still works but is deprecated; prefer `permission:` for `edit`/`bash`/`webfetch` and `permission.task` for subagent gating.
 
-## OpenAI Codex CLI — split layout: `AGENTS.md` + `.codex/agents/*.toml`
+## OpenAI Codex CLI + App — split layout: `AGENTS.md` + `.codex/agents/*.toml`
 
 Source: https://developers.openai.com/codex/subagents · general AGENTS.md spec: https://agents.md
 
-Codex uses **two complementary surfaces**:
+Codex uses **two complementary shared artifact surfaces** that should stay compatible with both Codex CLI and Codex App wherever the App has access to the repo artifacts:
 
 1. **`AGENTS.md`** at the repo root — project memory + orchestrator instructions + Directory Architecture / Capability Matrix / Waves. The orchestrator MAY appear here as `## Orchestrator`.
-2. **`.codex/agents/<name>.toml`** (project) or **`~/.codex/agents/<name>.toml`** (user) — one TOML file per specialized subagent. Codex loads each as a session config layer; switch with `/agent`.
+2. **`.codex/agents/<name>.toml`** (project) or **`~/.codex/agents/<name>.toml`** (user) — one TOML file per specialized subagent. Codex loads each as a session config layer; the CLI can switch threads with `/agent`.
+
+Keep **CLI-only** commands and workflows (`codex plugin marketplace add`, `/plugins`, `/agent`, `codex exec`, local approval overlays) in install or "Try it" notes. Do not make generated artifacts depend on those commands for Codex App behavior.
 
 ```toml
 name = "reviewer"
@@ -133,12 +135,13 @@ path = "/abs/path/to/SKILL.md"
 enabled = false
 ```
 
-Codex CLI rules:
+Codex shared artifact rules:
 - **Required fields**: `name`, `description`, `developer_instructions`. Missing any → silent skip.
 - **`name` is the source of truth** (filename is convention only). Custom files may override built-ins (`default`, `worker`, `explorer`) by reusing the name.
 - **Global config** in `.codex/config.toml`: `[agents] max_threads = 6` and `max_depth = 1` defaults.
 - MCP servers can be shared via `.mcp.json` at repo root *or* declared per-agent inside the TOML.
 - Skills: per-agent enable/disable via `[[skills.config]]` array entries.
+- `nickname_candidates` are display hints for Codex CLI and App activity views; they are not routing keys.
 
 ## Discovery Surface (all platforms)
 
@@ -153,7 +156,7 @@ The router/orchestrator picks a subagent based on the **`description`** field (o
 The VS Code `plan` prompt (`agent: Plan`) and Spec-Kit `/plan` output are planning inputs, not agent file formats. Normalize them to HandoffIR (see [handoff](./handoff.md)), then place the handoff in the target runtime's supported surface:
 
 - Copilot CLI / Claude Code / OpenCode: Markdown body section after valid YAML frontmatter.
-- Codex CLI: `developer_instructions` inside `.codex/agents/<name>.toml`, plus project-level summary in `AGENTS.md`.
+- OpenAI Codex (CLI + App): `developer_instructions` inside `.codex/agents/<name>.toml`, plus project-level summary in `AGENTS.md`. CLI-only interaction notes must stay optional.
 
 ## Common Pitfalls
 
@@ -167,7 +170,7 @@ The VS Code `plan` prompt (`agent: Plan`) and Spec-Kit `/plan` output are planni
 
 ## Tool Restriction Patterns (use the platform's syntax)
 
-| Pattern | Copilot CLI | Claude Code | OpenCode | Codex CLI |
+| Pattern | Copilot CLI | Claude Code | OpenCode | OpenAI Codex (CLI + App) |
 |---|---|---|---|---|
 | Read-only reviewer | `tools: [view, grep, glob, bash]` | `tools: Read, Grep, Glob, Bash` | `tools: { write: false, edit: false, bash: true }` | `sandbox_mode = "read-only"` in `.codex/agents/<name>.toml` |
 | Implementer (full) | omit `tools:` | omit `tools:` | omit `tools:` (or all true) | `sandbox_mode = "workspace-write"` (or omit to inherit) |
@@ -178,5 +181,6 @@ The VS Code `plan` prompt (`agent: Plan`) and Spec-Kit `/plan` output are planni
 - **Copilot CLI** — list servers under `mcp-servers:` in agent frontmatter, or define centrally in `.mcp.json`.
 - **Claude Code** — central `.mcp.json` (shared with Copilot when both target the repo).
 - **OpenCode** — central `opencode.json` `mcp` key only; agents reference by name via the runtime's discovery.
+- **OpenAI Codex (CLI + App)** — central `.mcp.json` plus optional per-agent `[mcp_servers.<id>]` in TOML where supported; keep approval-gated and surface any App support uncertainty as lossiness.
 
 **Any change to MCP requires the Phase 3.5 approval gate.**
