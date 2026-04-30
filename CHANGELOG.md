@@ -17,7 +17,7 @@ All notable changes to this plugin are documented here. Format: [Keep a Changelo
 - Codex setup, replication, templates, output contract, and README now distinguish shared **OpenAI Codex CLI + App** artifacts from CLI-only plugin and slash-command workflows.
 - `AGENTS.md` templates now name OpenAI Codex as a native project-memory consumer alongside Claude Code and OpenCode.
 
-## [Unreleased]
+## [0.8.0] - 2026-04-30
 
 ### Added
 

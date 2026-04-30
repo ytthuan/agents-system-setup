@@ -99,10 +99,6 @@ enabled: true
 | `description` | `description:` ✅ | `description:` ✅ | `description:` ✅ | TOML `description` ✅ | `description:` ✅; drives automatic delegation |
 | `role_prompt` | body ✅ | body ✅ | body ✅ | TOML `developer_instructions` (triple-quoted) ✅ | Markdown body system prompt ✅ |
 | `model.family` | `model: claude-sonnet-4.6` ✅ | `model: sonnet` ✅ | `model: anthropic/claude-sonnet-4-5` ✅ | TOML `model = "gpt-5.4"` ✅ + optional `model_reasoning_effort = "low\|medium\|high"` | `model: gemini-...` ✅ plus `temperature:` |
-
-> Replication preserves explicit `model:` overrides only. When the source agent left `model:` blank, emit `model: inherit` (or omit it where the target runtime treats absence as inherit). Never invent ids — see [models](./models.md) for accepted formats per target.
-
-> **Task Assignment preservation:** replication preserves the full Task Assignment Contract structure ([handoff.md](./handoff.md#delegation-packet-canonical-schema)). Required-minimum fields are 1:1 across runtimes; expansion blocks (Goal & Definition of Done, Scope, File Inventory, Verification Protocol, Reporting Protocol, etc.) must be carried into the target agent body. Codex TOML keeps the structure inside `developer_instructions`; never silently drop expansion blocks during replication. Surface any drop in the lossiness report.
 | `tools.*` (bool map) | `tools: [read, search, edit, execute, agent]` aliases ✅ | `tools: Read, Grep, ...` (comma string allowlist) + optional `disallowedTools:` denylist — map names | `permission: { edit, bash, webfetch }` ✅ (legacy `tools: { ... }` map is **deprecated**) | model `sandbox_mode` (`read-only`\|`workspace-write`); fine-grained tool list not enforced — drop with warning ⚠️ | `tools:` allowlist ✅; map only known Gemini tool names and warn on unknown/discovered-only tools |
 | `mcp_refs` | per-agent `mcp-servers:` *or* central `.mcp.json` | central `.mcp.json` only ⚠️ | central `opencode.json` › `mcp` only ⚠️ | central `.mcp.json` ✅ **and/or** per-agent `[mcp_servers.<id>]` table inside the agent's TOML ✅ | per-agent `mcp_servers:` ✅; extension `mcpServers` import/package surface ⚠️ |
 | `permission.edit` | n/a — drop with warning ❌ | n/a — drop with warning ❌ | `permission.edit:` ✅ | mapped to `sandbox_mode` (read-only ↔ no edits) ✅ | map to narrower `tools:` and/or policy-engine guidance ⚠️ |
@@ -117,6 +113,10 @@ enabled: true
 | `scope: project` | `.github/agents/<name>.agent.md` | `.claude/agents/<name>.md` | `.opencode/agents/<name>.md` | `.codex/agents/<name>.toml` (orchestrator stays in `AGENTS.md`) | `.gemini/agents/<name>.md` |
 | `nicknames` | n/a — drop ❌ | n/a — drop ❌ | n/a — drop ❌ | TOML `nickname_candidates = ["Atlas", "Delta"]` ✅ (Codex-only IR field; presentation in CLI + App activity views) | map one display value to `display_name` ⚠️ |
 | `security_controls`, `audit_requirements`, `architecture_decisions`, `quality_gates`, `sensitive_paths` | body + `AGENTS.md` managed governance sections ✅ | body + `AGENTS.md` / `CLAUDE.md` memory ✅ | body + `AGENTS.md` / `opencode.json` notes ✅ | TOML `developer_instructions` + `AGENTS.md` managed governance sections ✅ | body + `GEMINI.md`/`AGENTS.md` governance summary ✅ |
+
+> Replication preserves explicit `model:` overrides only. When the source agent left `model:` blank, emit `model: inherit` (or omit it where the target runtime treats absence as inherit). Never invent ids — see [models](./models.md) for accepted formats per target.
+>
+> **Task Assignment preservation:** replication preserves the full Task Assignment Contract structure ([handoff.md](./handoff.md#delegation-packet-canonical-schema)). Required-minimum fields are 1:1 across runtimes; expansion blocks (Goal & Definition of Done, Scope, File Inventory, Verification Protocol, Reporting Protocol, etc.) must be carried into the target agent body. Codex TOML keeps the structure inside `developer_instructions`; never silently drop expansion blocks during replication. Surface any drop in the lossiness report.
 
 ### Tool-name canonicalization
 
