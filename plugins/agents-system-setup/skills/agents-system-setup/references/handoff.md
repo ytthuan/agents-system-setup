@@ -16,7 +16,7 @@ argument-hint: Describe what you want to plan or research
 Plan my task.
 ```
 
-Treat this as an upstream planning surface only. The `agent: Plan` field routes the prompt to a planner; it is not valid Copilot CLI, Claude Code, OpenCode, or OpenAI Codex subagent frontmatter. Spec-Kit `/plan` and user-written plans follow the same rule: parse the planning output into HandoffIR, then render the selected runtime's native format.
+Treat this as an upstream planning surface only. The `agent: Plan` field routes the prompt to a planner; it is not valid Copilot CLI, Claude Code, OpenCode, OpenAI Codex, or Gemini CLI subagent frontmatter. Spec-Kit `/plan` and user-written plans follow the same rule: parse the planning output into HandoffIR, then render the selected runtime's native format.
 
 ## HandoffIR
 
@@ -25,7 +25,7 @@ Normalize every plan handoff into these fields before delegation or file generat
 ```yaml
 task: "<one sentence>"
 source_plan: "vs-code-plan-prompt | spec-kit-plan | user-plan | other"
-selected_platforms: ["copilot-cli", "claude-code", "opencode", "codex-cli"]
+selected_platforms: ["copilot-cli", "claude-code", "opencode", "codex-cli", "gemini-cli"]
 owning_agent: "<kebab-case agent name>"
 owned_paths: ["<glob>", "..."]
 read_only_paths: ["<glob>", "..."]
@@ -49,26 +49,153 @@ surface_lossiness: ["<CLI-only instruction not available in app/web UI>", "..."]
 | Claude Code | Markdown body in `.claude/agents/<name>.md` | YAML frontmatter must use Claude fields such as `name`, `description`, and comma-string `tools`; do not copy Copilot tool lists. |
 | OpenCode | Markdown body in `.opencode/agents/<name>.md` | Frontmatter has no `name`; filename is the agent name. Use `description`, `mode`, and `permission`; MCP stays in `opencode.json`. |
 | OpenAI Codex (CLI + App) | `developer_instructions` in `.codex/agents/<name>.toml`; orchestrator summary in `AGENTS.md` | TOML must include `name`, `description`, and `developer_instructions`. Specialized subagents are not Markdown headings in `AGENTS.md`. CLI-only instructions such as `/agent` are usage notes, not required App behavior. |
+| Gemini CLI | Markdown body in `.gemini/agents/<name>.md`; root-session summary in `GEMINI.md` pointing to `AGENTS.md` | YAML frontmatter must use `name`, `description`, optional `kind: local`, and snake_case `mcp_servers`. Handoff text tells subagents to return cross-agent work to the root session because Gemini subagents cannot recursively call subagents. |
 
 Skills are portable `SKILL.md` files; if a skill consumes handoff data, describe the HandoffIR fields in the skill body rather than inventing runtime-specific frontmatter.
 
-## Delegation packet
+## Delegation packet (canonical schema)
 
-The orchestrator passes subagents a compact packet:
+The orchestrator passes subagents a **Task Assignment**. Renderers fill the same fields in the same order. **This section is the single source of truth** — `references/context-optimization.md` and every orchestrator template must reference it instead of redefining it. The packet has two layers: a Required Minimum (always sent) and Expansion Blocks (sent when applicable).
+
+### Required minimum
 
 ```text
 Task: <one sentence>
-Source plan: <VS Code plan prompt | Spec-Kit /plan | user plan | other>
+Source plan: <user request | VS Code plan prompt | Spec-Kit /plan | other>
 Owned paths: <paths from Directory Architecture>
 Read-only paths: <paths for context only>
 Relevant gates: <quality/security gates>
+Constraints: <security/architecture constraints>
 Dependencies / wave: <wave and waits_for>
-Required approvals: <mcp/secrets/ci/user-scope/none>
+Required approvals: <mcp | secrets | ci | user-scope | none>
 Runtime format target: <none | platform path + schema>
 Expected output: <files changed, evidence, risks>
+Context freshness: <AGENTS.md@<sha or "recent"> | reload>
+Lossiness: <fields dropped or mapped, or "none">
 ```
 
-Do not include unrelated roster rows, marketplace research, or full platform schema details unless the task is generating or validating agent files.
+These twelve fields are mandatory in every assignment. They preserve backward compatibility with the legacy Delegation Packet name.
+
+### Expansion blocks
+
+Add only the blocks the task actually needs. Each block has a fixed name so subagents and validators can find it.
+
+```text
+Goal & Definition of Done:
+  - <observable outcome 1>
+  - <observable outcome 2>
+  - Done when: <single concrete check>
+
+Scope:
+  in_scope:
+    - <bullet>
+  out_of_scope:
+    - <bullet>
+
+File Inventory:
+  to_modify:
+    - <path>
+  to_create:
+    - <path>
+  to_read_only:
+    - <path>
+  evidence_sources:
+    - <path or url>
+
+Background:
+  - <prior decision / ADR id / link>
+  - <related issue, PR, commit>
+  - <session checkpoint reference>
+
+Reproduction (bug-fix tasks only):
+  steps:
+    - <step>
+  expected: <expected behavior>
+  actual: <actual behavior>
+  environment: <runtime, version, platform>
+
+Assumptions:
+  - <assumption the orchestrator made; subagent may challenge>
+
+Known Risks:
+  - <risk> -> <mitigation>
+
+Verification Protocol:
+  build: <command or "n/a">
+  test: <command or "n/a">
+  lint: <command or "n/a">
+  security: <command or "n/a">
+  manual: <smoke step or "n/a">
+
+Reporting Protocol:
+  required_evidence:
+    - <diff summary | test output | screenshot | adr addition | risk update>
+  format: <markdown bullets | structured block | plain prose>
+
+Coordination:
+  wave_siblings:
+    - <agent> -> <input/output relationship>
+  expected_inputs: <from siblings, if any>
+  expected_outputs_for: <siblings consuming this work>
+
+Size & Timebox:
+  size: <small | medium | large>
+  escalate_if: <e.g., "more than 8 files touched" or "more than 25 tool calls">
+
+Clarification Protocol:
+  if_missing_required_field: ask one consolidated question to @orchestrator and wait
+  if_assumption_invalid: stop, report, and request revised assignment
+  do_not: silently invent missing context
+```
+
+### Recommended Packet Form
+
+| Task tag | Recommended form | Required expansion blocks (in addition to required minimum) |
+|---|---|---|
+| `read-only-research` | short-form | none |
+| `code-edit` (≤2 files, no gates) | short-form | none |
+| `code-edit` (>2 files or touching shared boundary) | full-form | Goal & Definition of Done · Scope · File Inventory · Verification Protocol · Reporting Protocol |
+| `security-write` | full-form | Goal & Definition of Done · Scope · File Inventory · Known Risks · Verification Protocol · Reporting Protocol · Clarification Protocol |
+| `mcp-write` | full-form | Goal & Definition of Done · Scope · File Inventory · Known Risks · Reporting Protocol · Clarification Protocol |
+| `replication` | full-form | Goal & Definition of Done · Scope · File Inventory · Verification Protocol · Reporting Protocol · Coordination |
+| `release` | full-form | Goal & Definition of Done · Verification Protocol · Reporting Protocol · Known Risks |
+| `docs-only` | short-form | Reporting Protocol when docs CI exists |
+| `bug-fix` | full-form | Goal & Definition of Done · Reproduction · Verification Protocol · Reporting Protocol |
+
+Use full-form whenever the task touches MCP, secrets, CI/release, dependency manifests, generated scripts, ADRs, or fan-out waves — even if the table above suggests short-form.
+
+Do not include unrelated roster rows, marketplace research, or full platform schema details unless the task is generating or validating agent files. When the orchestrator already loaded `AGENTS.md` for the current turn, set `Context freshness: recent` so the subagent skips redundant re-reads (see [context-optimization](./context-optimization.md#context-freshness-rule)).
+
+### Acceptance Checklist
+
+Subagents run this before doing work and return one consolidated clarification question if any required field is missing.
+
+1. All twelve required-minimum fields are present and non-empty.
+2. `File Inventory.to_modify` (when used) intersects only `Owned paths`.
+3. `File Inventory.to_read_only` (when used) does not include any path the agent owns exclusively.
+4. `Required approvals` lists every approval the task could trigger, or `none`.
+5. `Verification Protocol` is provided when the task is full-form; otherwise fall back to `AGENTS.md` › Quality Gates.
+6. `Reporting Protocol` matches the orchestrator's expected evidence shape.
+7. `Constraints` and `Known Risks` mention every gate the agent will touch.
+8. `Coordination` lists wave siblings when `Dependencies / wave` is greater than 1.
+
+If any check fails, return: `clarification_request: <single consolidated question>` and stop. Do not loop.
+
+### Reporting Template
+
+Subagents emit a stable structure so the orchestrator can integrate without re-deriving:
+
+```text
+Outcome: <one sentence>
+Files changed: <list with relative paths>
+Evidence:
+  - <test output>
+  - <diff summary>
+  - <other evidence per Reporting Protocol>
+Gates touched: <list with status>
+Risks / escalations: <list or "none">
+Handoff status: accepted | completed | blocked | returned-to-orchestrator
+```
 
 ## Verification
 
@@ -80,6 +207,7 @@ Before declaring done:
 4. Confirm any lossy field mapping is in the lossiness report or output contract.
 5. Confirm MCP, secrets, CI/release, and user-scope writes still went through their approval gates.
 6. For Codex, confirm shared artifacts (`AGENTS.md`, `.codex/agents/*.toml`, `.codex/config.toml`) do not require CLI-only commands to work in the App.
+7. For Gemini, confirm `GEMINI.md` points to canonical `AGENTS.md` and `.gemini/agents/*.md` subagents use loader-valid frontmatter.
 
 ## Anti-patterns
 
@@ -89,3 +217,4 @@ Before declaring done:
 - Writing OpenCode MCP config into agent frontmatter instead of `opencode.json`.
 - Rendering Codex specialized subagents as Markdown headings in `AGENTS.md`.
 - Treating Codex CLI commands as requirements for Codex App compatibility.
+- Copying Gemini extension `mcpServers` examples into local `.gemini/agents/*.md` instead of normalizing to `mcp_servers`.

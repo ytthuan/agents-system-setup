@@ -1,7 +1,7 @@
 {
   "name": "agents-system-setup",
   "version": "0.7.0",
-  "description": "Bootstrap, update, improve, or replicate multi-agent systems across Copilot CLI, Claude Code, OpenCode, and OpenAI Codex. Encourages parallel subagents and Claude Code agent teams.",
+  "description": "Bootstrap, update, improve, or replicate multi-agent systems across Copilot CLI, Claude Code, OpenCode, OpenAI Codex, and Gemini CLI artifacts. Encourages parallel subagents and Claude Code agent teams.",
   "author": {
     "name": "ytthuan",
     "url": "https://github.com/ytthuan"
@@ -12,6 +12,7 @@
   "keywords": [
     "agents",
     "claude-code",
+    "gemini-cli",
     "subagents",
     "agent-teams",
     "scaffolding",

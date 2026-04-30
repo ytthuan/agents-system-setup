@@ -5,15 +5,15 @@
     "url": "https://github.com/ytthuan"
   },
   "metadata": {
-    "description": "Marketplace for the agents-system-setup plugin: bootstrap, update, improve, and replicate multi-agent systems across Copilot CLI, Claude Code, OpenCode, and Codex CLI.",
-    "version": "0.6.1"
+    "description": "Marketplace for the agents-system-setup plugin: bootstrap, update, improve, and replicate multi-agent systems across Copilot CLI, Claude Code, OpenCode, OpenAI Codex, and Gemini CLI artifacts.",
+    "version": "0.7.0"
   },
   "plugins": [
     {
       "name": "agents-system-setup",
       "source": "./plugins/agents-system-setup",
-      "description": "Bootstrap, update, improve, or replicate multi-agent systems across Copilot CLI, Claude Code, OpenCode, and Codex CLI. Encourages parallel subagents and Claude Code agent teams.",
-      "version": "0.6.1",
+      "description": "Bootstrap, update, improve, or replicate multi-agent systems across Copilot CLI, Claude Code, OpenCode, OpenAI Codex, and Gemini CLI artifacts. Encourages parallel subagents and Claude Code agent teams.",
+      "version": "0.7.0",
       "author": {
         "name": "ytthuan",
         "url": "https://github.com/ytthuan"
@@ -24,7 +24,11 @@
       "category": "productivity",
       "keywords": [
         "agents",
+        "copilot-cli",
         "claude-code",
+        "opencode",
+        "codex",
+        "gemini-cli",
         "subagents",
         "agent-teams",
         "scaffolding",

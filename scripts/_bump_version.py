@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Atomic version bump across all four manifests + CHANGELOG.md stub.
+Atomic version bump across plugin manifests, marketplace metadata, and CHANGELOG.md stub.
 
 Usage:
   python3 scripts/_bump_version.py 0.2.1
@@ -22,6 +22,7 @@ MANIFESTS = [
     REPO / "plugins" / "agents-system-setup" / ".claude-plugin" / "plugin.json",
     REPO / "plugins" / "agents-system-setup" / ".codex-plugin" / "plugin.json",
 ]
+CLAUDE_MARKETPLACE = REPO / ".claude-plugin" / "marketplace.json"
 
 SEMVER = re.compile(r"^\d+\.\d+\.\d+(-[A-Za-z0-9.-]+)?$")
 
@@ -32,6 +33,17 @@ def bump_json(path: Path, new_version: str) -> str:
     data["version"] = new_version
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return f"  {path.relative_to(REPO)}: {old} → {new_version}"
+
+
+def bump_claude_marketplace(new_version: str) -> str:
+    data = json.loads(CLAUDE_MARKETPLACE.read_text(encoding="utf-8"))
+    old = data.get("metadata", {}).get("version")
+    data.setdefault("metadata", {})["version"] = new_version
+    for plugin in data.get("plugins", []):
+        if isinstance(plugin, dict):
+            plugin["version"] = new_version
+    CLAUDE_MARKETPLACE.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return f"  {CLAUDE_MARKETPLACE.relative_to(REPO)}: {old} → {new_version}"
 
 
 def bump_changelog(new_version: str) -> str:
@@ -67,6 +79,7 @@ def main() -> int:
     print(f"Bumping to {nv}:")
     for m in MANIFESTS:
         print(bump_json(m, nv))
+    print(bump_claude_marketplace(nv))
     print(bump_changelog(nv))
     print("\nNext steps:")
     print(f"  git checkout -b release/v{nv}")

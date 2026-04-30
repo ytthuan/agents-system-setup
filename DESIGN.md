@@ -2,6 +2,8 @@
 
 This document explains **why** each phase and hard rule of `agents-system-setup` exists. If you contribute, read this first — many constraints look arbitrary until you see what they prevent.
 
+Public runtime support spans **Copilot CLI**, **Claude Code**, **OpenCode**, **OpenAI Codex (CLI + App)**, and **Gemini CLI** artifact layouts. Plugin installation is documented only for runtimes with supported plugin/install surfaces; Gemini CLI remains artifact-first.
+
 ## Hard rules — reasoning
 
 | Rule | Why it exists | What it prevents |
@@ -26,6 +28,7 @@ This document explains **why** each phase and hard rule of `agents-system-setup`
 | 18. Context budget is a feature | Generated agent systems become less useful when every file repeats every rule | Prompt bloat, missed routing facts, expensive/noisy subagent delegation |
 | 19. Artifact tracking is explicit | Agent systems may be team infrastructure or personal local memory; the write behavior must match user intent | Accidentally committing private prompts, or hiding team-owned agent files |
 | 20. Plan handoff normalized before emission | Planning prompts and slash commands have their own metadata, not runtime agent schemas | Copying `agent: Plan`, Spec-Kit metadata, or Copilot frontmatter into Claude/OpenCode/Codex artifacts |
+| 21. Runtime drift is source-backed and gated | Upstream agent runtimes change formats independently; support claims must match implemented emitters and validators | Advertising candidate runtimes too early, switching formats on docs ambiguity, stale schema guidance |
 
 ## Phase-by-phase reasoning
 
@@ -78,7 +81,7 @@ This document explains **why** each phase and hard rule of `agents-system-setup`
 - *Architecture / Design Pattern Matrix* — documents pattern decisions, alternatives, guardrails, and ADR refs.
 - *Quality Gates* — defines what proof is required before agents can claim completion.
 - *Context Loading Policy* — tells agents what to read first and what to load only when needed.
-- *Plan Handoff Contract* — turns upstream planning output into a compact HandoffIR before any platform-specific artifact is emitted, including Codex shared artifacts that work across CLI + App surfaces.
+- *Plan Handoff Contract* — turns upstream planning output into a compact HandoffIR before any platform-specific artifact is emitted, including Codex shared artifacts that work across CLI + App surfaces and Gemini CLI agent artifacts.
 
 ### Phase 3 — Marketplace Lookup with per-item opt-in
 
@@ -99,6 +102,8 @@ This document explains **why** each phase and hard rule of `agents-system-setup`
 **Why post-approval?** Pre-approval generation means the disk gets dirty even if the user rejects MCP. Post-approval keeps the rejection lossless.
 
 **Why one loop over selected platforms?** Avoids the temptation of platform-specific code paths that drift over time.
+
+**Why Gemini is artifact-first?** Gemini CLI has documented agent artifact paths, but this repo does not claim a Gemini plugin installation path. Treating Gemini as artifact support keeps public install docs honest while still letting generated `.gemini/agents/*.md` or extension `agents/*.md` files participate in the same planning, governance, and verification flow.
 
 ### Phase 5 — Update Mode (non-destructive)
 
@@ -163,3 +168,4 @@ MCP approval is per-target, not global. Approving a server for Copilot CLI tells
 - Plugin-of-plugins — should this skill be able to install other plugins it recommends? Currently it surfaces install commands only.
 - LSP server discovery — Copilot CLI plugins can ship LSP configs; not yet covered.
 - Codex App capability detection — generated repo artifacts are CLI + App compatible where Codex surfaces load them, but plugin installation remains CLI-documented until OpenAI publishes App plugin-install semantics.
+- Gemini CLI plugin distribution — artifact generation is supported; plugin or extension install documentation should wait for explicit Gemini install semantics plus matching manifests and validators.

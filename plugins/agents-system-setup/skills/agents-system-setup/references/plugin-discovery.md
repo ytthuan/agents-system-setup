@@ -86,10 +86,10 @@ These are *search hints*, not assumed-existing entries.
 
 ## MCP Approval Rendering (handed off to Phase 3.5)
 
-Only the user's *selected* MCP candidates reach Phase 3.5. Render proposal per platform:
+Only the user's *selected* MCP candidates reach Phase 3.5. Render every proposed MCP surface per platform, including inline agent blocks:
 
 ```jsonc
-// proposed: .mcp.json (Copilot CLI + Claude Code)
+// proposed: .mcp.json (Copilot CLI + Claude Code + Codex shared root)
 {
   "mcpServers": {
     "github": {
@@ -99,6 +99,18 @@ Only the user's *selected* MCP candidates reach Phase 3.5. Render proposal per p
     }
   }
 }
+```
+
+```yaml
+# proposed: Copilot agent mcp-servers
+mcp-servers:
+  github: {}
+```
+
+```yaml
+# proposed: Claude Code project/user-agent mcpServers
+mcpServers:
+  github: {}
 ```
 
 ```jsonc
@@ -113,6 +125,21 @@ Only the user's *selected* MCP candidates reach Phase 3.5. Render proposal per p
     }
   }
 }
+```
+
+```toml
+# proposed: .codex/agents/<name>.toml
+[mcp_servers.github]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-github"]
+```
+
+```yaml
+# proposed: .gemini/agents/<name>.md
+mcp_servers:
+  github:
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-github"]
 ```
 
 Then ask:

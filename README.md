@@ -5,15 +5,15 @@
 [![Latest release](https://img.shields.io/github/v/release/ytthuan/agents-system-setup?sort=semver&display_name=tag)](https://github.com/ytthuan/agents-system-setup/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Cross-OS](https://img.shields.io/badge/cross--os-linux%20%7C%20macos%20%7C%20windows-blue)](.github/workflows/ci.yml)
-[![Runtimes](https://img.shields.io/badge/runtimes-Copilot%20CLI%20%7C%20Claude%20Code%20%7C%20Codex%20%7C%20OpenCode-purple)](#install--per-runtime)
+[![Runtimes](https://img.shields.io/badge/runtimes-Copilot%20CLI%20%7C%20Claude%20Code%20%7C%20Codex%20%7C%20OpenCode%20%7C%20Gemini-purple)](#install--per-runtime)
 
-A multi-runtime plugin that **bootstraps**, **updates**, **improves**, or **replicates** a complete multi-agent system across **GitHub Copilot CLI**, **Claude Code**, **OpenCode**, and **OpenAI Codex (CLI + App)** — from a single skill, with a Canonical IR for bidirectional replication, parallel-aware orchestration, mandatory security/audit/architecture governance, and compact-by-default context output baked in.
+A multi-runtime plugin/skill package that **bootstraps**, **updates**, **improves**, or **replicates** a complete multi-agent system across five supported runtimes: **GitHub Copilot CLI**, **Claude Code**, **OpenCode**, **OpenAI Codex (CLI + App)**, and **Gemini CLI** artifact layouts — from a single skill, with a Canonical IR for bidirectional replication, parallel-aware orchestration, mandatory security/audit/architecture governance, and compact-by-default context output baked in.
 
 ## What it generates
 
 - `AGENTS.md` at repo root with a **Read First** section, **Context Loading Policy**, **Directory Architecture**, **Agent Roster (with parallel-safety waves)**, **Capability Matrix**, **Security & Audit Matrix**, **Threat Model**, **Architecture / Design Pattern Decisions**, **ADR Index**, and **Quality Gates**.
 - **Orchestrator + N subagents** (3–50, sized to scope) emitted in the right format for every selected runtime, with a **fan-out clause** so parallel-safe subagents always run in one wave.
-- A **Plan Handoff Contract** that normalizes VS Code Plan agent output, Spec-Kit `/plan`, or user-written plans before emitting runtime-correct Copilot, Claude Code, OpenCode, or Codex artifacts.
+- A **Plan Handoff Contract** that normalizes VS Code Plan agent output, Spec-Kit `/plan`, or user-written plans before emitting runtime-correct Copilot, Claude Code, OpenCode, Codex, or Gemini CLI artifacts.
 - **`AGENT-TEAMS.md`** for Claude Code projects when the roster benefits from peer-to-peer teammates (3+ independent concerns).
 - Project-scoped **skills** under each runtime's conventional path.
 - **Curated plugin / MCP recommendations** from vendor-official catalogs, every recommendation tagged `[Tier · Vendor]` and **opt-in per item**.
@@ -21,6 +21,11 @@ A multi-runtime plugin that **bootstraps**, **updates**, **improves**, or **repl
 - **Source-backed governance baseline** — OWASP GenAI, NIST SSDF, MCP Security Best Practices, GitHub Code Security, SLSA, OPA, Azure Well-Architected, C4, and TOGAF (enterprise only).
 - **Context-optimized output profiles** — `Balanced` by default, with `Compact` and `Full` options for generated files and summaries.
 - **Artifact tracking choice** — generated systems can be team-shared in git, local-only via `.git/info/exclude`, or written to personal/global runtime paths.
+- **Runtime update audit** — latest upstream drift is tracked in `plugins/agents-system-setup/skills/agents-system-setup/references/runtime-updates.md` for all supported runtimes and future candidates.
+- **Optional model overrides with rate-limit guidance** — model selection stays optional during the interview; per-runtime accepted formats, defaults, and source-linked rate-limit pointers live in `plugins/agents-system-setup/skills/agents-system-setup/references/models.md`.
+- **Sharper context engine** — generated `AGENTS.md` includes a Task-Type Routing Map, a context-freshness rule, and a single canonical Delegation Packet schema in `references/handoff.md` so subagents skip duplicated reads and load only what each task tag needs.
+- **Richer task assignments** — orchestrator → subagent handoffs use a canonical Task Assignment Contract with required minimum + opt-in expansion blocks (Goal & Definition of Done, Scope, File Inventory, Background, Reproduction, Constraints, Assumptions, Known Risks, Verification Protocol, Reporting Protocol, Coordination, Size & Timebox, Clarification Protocol). Subagent templates ship with an Acceptance Checklist and Reporting Template so handoffs are well-structured by default.
+- **Gemini CLI artifact support** — generated Gemini subagents use `.gemini/agents/*.md` or Gemini extension `agents/*.md`; no Gemini plugin install command is claimed.
 - Cross-OS scripts (`.sh` + `.ps1`), `.gitattributes` for line-ending safety.
 
 ## Modes
@@ -30,11 +35,11 @@ A multi-runtime plugin that **bootstraps**, **updates**, **improves**, or **repl
 | `init` | Brand-new repo, no agent artifacts |
 | `update` | Existing artifacts, regenerate managed blocks non-destructively |
 | `improve` | Audit existing system → propose checklist of targeted fixes → opt-in apply |
-| `replicate` | Port agents/skills/MCP from one runtime to another (Copilot ↔ Claude ↔ OpenCode ↔ OpenAI Codex) via Canonical IR |
+| `replicate` | Port agents/skills/MCP from one runtime to another (Copilot ↔ Claude ↔ OpenCode ↔ OpenAI Codex ↔ Gemini CLI) via Canonical IR |
 
 ## Install — per runtime
 
-Each runtime has a different install mechanism. The repo ships the right manifest for each.
+Each runtime has a different install/use mechanism. The repo ships plugin manifests where a runtime supports them; Gemini CLI support is artifact-based and does not claim a plugin install.
 
 ### GitHub Copilot CLI
 
@@ -89,6 +94,18 @@ pwsh ./scripts/install-opencode.ps1 -Scope project
 
 This places the skill at `.opencode/skills/agents-system-setup/` (or `~/.config/opencode/skills/` for global).
 
+### Gemini CLI artifact support
+
+Gemini CLI support is generated artifact support, not a plugin install. This repo does **not** publish or document a Gemini plugin installation command. Generate or copy Gemini artifacts into the target project, then run Gemini CLI normally:
+
+```bash
+# Project-local generated subagents
+ls .gemini/agents/
+gemini
+```
+
+Inside Gemini CLI, invoke generated subagents with Gemini's agent invocation syntax, for example `@<agent-name>`. Supported artifact shapes are project `.gemini/agents/*.md`, user `~/.gemini/agents/*.md`, and extension-bundled `agents/*.md` when packaging a Gemini extension yourself.
+
 ## Usage
 
 Once installed, invoke the skill — no arguments needed; it auto-detects mode:
@@ -105,6 +122,8 @@ Or be explicit:
 /agents-system-setup improve
 /agents-system-setup replicate
 ```
+
+For Gemini CLI, there is no `/plugin install` or `/agents-system-setup` command documented by this repo. Use Gemini normally after generated `.gemini/agents/*.md` artifacts are present, then call the generated subagents with `@<agent-name>`.
 
 ## Parallel subagents & Claude Code agent teams
 
@@ -124,7 +143,7 @@ Before writing project-scoped agent files, the skill asks whether artifacts shou
 
 - A **skill** is the *unit of capability*.
 - A **plugin** is the *distribution unit*.
-- Wrapping the skill in plugin manifests for each runtime makes it one-line installable on Copilot CLI / Claude Code / Codex CLI, and clone-and-copy installable on OpenCode.
+- Wrapping the skill in plugin manifests for installable runtimes makes it one-line installable on Copilot CLI / Claude Code / Codex CLI, clone-and-copy installable on OpenCode, and able to generate artifact-only support for Gemini CLI.
 
 ## Repo layout
 
@@ -157,14 +176,17 @@ agents-system-setup/
 
 ## Compatibility
 
-| Runtime | Plugin install | Skill format compatible | Parallel subagents | Agent teams |
+| Runtime | Plugin install | Artifact / skill format compatible | Parallel subagents | Agent teams |
 |---|---|---|---|---|
 | GitHub Copilot CLI | ✅ `/plugin install` | ✅ | ✅ | n/a |
 | Claude Code | ✅ `/plugin install` | ✅ | ✅ | ✅ (opt-in env var) |
 | OpenAI Codex (CLI + App artifacts) | ✅ CLI: `marketplace add` + `/plugins` | ✅ via `AGENTS.md` + `.codex/agents/*.toml` | ✅ | n/a |
 | OpenCode | ⚠️ clone + script copy | ✅ | ✅ | n/a |
+| Gemini CLI | ❌ no plugin install claimed | ✅ via `.gemini/agents/*.md` / extension `agents/*.md` artifacts | ✅ with non-recursive subagent use | n/a |
 
 Cross-OS: Linux, macOS, Windows (native PowerShell + Git Bash + WSL).
+
+**Gemini CLI note:** Gemini CLI now has official subagent docs; this repo documents it as supported artifact-first rather than candidate-only. Do not use or document a Gemini plugin install unless Gemini publishes compatible plugin-install semantics and this repo adds matching manifests.
 
 ## Design rationale
 

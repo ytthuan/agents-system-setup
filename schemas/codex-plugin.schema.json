@@ -11,6 +11,8 @@
     "description": { "type": "string", "minLength": 10 },
     "skills": { "type": "string" },
     "mcp": { "type": "object" },
-    "apps": { "type": "array" }
+    "mcpServers": { "type": "string" },
+    "apps": { "type": "string" },
+    "interface": { "type": "object" }
   }
 }

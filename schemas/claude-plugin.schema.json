@@ -4,6 +4,17 @@
   "title": "Claude Code plugin manifest (.claude-plugin/plugin.json)",
   "type": "object",
   "additionalProperties": true,
+  "allOf": [
+    {
+      "not": {
+        "anyOf": [
+          { "required": ["hooks"] },
+          { "required": ["mcpServers"] },
+          { "required": ["permissionMode"] }
+        ]
+      }
+    }
+  ],
   "required": ["name", "version", "description"],
   "properties": {
     "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },

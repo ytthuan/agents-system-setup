@@ -10,13 +10,17 @@ Checks (per the CONTRIBUTING.md contract):
   5. UTF-8-without-BOM encoding for every text file under git
   6. Internal markdown link resolution (./relative paths only)
   7. Codex TOML subagents parse and include required fields
-  8. Replication ledger/logs do not live inside agents/ directories
-  9. Governance baseline references and templates are present
- 10. Context optimization policy and generated-template markers are present
- 11. Local-vs-git-tracked artifact policy is present
-  12. Plan handoff policy is present and platform-specific
-  13. Codex shared artifacts are documented as CLI + App compatible without
+  8. Gemini Markdown subagents parse for local, remote, and extension scopes
+  9. OpenCode Markdown agents use the Markdown/frontmatter schema
+ 10. Claude plugin-shipped agents avoid project-only fields
+ 11. Replication ledger/logs do not live inside agents/ directories
+ 12. Governance baseline references and templates are present
+ 13. Context optimization policy and generated-template markers are present
+ 14. Local-vs-git-tracked artifact policy is present
+ 15. Plan handoff policy is present and platform-specific
+ 16. Codex shared artifacts are documented as CLI + App compatible without
       overclaiming Codex App plugin installation
+ 17. Runtime update audit tracks supported-runtime drift for five runtimes
 
 Exits non-zero on any failure. Designed to be invoked from CI on
 Linux / macOS / Windows runners with only Python 3.10+ available
@@ -60,13 +64,18 @@ VERSIONED_MANIFESTS = [
     REPO / "plugin.json",
     REPO / ".claude-plugin" / "plugin.json",
     REPO / ".codex-plugin" / "plugin.json",
+    REPO / "plugins" / "agents-system-setup" / ".claude-plugin" / "plugin.json",
+    REPO / "plugins" / "agents-system-setup" / ".codex-plugin" / "plugin.json",
 ]
 MARKETPLACE = REPO / ".agents" / "plugins" / "marketplace.json"
+CLAUDE_MARKETPLACE = REPO / ".claude-plugin" / "marketplace.json"
 
 REQUIRED = {
     "plugin.json": ["name", "version", "description"],
     ".claude-plugin/plugin.json": ["name", "version", "description"],
     ".codex-plugin/plugin.json": ["name", "version", "description"],
+    "plugins/agents-system-setup/.claude-plugin/plugin.json": ["name", "version", "description"],
+    "plugins/agents-system-setup/.codex-plugin/plugin.json": ["name", "version", "description"],
     ".agents/plugins/marketplace.json": ["name", "plugins"],
 }
 
@@ -111,17 +120,29 @@ def check_manifests() -> None:
         if not isinstance(plugins, list) or not plugins:
             err(f"{rel}: plugins[] must be a non-empty array")
         for i, p in enumerate(plugins):
-            src = p.get("source", {})
-            sp = src.get("path")
-            if sp is None:
-                err(f"{rel}: plugins[{i}].source.path missing")
+            if not isinstance(p, dict):
+                err(f"{rel}: plugins[{i}] must be an object")
+                continue
+            src = p.get("source")
+            source_kind = None
+            sp = None
+            if isinstance(src, str):
+                source_kind = "local" if src.startswith("./") else "remote"
+                sp = src if source_kind == "local" else None
+            elif isinstance(src, dict):
+                source_kind = src.get("source")
+                sp = src.get("path")
             else:
-                # Codex CLI rule: must start with `./`, must not be bare `./`,
-                # must not contain `..`, and must resolve to a dir containing
-                # .codex-plugin/plugin.json or .claude-plugin/plugin.json.
-                # Source: openai/codex codex-rs/core-plugins/src/marketplace.rs
-                # (resolve_local_plugin_source_path) and utils/plugins/src/
-                # plugin_namespace.rs (DISCOVERABLE_PLUGIN_MANIFEST_PATHS).
+                err(f"{rel}: plugins[{i}].source must be a string or object")
+                continue
+
+            if sp is not None or source_kind == "local":
+                if not isinstance(sp, str) or not sp:
+                    err(f"{rel}: plugins[{i}].source.path missing")
+                    continue
+                # Codex CLI local rule: path must start with `./`, must not be
+                # bare `./`, must not contain `..`, and must resolve to a dir
+                # containing .codex-plugin/plugin.json or .claude-plugin/plugin.json.
                 if not sp.startswith("./"):
                     err(f"{rel}: plugins[{i}].source.path `{sp}` must start with `./`")
                 elif sp.rstrip("/") in ("", "."):
@@ -138,6 +159,24 @@ def check_manifests() -> None:
                     ):
                         err(f"{rel}: plugins[{i}].source.path `{sp}` is missing .codex-plugin/plugin.json or .claude-plugin/plugin.json — Codex/Claude marketplace will skip it")
 
+    cdata = load_json(CLAUDE_MARKETPLACE)
+    if cdata is not None:
+        rel = CLAUDE_MARKETPLACE.relative_to(REPO).as_posix()
+        metadata_version = cdata.get("metadata", {}).get("version")
+        if metadata_version:
+            versions[f"{rel}:metadata.version"] = str(metadata_version)
+        plugins = cdata.get("plugins", [])
+        if not isinstance(plugins, list) or not plugins:
+            err(f"{rel}: plugins[] must be a non-empty array")
+        else:
+            for i, plugin in enumerate(plugins):
+                if not isinstance(plugin, dict):
+                    err(f"{rel}: plugins[{i}] must be an object")
+                    continue
+                plugin_version = plugin.get("version")
+                if plugin_version:
+                    versions[f"{rel}:plugins[{i}].version"] = str(plugin_version)
+
     # version sync
     unique = set(versions.values())
     if len(unique) > 1:
@@ -145,31 +184,121 @@ def check_manifests() -> None:
         err(f"version mismatch across manifests: {details}")
 
 
+def check_schema_files() -> None:
+    for path in sorted((REPO / "schemas").glob("*.json")):
+        rel = path.relative_to(REPO).as_posix()
+        data = load_json(path)
+        if data is None:
+            continue
+        for key in ("$schema", "$id", "title", "type"):
+            if key not in data:
+                err(f"{rel}: schema missing required field `{key}`")
+
+
 # ---------- 3 & 4: agent/skill frontmatter ----------
 
 FRONTMATTER_RE = re.compile(r"^---\r?\n(.*?)\r?\n---\r?\n", re.DOTALL)
+SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+CODEX_NICKNAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9 _-]{0,31}$")
 
 
-def parse_frontmatter(text: str) -> dict[str, Any] | None:
-    m = FRONTMATTER_RE.match(text)
-    if not m:
+def parse_scalar(value: str) -> Any:
+    raw = value.strip()
+    if not raw:
+        return ""
+    if raw in {"|", ">"}:
+        return raw
+    if (raw.startswith("'") and raw.endswith("'")) or (raw.startswith('"') and raw.endswith('"')):
+        return raw[1:-1]
+    lowered = raw.lower()
+    if lowered == "true":
+        return True
+    if lowered == "false":
+        return False
+    if lowered in {"null", "none", "~"}:
         return None
-    body = m.group(1)
+    try:
+        return int(raw)
+    except ValueError:
+        try:
+            return float(raw)
+        except ValueError:
+            return raw
+
+
+def parse_simple_yaml(body: str) -> Any:
+    """Tiny fallback for the top-level YAML shapes used by runtime frontmatter."""
+    lines = [line.rstrip("\r") for line in body.splitlines()]
+    significant = [line for line in lines if line.strip() and not line.lstrip().startswith("#")]
+    if not significant:
+        return {}
+    if significant[0].lstrip().startswith("- "):
+        items: list[dict[str, Any]] = []
+        current: dict[str, Any] | None = None
+        for line in significant:
+            stripped = line.strip()
+            if stripped.startswith("- "):
+                current = {}
+                items.append(current)
+                stripped = stripped[2:].strip()
+                if not stripped:
+                    continue
+            if current is not None and ":" in stripped:
+                key, _, value = stripped.partition(":")
+                current[key.strip()] = parse_scalar(value)
+        return items
+
+    out: dict[str, Any] = {}
+    current_list_key: str | None = None
+    for line in significant:
+        stripped = line.strip()
+        if current_list_key and stripped.startswith("- "):
+            out.setdefault(current_list_key, []).append(parse_scalar(stripped[2:]))
+            continue
+        current_list_key = None
+        if ":" not in stripped:
+            continue
+        key, _, value = stripped.partition(":")
+        key = key.strip()
+        value = value.strip()
+        if not value:
+            out[key] = []
+            current_list_key = key
+        else:
+            out[key] = parse_scalar(value)
+    return out
+
+
+def parse_yaml_document(body: str) -> Any:
     try:
         import yaml  # type: ignore
 
         return yaml.safe_load(body) or {}
     except ImportError:
-        # Minimal fallback: extract `key: value` pairs at top level only.
-        out: dict[str, Any] = {}
-        for line in body.splitlines():
-            if ":" in line and not line.startswith(" "):
-                k, _, v = line.partition(":")
-                out[k.strip()] = v.strip().strip("'\"")
-        return out
+        return parse_simple_yaml(body)
+
+
+def split_frontmatter(text: str) -> tuple[str, str] | None:
+    m = FRONTMATTER_RE.match(text)
+    if not m:
+        return None
+    return m.group(1), text[m.end():]
+
+
+def parse_frontmatter(text: str) -> dict[str, Any] | None:
+    split = split_frontmatter(text)
+    if split is None:
+        return None
+    body, _ = split
+    try:
+        document = parse_yaml_document(body)
     except Exception as e:
         err(f"frontmatter parse error: {e}")
         return None
+    if not isinstance(document, dict):
+        err("frontmatter must be a YAML mapping")
+        return None
+    return document
 
 
 def check_frontmatter_files() -> None:
@@ -260,7 +389,7 @@ def check_codex_toml_agents() -> None:
     try:
         import tomllib  # py 3.11+
     except ImportError:
-        warn("tomllib unavailable (Python <3.11) — skipping .codex/agents/*.toml validation")
+        warn("tomllib unavailable (Python <3.11) — skipping Codex TOML validation")
         return
     # Validate any .codex/agents/ tree under the repo (project-scope) but skip
     # samples inside skill assets/templates.
@@ -278,23 +407,312 @@ def check_codex_toml_agents() -> None:
                 if not data.get(key):
                     err(f"{rel}: missing required Codex subagent field `{key}`")
             name = data.get("name")
+            if isinstance(name, str) and not SLUG_RE.fullmatch(name):
+                err(f"{rel}: Codex `name` must be a lowercase slug using letters, digits, hyphen, or underscore")
             if isinstance(name, str) and name != toml_path.stem:
                 warn(f"{rel}: TOML `name` ({name}) differs from filename stem ({toml_path.stem}) — name is the source of truth, but matching filenames is the recommended convention")
+            desc = data.get("description")
+            if isinstance(desc, str) and not desc.startswith("Use when"):
+                err(f"{rel}: Codex `description` must start with `Use when` for runtime discovery")
+            elif desc is not None and not isinstance(desc, str):
+                err(f"{rel}: Codex `description` must be a string")
+            nicknames = data.get("nickname_candidates")
+            if nicknames is not None:
+                if not isinstance(nicknames, list):
+                    err(f"{rel}: nickname_candidates must be an array of display-name strings")
+                else:
+                    seen_nicknames: set[str] = set()
+                    for nickname in nicknames:
+                        if not isinstance(nickname, str) or not nickname.strip():
+                            err(f"{rel}: nickname_candidates entries must be non-empty strings")
+                            continue
+                        folded = nickname.casefold()
+                        if folded in seen_nicknames:
+                            err(f"{rel}: nickname_candidates contains duplicate `{nickname}`")
+                        seen_nicknames.add(folded)
+                        if not CODEX_NICKNAME_RE.fullmatch(nickname):
+                            err(f"{rel}: nickname `{nickname}` must be 1-32 chars, start with a letter, and use letters/digits/space/hyphen/underscore only")
             effort = data.get("model_reasoning_effort")
             if effort and effort not in ("low", "medium", "high"):
                 err(f"{rel}: model_reasoning_effort must be low|medium|high (got `{effort}`)")
             sandbox = data.get("sandbox_mode")
             if sandbox and sandbox not in ("read-only", "workspace-write"):
                 warn(f"{rel}: sandbox_mode `{sandbox}` is not one of the documented values (read-only|workspace-write)")
+            for key in ("job_max_runtime_seconds",):
+                value = data.get(key)
+                if value is not None and (not isinstance(value, int) or isinstance(value, bool) or value <= 0):
+                    err(f"{rel}: {key} must be a positive integer")
+            spawn_csv = data.get("spawn_agents_on_csv")
+            if spawn_csv is not None and not isinstance(spawn_csv, bool):
+                err(f"{rel}: spawn_agents_on_csv must be boolean when present")
+
+    for config_path in REPO.rglob(".codex/config.toml"):
+        if ".git" in config_path.parts:
+            continue
+        rel = config_path.relative_to(REPO)
+        try:
+            data = tomllib.loads(config_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            err(f"{rel}: invalid TOML: {e}")
+            continue
+        agents = data.get("agents")
+        if not isinstance(agents, dict):
+            err(f"{rel}: missing or invalid [agents] table")
+            continue
+        for key in ("max_threads", "max_depth"):
+            value = agents.get(key)
+            if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+                err(f"{rel}: [agents].{key} must be a positive integer")
 
 
-# ---------- 8: replication ledger location ----------
+# ---------- 8: Gemini Markdown subagents (.gemini/agents/*.md, extension agents/*.md) ----------
+
+def is_positive_number(value: Any) -> bool:
+    return not isinstance(value, bool) and isinstance(value, (int, float)) and value > 0
+
+
+def is_positive_int(value: Any) -> bool:
+    return not isinstance(value, bool) and isinstance(value, int) and value > 0
+
+
+def is_numeric(value: Any) -> bool:
+    return not isinstance(value, bool) and isinstance(value, (int, float))
+
+
+def is_gemini_local_agent_path(path: Path) -> bool:
+    parts = path.parts
+    return path.suffix == ".md" and not path.name.startswith("_") and any(
+        parts[i] == ".gemini" and i + 2 < len(parts) and parts[i + 1] == "agents" and i + 2 == len(parts) - 1
+        for i in range(len(parts))
+    )
+
+
+def is_gemini_extension_agent_path(path: Path) -> bool:
+    if path.suffix != ".md" or path.name.startswith("_") or path.parent.name != "agents":
+        return False
+    return (path.parent.parent / "gemini-extension.json").is_file()
+
+
+def validate_gemini_agent_record(rel: Path, record: Any, markdown_body: str, *, list_item: int | None = None) -> None:
+    prefix = f"{rel}" if list_item is None else f"{rel}: item {list_item}"
+    if not isinstance(record, dict):
+        err(f"{prefix}: Gemini agent frontmatter must be a YAML mapping")
+        return
+    if "mcpServers" in record:
+        err(f"{prefix}: Gemini frontmatter must use `mcp_servers`, not `mcpServers`")
+    if "mcp-servers" in record:
+        err(f"{prefix}: Gemini frontmatter must use `mcp_servers`, not `mcp-servers`")
+
+    name = record.get("name")
+    if not isinstance(name, str) or not name:
+        err(f"{prefix}: missing required Gemini `name`")
+    elif not SLUG_RE.fullmatch(name):
+        err(f"{prefix}: Gemini `name` must be a lowercase slug using letters, digits, hyphen, or underscore")
+
+    kind_value = record.get("kind", "local")
+    kind = "local" if kind_value is None else kind_value
+    if not isinstance(kind, str) or kind not in ("local", "remote"):
+        err(f"{prefix}: Gemini `kind` must be `local` or `remote`")
+        return
+
+    for key in ("max_turns", "timeout_mins"):
+        value = record.get(key)
+        if value is not None and not is_positive_int(value):
+            err(f"{prefix}: Gemini `{key}` must be a positive integer")
+    if "temperature" in record and not is_numeric(record.get("temperature")):
+        err(f"{prefix}: Gemini `temperature` must be numeric")
+
+    if kind == "local":
+        for key in ("agent_card_url", "agent_card_json", "auth"):
+            if key in record:
+                err(f"{prefix}: local Gemini agent must not set remote field `{key}`")
+        mcp_servers = record.get("mcp_servers")
+        if mcp_servers is not None and not isinstance(mcp_servers, dict):
+            err(f"{prefix}: Gemini `mcp_servers` must be a mapping")
+        desc = record.get("description")
+        if not isinstance(desc, str) or not desc:
+            err(f"{prefix}: local Gemini agent missing required `description`")
+        if not markdown_body.strip():
+            err(f"{prefix}: local Gemini agent body must contain the system prompt")
+    else:
+        for key in ("tools", "mcp_servers", "model", "temperature", "max_turns", "timeout_mins"):
+            if key in record:
+                err(f"{prefix}: remote Gemini agent must not set local execution field `{key}`")
+        has_url = "agent_card_url" in record
+        has_json = "agent_card_json" in record
+        if has_url == has_json:
+            err(f"{prefix}: remote Gemini agent requires exactly one of `agent_card_url` or `agent_card_json`")
+        elif has_url:
+            url = record.get("agent_card_url")
+            if not isinstance(url, str) or not re.fullmatch(r"https?://\S+", url):
+                err(f"{prefix}: remote Gemini `agent_card_url` must be an http(s) URL")
+        elif not isinstance(record.get("agent_card_json"), dict):
+            err(f"{prefix}: remote Gemini `agent_card_json` must be a mapping")
+
+
+def check_gemini_markdown_agents() -> None:
+    for path in REPO.rglob("*.md"):
+        if ".git" in path.parts or "node_modules" in path.parts:
+            continue
+        if not is_gemini_local_agent_path(path) and not is_gemini_extension_agent_path(path):
+            continue
+        rel = path.relative_to(REPO)
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            err(f"{rel}: not valid UTF-8")
+            continue
+        split = split_frontmatter(text)
+        if split is None:
+            err(f"{rel}: missing Gemini YAML frontmatter")
+            continue
+        frontmatter_body, markdown_body = split
+        try:
+            document = parse_yaml_document(frontmatter_body)
+        except Exception as e:
+            err(f"{rel}: invalid Gemini YAML frontmatter: {e}")
+            continue
+        if isinstance(document, list):
+            if not document:
+                err(f"{rel}: Gemini remote-agent YAML list must not be empty")
+                continue
+            for index, item in enumerate(document):
+                if not isinstance(item, dict) or item.get("kind") != "remote":
+                    err(f"{rel}: remote YAML lists are allowed only when every item has `kind: remote`")
+                    break
+                validate_gemini_agent_record(rel, item, "", list_item=index)
+            continue
+        validate_gemini_agent_record(rel, document, markdown_body)
+
+
+# ---------- 9: OpenCode Markdown agents (.opencode/agents/*.md) ----------
+
+def is_opencode_agent_path(path: Path) -> bool:
+    parts = path.parts
+    return path.suffix == ".md" and (
+        any(parts[i] == ".opencode" and i + 1 < len(parts) and parts[i + 1] == "agents" for i in range(len(parts)))
+        or any(
+            parts[i] == ".config"
+            and i + 2 < len(parts)
+            and parts[i + 1] == "opencode"
+            and parts[i + 2] == "agents"
+            for i in range(len(parts))
+        )
+    )
+
+
+def check_opencode_markdown_agents() -> None:
+    valid_modes = {"primary", "subagent", "all"}
+    valid_permission_keys = {
+        "read",
+        "edit",
+        "glob",
+        "grep",
+        "list",
+        "bash",
+        "task",
+        "external_directory",
+        "todowrite",
+        "webfetch",
+        "websearch",
+        "codesearch",
+        "lsp",
+        "skill",
+        "question",
+        "doom_loop",
+    }
+    valid_actions = {"allow", "ask", "deny"}
+
+    for path in REPO.rglob("*.md"):
+        if ".git" in path.parts or "node_modules" in path.parts or not is_opencode_agent_path(path):
+            continue
+        rel = path.relative_to(REPO)
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            err(f"{rel}: not valid UTF-8")
+            continue
+        fm = parse_frontmatter(text)
+        if fm is None:
+            err(f"{rel}: missing or unparseable OpenCode YAML frontmatter")
+            continue
+        if "name" in fm:
+            err(f"{rel}: OpenCode Markdown agents must not set `name`; filename stem is the agent name")
+        if not fm.get("description"):
+            err(f"{rel}: OpenCode frontmatter missing required `description`")
+        mode = fm.get("mode")
+        if mode is not None and mode not in valid_modes:
+            err(f"{rel}: OpenCode `mode` must be one of primary|subagent|all")
+        for key in ("mcp-servers", "mcpServers"):
+            if key in fm:
+                err(f"{rel}: OpenCode agents must not set `{key}`; configure MCP in opencode.json `mcp`")
+        permission = fm.get("permission")
+        if permission is not None:
+            if not isinstance(permission, dict):
+                err(f"{rel}: OpenCode `permission` must be a mapping")
+            else:
+                for perm_key, perm_value in permission.items():
+                    if perm_key not in valid_permission_keys:
+                        err(f"{rel}: OpenCode permission key `{perm_key}` is not documented")
+                        continue
+                    if isinstance(perm_value, str):
+                        if perm_value not in valid_actions:
+                            err(f"{rel}: OpenCode permission `{perm_key}` must be allow|ask|deny")
+                    elif isinstance(perm_value, dict):
+                        rules = list(perm_value.items())
+                        if "*" in perm_value and rules and rules[0][0] != "*":
+                            err(f"{rel}: OpenCode permission `{perm_key}` wildcard `*` must appear first because rules are last-match-wins")
+                        for pattern, action in rules:
+                            if not isinstance(pattern, str) or action not in valid_actions:
+                                err(f"{rel}: OpenCode permission `{perm_key}` rules must map string patterns to allow|ask|deny")
+                    else:
+                        err(f"{rel}: OpenCode permission `{perm_key}` must be allow|ask|deny or a pattern mapping")
+        if "tools" in fm and "permission" not in fm:
+            warn(f"{rel}: OpenCode `tools` is deprecated; prefer `permission` for tool gating")
+
+
+# ---------- 10: Claude plugin-shipped agent field restrictions ----------
+
+CLAUDE_PLUGIN_AGENT_FORBIDDEN_FIELDS = ("hooks", "mcpServers", "permissionMode")
+
+
+def is_claude_plugin_agent_path(path: Path) -> bool:
+    if path.suffix != ".md" or path.name.startswith("_"):
+        return False
+    for root in path.parents:
+        agents_dir = root / "agents"
+        if (root / ".claude-plugin" / "plugin.json").is_file() and path.is_relative_to(agents_dir):
+            return True
+    return False
+
+
+def check_claude_plugin_agent_fields() -> None:
+    for path in REPO.rglob("*.md"):
+        if ".git" in path.parts or "node_modules" in path.parts or not is_claude_plugin_agent_path(path):
+            continue
+        rel = path.relative_to(REPO)
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            err(f"{rel}: not valid UTF-8")
+            continue
+        fm = parse_frontmatter(text)
+        if fm is None:
+            err(f"{rel}: missing or unparseable Claude plugin agent frontmatter")
+            continue
+        for key in CLAUDE_PLUGIN_AGENT_FORBIDDEN_FIELDS:
+            if key in fm:
+                err(f"{rel}: Claude plugin-shipped agents must not use project/user-only field `{key}`")
+
+
+# ---------- 11: replication ledger location ----------
 
 LEDGER_FORBIDDEN_DIRS = (
     ".claude/agents",
     ".codex/agents",
     ".opencode/agents",
     ".github/agents",
+    ".gemini/agents",
     ".config/opencode/agents",
 )
 
@@ -315,11 +733,13 @@ def check_replication_ledger() -> None:
         for forbidden in LEDGER_FORBIDDEN_DIRS:
             if forbidden in rel:
                 err(f"{rel}: replication ledger/log must not live inside `{forbidden}` — runtime will misread it as an agent. Move to `.agents-system-setup/replication.jsonl`.")
+        if is_gemini_extension_agent_path(path):
+            err(f"{rel}: replication ledger/log must not live inside a Gemini extension `agents/` directory. Move to `.agents-system-setup/replication.jsonl`.")
         if path.suffix == ".md" and "/agents/" in f"/{rel}":
             err(f"{rel}: replication artifact with `.md` extension inside an agents/ tree will be parsed as a malformed agent.")
 
 
-# ---------- 9: governance baseline ----------
+# ---------- 12: governance baseline ----------
 
 SKILL_ROOT = REPO / "plugins" / "agents-system-setup" / "skills" / "agents-system-setup"
 
@@ -337,6 +757,17 @@ def require_contains(path: Path, needles: tuple[str, ...]) -> None:
     for needle in needles:
         if needle not in text:
             err(f"{rel}: missing required governance marker `{needle}`")
+
+
+def require_not_contains(path: Path, needles: tuple[str, ...]) -> None:
+    rel = path.relative_to(REPO).as_posix()
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (FileNotFoundError, UnicodeDecodeError):
+        return
+    for needle in needles:
+        if needle in text:
+            err(f"{rel}: forbidden stale runtime marker `{needle}`")
 
 
 def check_governance_baseline() -> None:
@@ -415,7 +846,7 @@ def check_governance_baseline() -> None:
     )
 
 
-# ---------- 10: context optimization ----------
+# ---------- 13: context optimization ----------
 
 def check_context_optimization() -> None:
     """The skill must stay compact-by-default and preserve progressive loading
@@ -433,6 +864,40 @@ def check_context_optimization() -> None:
             "Full",
             "Context budgets",
             "Concise delegation packets",
+            "Task-Type Routing Map",
+            "Context freshness rule",
+            "Compact mode trimming",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "handoff.md",
+        (
+            "Delegation packet (canonical schema)",
+            "Context freshness:",
+            "Required minimum",
+            "Expansion blocks",
+            "Goal & Definition of Done",
+            "File Inventory",
+            "Verification Protocol",
+            "Reporting Protocol",
+            "Recommended Packet Form",
+            "Acceptance Checklist",
+            "Reporting Template",
+            "Clarification Protocol",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "agent-format.md",
+        (
+            "Codex TOML summary + pointer rule",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "output-contract.md",
+        (
+            "Context budget",
+            "Task assignment quality",
+            "Clarifications requested",
         ),
     )
     require_contains(
@@ -442,6 +907,9 @@ def check_context_optimization() -> None:
             "Context Loading Policy",
             "Context profile",
             "Context split",
+            "Task-Type Routing Map",
+            "Context freshness",
+            "compact-mode trimming",
         ),
     )
     require_contains(
@@ -451,6 +919,17 @@ def check_context_optimization() -> None:
             "## Context Loading Policy",
             "{{CONTEXT_PROFILE}}",
             "{{DETAIL_REFERENCES}}",
+            "Task-Type Routing Map",
+            "Context Freshness",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "GEMINI.md.template",
+        (
+            "agents-system-setup:platform: gemini-cli",
+            "AGENTS.md",
+            ".gemini/agents/*.md",
+            "mcp_servers",
         ),
     )
     require_contains(
@@ -458,7 +937,22 @@ def check_context_optimization() -> None:
         (
             "## Context Load Order",
             "## Delegation Packet",
-            "concise delegation packet",
+            "delegation-packet-canonical-schema",
+            "Context freshness: recent",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "orchestrator.claude.md.template",
+        (
+            "## Delegation Packet",
+            "delegation-packet-canonical-schema",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "orchestrator.opencode.md.template",
+        (
+            "## Delegation Packet",
+            "delegation-packet-canonical-schema",
         ),
     )
     require_contains(
@@ -466,6 +960,33 @@ def check_context_optimization() -> None:
         (
             "## Context Load Order",
             "Keep the response concise",
+            "## Acceptance Checklist",
+            "## Reporting Template",
+            "clarification_request",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "subagent.claude.md.template",
+        (
+            "## Acceptance Checklist",
+            "## Reporting Template",
+            "clarification_request",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "subagent.opencode.md.template",
+        (
+            "## Acceptance Checklist",
+            "## Reporting Template",
+            "clarification_request",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "subagent.gemini.md.template",
+        (
+            "## Acceptance Checklist",
+            "## Reporting Template",
+            "clarification_request",
         ),
     )
     require_contains(
@@ -473,8 +994,19 @@ def check_context_optimization() -> None:
         (
             "Context Load Order",
             "Outcome first",
+            "summary + pointer rule",
+            "Task Assignment Acceptance Checklist",
+            "clarification_request",
         ),
     )
+
+    _check_codex_developer_instructions_budget(
+        SKILL_ROOT / "assets" / "subagent.codex.toml.template"
+    )
+    _check_agents_template_read_first_budget(
+        SKILL_ROOT / "assets" / "AGENTS.md.template"
+    )
+    _check_managed_block_drift()
 
     skill_path = SKILL_ROOT / "SKILL.md"
     try:
@@ -487,7 +1019,82 @@ def check_context_optimization() -> None:
         warn(f"{skill_path.relative_to(REPO).as_posix()}: SKILL.md is {line_count} lines; target is about 250. Consider moving more detail to references.")
 
 
-# ---------- 11: local-vs-git-tracked artifact policy ----------
+def _check_codex_developer_instructions_budget(path: Path) -> None:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (FileNotFoundError, UnicodeDecodeError):
+        return
+    rel = path.relative_to(REPO).as_posix()
+    match = re.search(r'developer_instructions\s*=\s*"""(.*?)"""', text, re.DOTALL)
+    if not match:
+        return
+    body_lines = len(match.group(1).strip("\n").splitlines())
+    if body_lines > 80:
+        warn(f"{rel}: Codex developer_instructions block is {body_lines} lines; target is <= 60 (apply summary + pointer rule).")
+
+
+def _check_agents_template_read_first_budget(path: Path) -> None:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (FileNotFoundError, UnicodeDecodeError):
+        return
+    rel = path.relative_to(REPO).as_posix()
+    match = re.search(r"## Read First\s*\n(.*?)\n## ", text, re.DOTALL)
+    if not match:
+        return
+    body_lines = len([line for line in match.group(1).splitlines() if line.strip()])
+    if body_lines > 12:
+        warn(f"{rel}: AGENTS.md template Read First has {body_lines} non-empty lines; aim for <= 8.")
+
+
+def _check_managed_block_drift() -> None:
+    import subprocess
+
+    marker_start = "<!-- agents-system-setup:managed:start -->"
+    marker_end = "<!-- agents-system-setup:managed:end -->"
+    for path in REPO.rglob("*.md"):
+        if ".git" in path.parts or "node_modules" in path.parts:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        if marker_start not in text or marker_end not in text:
+            continue
+        rel = path.relative_to(REPO).as_posix()
+        new_block = _extract_managed_block(text, marker_start, marker_end)
+        if new_block is None:
+            continue
+        try:
+            old = subprocess.run(
+                ["git", "show", f"HEAD:{rel}"],
+                capture_output=True,
+                text=True,
+                cwd=REPO,
+                check=False,
+            )
+        except FileNotFoundError:
+            return
+        if old.returncode != 0:
+            continue
+        old_block = _extract_managed_block(old.stdout, marker_start, marker_end)
+        if not old_block or len(old_block) < 10:
+            continue
+        if len(new_block) > int(len(old_block) * 2.5):
+            warn(
+                f"{rel}: managed block grew from {len(old_block)} to {len(new_block)} lines (>2.5x). Consider moving overflow detail to a reference per context-optimization."
+            )
+
+
+def _extract_managed_block(text: str, start: str, end: str) -> list[str] | None:
+    try:
+        block = text.split(start, 1)[1].split(end, 1)[0]
+    except IndexError:
+        return None
+    return [line for line in block.splitlines() if line.strip()]
+
+
+# ---------- 14: local-vs-git-tracked artifact policy ----------
 
 def check_local_tracking_policy() -> None:
     require_contains(
@@ -498,6 +1105,8 @@ def check_local_tracking_policy() -> None:
             "personal-global",
             ".git/info/exclude",
             "git check-ignore",
+            "GEMINI.md",
+            ".gemini/agents/",
         ),
     )
     require_contains(
@@ -534,7 +1143,7 @@ def check_local_tracking_policy() -> None:
     )
 
 
-# ---------- 12: plan handoff policy ----------
+# ---------- 15: plan handoff policy ----------
 
 def check_plan_handoff_policy() -> None:
     require_contains(
@@ -547,7 +1156,9 @@ def check_plan_handoff_policy() -> None:
             "Claude Code",
             "OpenCode",
             "OpenAI Codex (CLI + App)",
+            "Gemini CLI",
             "developer_instructions",
+            ".gemini/agents/",
         ),
     )
     require_contains(
@@ -572,8 +1183,7 @@ def check_plan_handoff_policy() -> None:
         SKILL_ROOT / "assets" / "orchestrator.agent.md.template",
         (
             "Plan Handoff Contract",
-            "Source plan:",
-            "Runtime format target:",
+            "delegation-packet-canonical-schema",
         ),
     )
     require_contains(
@@ -581,8 +1191,7 @@ def check_plan_handoff_policy() -> None:
         (
             "agents-system-setup:platform: claude-code",
             "Plan Handoff Contract",
-            "Runtime format target:",
-            "Claude Code frontmatter schema",
+            "delegation-packet-canonical-schema",
         ),
     )
     require_contains(
@@ -590,8 +1199,7 @@ def check_plan_handoff_policy() -> None:
         (
             "agents-system-setup:platform: opencode",
             "mode: primary",
-            "Runtime format target:",
-            "OpenCode frontmatter schema",
+            "delegation-packet-canonical-schema",
         ),
     )
     require_contains(
@@ -643,7 +1251,7 @@ def check_plan_handoff_policy() -> None:
     )
 
 
-# ---------- 13: Codex CLI + App compatibility ----------
+# ---------- 16: Codex CLI + App compatibility ----------
 
 def check_codex_cli_app_compatibility() -> None:
     """Codex setup/replication emits shared repo artifacts that work across
@@ -718,21 +1326,259 @@ def check_codex_cli_app_compatibility() -> None:
     )
 
 
+# ---------- 17: runtime update drift policy ----------
+
+def check_runtime_update_policy() -> None:
+    """Latest runtime changes must be source-backed and fully wired across the
+    five supported runtimes: Copilot CLI, Claude Code, OpenCode, Codex, Gemini.
+    """
+    runtime_updates = SKILL_ROOT / "references" / "runtime-updates.md"
+    models_ref = SKILL_ROOT / "references" / "models.md"
+    require_contains(
+        models_ref,
+        (
+            "Per-Runtime Model Constraints",
+            "Copilot CLI",
+            "Claude Code",
+            "OpenCode",
+            "OpenAI Codex (CLI + App)",
+            "Gemini CLI",
+            "Rate limits",
+            "Sources",
+            "Decision aid",
+            "inherit",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "interview.md",
+        (
+            "Per-Agent Model Override",
+            "(./models.md)",
+            "platform default",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "output-contract.md",
+        (
+            "Model overrides",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "replication.md",
+        (
+            "Replication preserves explicit `model:` overrides only",
+        ),
+    )
+    require_contains(
+        runtime_updates,
+        (
+            "Runtime Update Audit",
+            "Last verified: 2026-04-29",
+            "Copilot CLI",
+            ".github/agents/<name>.md",
+            ".github/agents/<name>.agent.md",
+            "Claude Code",
+            "plugin-shipped agents",
+            "OpenCode",
+            "Permission keys",
+            "OpenAI Codex (CLI + App)",
+            "job_max_runtime_seconds",
+            "spawn_agents_on_csv",
+            "Gemini CLI",
+            "Supported",
+            ".gemini/agents/*.md",
+            "extension `agents/*.md`",
+            "mcp_servers",
+            "agent_card_url",
+            "agent_card_json",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "Runtime drift is source-backed and gated",
+            "runtime-updates.md",
+            "Gemini CLI",
+            ".gemini/agents/*.md",
+            "subagent.gemini.md.template",
+            "mcp_servers",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "platforms.md",
+        (
+            "Gemini CLI",
+            "Emit `.github/agents/<name>.agent.md`",
+            ".github/agents/<name>.md",
+            "plugin-shipped agents",
+            "Permission keys",
+            "job_max_runtime_seconds",
+            "spawn_agents_on_csv",
+            ".gemini/agents/<name>.md",
+            "extension `agents/*.md`",
+            "mcp_servers",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "agent-format.md",
+        (
+            "Emitter rule: keep writing `.github/agents/<name>.agent.md`",
+            "Schema split",
+            "Plugin-shipped agents",
+            "Permission keys",
+            "job_max_runtime_seconds",
+            "spawn_agents_on_csv",
+            "Gemini CLI",
+            ".gemini/agents/*.md",
+            "kind: local",
+            "kind: remote",
+            "mcp_servers",
+            "agent_card_url",
+            "agent_card_json",
+            "subagents must not recursively call subagents",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "replication.md",
+        (
+            "source_scope",
+            "agent_invocation",
+            "limits:",
+            "plugin_component_refs",
+            "surface_lossiness",
+            "Gemini CLI",
+            "gemini-cli",
+            "mcp_servers",
+            "agent_card_url",
+            "agent_card_json",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "marketplaces.md",
+        (
+            "Last verified: 2026-04-29",
+            "Gemini CLI",
+            ".gemini/agents/*.md",
+            "skills`, `mcpServers`, `apps`",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "output-contract.md",
+        (
+            "Runtime drift notes",
+            "Gemini",
+            "artifact",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "subagent.opencode.md.template",
+        (
+            "Use `permission:` for tool gating",
+            "doom_loop",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "subagent.codex.toml.template",
+        (
+            "job_max_runtime_seconds",
+            "spawn_agents_on_csv",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "subagent.gemini.md.template",
+        (
+            "agents-system-setup:platform: gemini-cli",
+            "kind: local",
+            "mcp_servers",
+            "not `mcpServers`",
+            "agent_card_url",
+            "agent_card_json",
+            "subagents cannot call subagent tools",
+        ),
+    )
+    require_contains(
+        REPO / "README.md",
+        (
+            "Runtime update audit",
+            "Gemini CLI now has official subagent docs",
+            "supported artifact-first",
+            ".gemini/agents/*.md",
+        ),
+    )
+    require_contains(
+        REPO / "CHANGELOG.md",
+        (
+            "five supported runtimes",
+            "Gemini CLI",
+            "artifact support",
+        ),
+    )
+
+    for path in (
+        runtime_updates,
+        SKILL_ROOT / "SKILL.md",
+        SKILL_ROOT / "references" / "platforms.md",
+        SKILL_ROOT / "references" / "agent-format.md",
+        SKILL_ROOT / "references" / "replication.md",
+        SKILL_ROOT / "references" / "marketplaces.md",
+        SKILL_ROOT / "references" / "output-contract.md",
+    ):
+        require_not_contains(
+            path,
+            (
+                "Gemini CLI is tracked as a candidate",
+                "Gemini CLI is a candidate / monitor only runtime",
+                "Gemini CLI candidate",
+                "Gemini candidate only",
+                "Gemini CLI subagents (candidate only)",
+            ),
+        )
+
+    validator_text = Path(__file__).read_text(encoding="utf-8")
+    for marker in (
+        "check_gemini_markdown_agents",
+        "check_opencode_markdown_agents",
+        "check_claude_plugin_agent_fields",
+        "mcp_servers",
+        "agent_card_url",
+        "GEMINI.md",
+        "models.md",
+        "Model overrides",
+        "Acceptance Checklist",
+        "Task assignment quality",
+    ):
+        if marker not in validator_text:
+            err(f"scripts/_validate.py: missing runtime validator marker `{marker}`")
+
+    for manifest in VERSIONED_MANIFESTS:
+        data = load_json(manifest)
+        if not data:
+            continue
+        compat = data.get("compatibility", {})
+        if isinstance(compat, dict) and "gemini-cli" in compat and not isinstance(compat["gemini-cli"], str):
+            err(f"{manifest.relative_to(REPO).as_posix()}: compatibility.gemini-cli must be a version string when present")
+
+
 # ---------- main ----------
 
 def main() -> int:
     print(f"Validating {REPO} …")
     check_manifests()
+    check_schema_files()
     check_frontmatter_files()
     check_encoding()
     check_internal_links()
     check_codex_toml_agents()
+    check_gemini_markdown_agents()
+    check_opencode_markdown_agents()
+    check_claude_plugin_agent_fields()
     check_replication_ledger()
     check_governance_baseline()
     check_context_optimization()
     check_local_tracking_policy()
     check_plan_handoff_policy()
     check_codex_cli_app_compatibility()
+    check_runtime_update_policy()
 
     if WARNINGS:
         print("\nWARNINGS:")

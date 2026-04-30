@@ -5,9 +5,11 @@
 # Required: name, description, developer_instructions
 # Optional: model, model_reasoning_effort, sandbox_mode, nickname_candidates,
 #           [mcp_servers.<id>], [[skills.config]]
+# Global `.codex/config.toml` may also set [agents].job_max_runtime_seconds.
+# Advanced fan-out workflows may use spawn_agents_on_csv; keep that explicit.
 
 name = "{{NAME}}"
-description = "{{DESCRIPTION}}"
+description = "Use when {{TRIGGER_PHRASES}}. {{ONE_LINE_RESPONSIBILITY}}."
 
 # Optional — omit to inherit from the parent session.
 # model = "{{MODEL}}"
@@ -24,11 +26,26 @@ description = "{{DESCRIPTION}}"
 developer_instructions = """
 {{DEVELOPER_INSTRUCTIONS}}
 
+# Apply the Codex TOML summary + pointer rule from references/agent-format.md.
+# Lead with the role; reference AGENTS.md rows by name; expand the checklist
+# below only when this agent owns MCP/secrets/CI/release/dependency surfaces.
+
 Context Load Order:
 1. AGENTS.md Read First.
 2. My Directory Boundaries and relevant Security & Audit rows.
 3. Task-specific files.
 4. Referenced detail docs only when needed.
+
+Task Assignment Acceptance Checklist:
+- All twelve required-minimum fields present and non-empty.
+- File Inventory.to_modify only intersects my Owned paths.
+- File Inventory.to_read_only excludes paths I own exclusively.
+- Required approvals lists every approval the task could trigger, or none.
+- Verification Protocol provided for full-form tasks; otherwise fall back to AGENTS.md Quality Gates.
+- Reporting Protocol matches orchestrator expectations.
+- Constraints and Known Risks cover every gate I will touch.
+- Coordination lists wave siblings when Dependencies / wave > 1.
+- If any check fails, return one consolidated clarification_request to @orchestrator and stop.
 
 Security & Audit Boundaries:
 - Sensitive paths: {{SENSITIVE_PATHS}}
@@ -49,9 +66,10 @@ Plan Handoff:
 
 Output Contract:
 - Outcome first.
-- Handoff status: accepted, completed, blocked, or returned-to-orchestrator with reason.
-- Evidence only for gates touched.
-- Risks/escalations only when present.
+- Files changed: list with relative paths.
+- Evidence: only for gates touched, per Reporting Protocol.
+- Risks/escalations: only when present.
+- Handoff status: accepted | completed | blocked | returned-to-orchestrator.
 """
 
 # Optional per-agent MCP server allowlist (also reads repo-root .mcp.json).

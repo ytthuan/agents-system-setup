@@ -4,7 +4,7 @@ Use `ask_user` for **every** question. One question per call. Multiple-choice wh
 
 ## 0. Platform Selection (FIRST question after detection)
 - Q: "Which agent runtime(s) should I configure?"
-- Choices: `["Copilot CLI only (Recommended for GitHub-centric teams)", "Claude Code only", "OpenCode only", "OpenAI Codex only (CLI + App artifacts)", "Copilot CLI + Claude Code", "All four (Copilot + Claude Code + OpenCode + Codex)"]`
+- Choices: `["Copilot CLI only (Recommended for GitHub-centric teams)", "Claude Code only", "OpenCode only", "OpenAI Codex only (CLI + App artifacts)", "Gemini CLI only", "Copilot CLI + Claude Code", "All supported runtimes (Copilot + Claude Code + OpenCode + Codex + Gemini)"]`
 
 ## 1. Purpose
 - Q: "In one sentence, what does this project do?"
@@ -46,12 +46,12 @@ Use `ask_user` for **every** question. One question per call. Multiple-choice wh
 - Freeform with the suggested list pre-printed.
 
 ## 9b. Per-Agent Model Override (optional, ask only if user wants to set models)
-- Q: "Want to set a custom model for any agent? (Leave blank for platform default)"
+- Q: "Want to set a custom model for any agent? Each runtime has its own accepted format and plan-tier rate limits — see [models](./models.md). Leave blank to keep the runtime's default and stay portable."
 - Choices: `["No, use platform default for all (Recommended)", "Yes, I'll specify per agent"]`
-- If yes: loop per agent name, freeform model id (e.g., `claude-sonnet-4.6`, `sonnet`, `anthropic/claude-sonnet-4-5`). Skip leaves model blank.
+- If yes: loop per agent. Before each prompt, surface the runtime's accepted format from [models.md](./models.md) (Copilot internal id, Claude alias or full id, OpenCode `provider/model-id`, Codex `gpt-5.x` plus optional `model_reasoning_effort`, Gemini local id). Freeform input; `inherit` or blank skips that agent. Warn when the supplied id does not match the documented format and ask whether to keep it.
 
 ## 10. Plugin / Skill / MCP Discovery Scope
-- Q: "Which capabilities should I look up in the marketplaces (github/copilot-plugins, github/awesome-copilot, anthropics/skills, claudeforge/marketplace)? (comma-separated, e.g., 'playwright, azure, postgres')"
+- Q: "Which capabilities should I look up in the marketplaces (github/awesome-copilot, github/copilot-plugins, anthropics/skills, openai/skills, OpenCode catalogs, Gemini extensions)? (comma-separated, e.g., 'playwright, azure, postgres')"
 - Freeform. Allow `skip`.
 
 ## 10b. MCP Approval Mode (only if any MCP server is among selections later)

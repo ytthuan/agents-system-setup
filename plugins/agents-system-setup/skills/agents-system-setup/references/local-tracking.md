@@ -6,7 +6,7 @@ Always ask how generated agent artifacts should be stored before writing project
 
 | Mode | Use when | Write location | Git behavior |
 |---|---|---|---|
-| `project-tracked` | Team should share the agent system | Standard project paths (`AGENTS.md`, `.github/agents/**`, `.claude/**`, `.opencode/**`, `.codex/**`) | Files are normal repo files; do not commit unless user approves git actions. |
+| `project-tracked` | Team should share the agent system | Standard project paths (`AGENTS.md`, `GEMINI.md`, `.github/agents/**`, `.claude/**`, `.opencode/**`, `.codex/**`, `.gemini/**`) | Files are normal repo files; do not commit unless user approves git actions. |
 | `project-local` | User wants project-specific agents for this checkout only | Standard project paths in the working tree | Add generated paths to `.git/info/exclude`; never modify `.gitignore` just to hide local-only artifacts. |
 | `personal-global` | User wants reusable personal agents outside this repo | Runtime user paths (`~/.copilot`, `~/.claude`, `~/.config/opencode`, `~/.codex`) | Nothing written to repo unless explicitly approved. |
 
@@ -34,6 +34,7 @@ Recommended exclude block:
 # agents-system-setup local-only artifacts
 AGENTS.md
 CLAUDE.md
+GEMINI.md
 AGENT-TEAMS.md
 .agents-system-setup/
 .github/agents/
@@ -45,6 +46,8 @@ AGENT-TEAMS.md
 .opencode/skills/
 .codex/agents/
 .codex/config.toml
+.gemini/agents/
+.gemini/settings.json
 .mcp.json
 opencode.json
 ```

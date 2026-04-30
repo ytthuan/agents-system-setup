@@ -22,12 +22,21 @@
         "properties": {
           "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
           "source": {
-            "type": "object",
-            "required": ["source", "path"],
-            "properties": {
-              "source": { "enum": ["local", "git"] },
-              "path": { "type": "string" }
-            }
+            "oneOf": [
+              { "type": "string" },
+              {
+                "type": "object",
+                "required": ["source"],
+                "properties": {
+                  "source": { "enum": ["local", "git", "git-subdir", "url"] },
+                  "path": { "type": "string" },
+                  "url": { "type": "string" },
+                  "ref": { "type": "string" },
+                  "subdir": { "type": "string" }
+                },
+                "additionalProperties": true
+              }
+            ]
           },
           "policy": {
             "type": "object",

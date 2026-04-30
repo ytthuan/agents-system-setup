@@ -82,19 +82,51 @@ Use these defaults in generated content:
 
 ## 6. Concise delegation packets
 
-The orchestrator should pass subagents enough context to act without dumping the full project memory:
+The orchestrator should pass subagents enough context to act without dumping the full project memory. **The canonical Delegation Packet schema lives in [`handoff.md`](./handoff.md#delegation-packet-canonical-schema).** Every orchestrator template and runtime renderer fills the same fields in the same order; do not redefine the schema here.
 
-```text
-Task: <one sentence>
-Source plan: <user request | VS Code plan prompt | Spec-Kit /plan | other>
-Owned paths: <paths from Directory Architecture>
-Relevant gates: <quality/security gates>
-Constraints: <security/architecture constraints>
-Runtime format target: <none | target platform path/schema>
-Expected output: <files changed, evidence, risks>
-```
+When updating field semantics or adding a field, edit `handoff.md` first, then re-link from this section.
 
-Do not include unrelated agent roster, marketplace research, or platform format notes unless the subagent needs them.
+## Context freshness rule
+
+Agents in the same turn should not re-read every `AGENTS.md` row when the orchestrator already loaded it. Use the `Context freshness` field of the canonical Delegation Packet:
+
+| Freshness value | Meaning | Subagent behavior |
+|---|---|---|
+| `AGENTS.md@<sha>` | Orchestrator computed sha during this turn | Trust the snapshot; reload only sections relevant to the new task tag. |
+| `recent` | Same orchestrator turn, no sha available | Skip row-by-row reload; load only Task-Type Routing rows for the current task tag. |
+| `reload` | Stale or unknown | Re-read `AGENTS.md` Read First plus rows for the task tag. |
+
+Orchestrators must set this field whenever they know `AGENTS.md` is fresh; subagents must respect it. Replication and update flows revert to `reload`.
+
+## Task-Type Routing Map
+
+Map common task tags to the references each agent should load (or skip), and to the **Recommended Packet Form** for the Task Assignment Contract (see [`handoff.md`](./handoff.md#recommended-packet-form)). Agents look up their task tag here before reading anything beyond `AGENTS.md` Read First.
+
+| Task tag | Always load | Load when applicable | Safe to skip | Recommended packet form |
+|---|---|---|---|---|
+| `read-only-research` | `AGENTS.md` Read First, Directory Architecture | `topology.md` if topology questions | Security & Audit Matrix detail, Threat Model long rationale, MCP gate | short-form |
+| `code-edit` | `AGENTS.md` Read First, Directory Architecture, owning agent boundary | Quality Gates row for this path | Marketplace research, full platform schemas | short-form (≤2 files) · full-form when >2 files or shared boundary |
+| `security-write` | Security & Audit Matrix, Threat Model, owning agent boundary | `security-audit-architecture.md` rows for the change | Long marketplace candidate research | full-form |
+| `mcp-write` | MCP approval gate (Phase 3.5), Security & Audit Matrix | `plugin-discovery.md` MCP rendering | Architecture Decisions detail | full-form |
+| `replication` | `replication.md`, `handoff.md`, `output-contract.md` | `models.md` for explicit overrides | Project-specific quality gate detail | full-form |
+| `release` | Quality Gates, manifests, version sync rules | `runtime-updates.md` for upstream drift | Long architecture rationale | full-form |
+| `docs-only` | `AGENTS.md` Read First | Quality Gates only if doc CI exists | Security/MCP gates unless docs touch credentials | short-form |
+| `bug-fix` | `AGENTS.md` Read First, Directory Architecture, owning agent boundary | Quality Gates row, repro logs, related ADRs | Long marketplace research | full-form (Reproduction block required) |
+
+The map is guidance, not a hard schema. Agents may load more references when the task warrants it; they must not skip load rows that include a hard gate, and they must not downgrade the recommended form for security/MCP/release tasks.
+
+## Compact mode trimming
+
+Output profile (Phase 1.9) controls subagent body verbosity. The frontmatter and section anchors stay intact; only body prose is trimmed.
+
+| Section | Compact | Balanced (default) | Full |
+|---|---|---|---|
+| Context Load Order | Single bulleted line referencing `AGENTS.md` rows | Numbered list (current default) | Numbered list plus rationale |
+| Security & Audit Boundaries | One line + link to the matching `AGENTS.md` row | Current expanded list | Expanded list plus evidence template |
+| Architecture & Design Expectations | One line + link to the matching ADR row | Current expanded list | Expanded list plus rejected alternatives |
+| Outputs | One sentence | Current bullet list | Bullet list plus example output |
+
+Renderers must keep section headings (so validators and humans can find them) and keep the link target valid. Codex TOML `developer_instructions` follows the "summary + pointer" rule from [agent-format](./agent-format.md#codex-toml-summary--pointer-rule) regardless of profile because TOML cannot link inline.
 
 ## 7. Anti-patterns
 

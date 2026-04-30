@@ -1,14 +1,17 @@
 ---
+name: {{AGENT_NAME}}
 description: 'Use when {{TRIGGER_PHRASES}}. {{ONE_LINE_RESPONSIBILITY}}.'
-mode: subagent
+kind: local
+{{OPTIONAL_DISPLAY_NAME_LINE}}
+{{OPTIONAL_TOOLS_BLOCK}}
+{{OPTIONAL_MCP_SERVERS_BLOCK}}
 {{OPTIONAL_MODEL_LINE}}
 {{OPTIONAL_TEMPERATURE_LINE}}
-{{OPTIONAL_STEPS_LINE}}
-{{OPTIONAL_HIDDEN_LINE}}
-{{OPTIONAL_PERMISSION_BLOCK}}
+{{OPTIONAL_MAX_TURNS_LINE}}
+{{OPTIONAL_TIMEOUT_MINS_LINE}}
 ---
 
-<!-- agents-system-setup:platform: opencode -->
+<!-- agents-system-setup:platform: gemini-cli -->
 <!-- agents-system-setup:replicated-from: {{REPLICATION_SOURCE}} -->
 
 # {{AGENT_DISPLAY_NAME}}
@@ -57,7 +60,7 @@ If implementation would change a public API, module boundary, data model, servic
 ## Handoff Input
 
 - Source plan: {{HANDOFF_SOURCE}}
-- Runtime format target: `opencode` — `.opencode/agents/{{AGENT_NAME}}.md` — OpenCode frontmatter schema
+- Runtime format target: `gemini-cli` — `.gemini/agents/{{AGENT_NAME}}.md` — Gemini CLI local subagent schema
 - Dependencies / wave: {{HANDOFF_DEPENDENCIES}}
 - Required approvals: {{HANDOFF_APPROVALS}}
 
@@ -78,7 +81,16 @@ Before doing work I confirm the Task Assignment is well-formed:
 
 If any check fails I return one consolidated `clarification_request:` to `@orchestrator` and stop. I do not loop or invent missing context.
 
-> Note: OpenCode agent filename is the agent name (`{{AGENT_NAME}}.md` → agent `{{AGENT_NAME}}`). No `name:` key in frontmatter. MCP servers are **not** configured here — they belong in `opencode.json` › `mcp`. Use `permission:` for tool gating (not the deprecated `tools:` map). Known permission keys include `read`, `edit`, `glob`, `grep`, `list`, `bash`, `task`, `external_directory`, `todowrite`, `webfetch`, `websearch`, `codesearch`, `lsp`, `skill`, `question`, and `doom_loop`. Model must use `provider/model-id` format (e.g., `anthropic/claude-sonnet-4-20250514`).
+> Note (Gemini CLI): The file **must** start with YAML frontmatter. Required keys are `name` and `description`; this template sets `kind: local` explicitly. Optional keys are `display_name`, `tools`, `mcp_servers`, `model`, `temperature`, `max_turns`, and `timeout_mins`. Use snake_case `mcp_servers` (not `mcpServers` or `mcp-servers`). Files in `.gemini/agents/` whose basename starts with `_` are ignored. Remote A2A agents are advanced/import-only and must not be emitted by default.
+
+## Gemini CLI Local Subagent Rules
+
+1. The Markdown body is the system prompt loaded for this subagent.
+2. Keep `name` aligned with the filename basename: `.gemini/agents/{{AGENT_NAME}}.md`.
+3. Use the narrowest practical `tools:` list. If `tools:` is omitted, Gemini inherits tools from the parent session.
+4. Do not delegate recursively to other subagents. Gemini CLI subagents cannot call subagent tools, even with `tools: ['*']`; return cross-boundary work to `@orchestrator`.
+5. Inline MCP servers, when approved, belong under `mcp_servers:` and are isolated to this subagent.
+6. Do not use remote A2A fields (`agent_card_url`, `agent_card_json`, `auth`) in this local template.
 
 ## How I work
 1. {{STEP_1}}

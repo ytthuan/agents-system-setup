@@ -1,29 +1,29 @@
 ---
 name: agents-system-setup
-description: 'Bootstrap, improve, or replicate compact multi-agent systems across Copilot CLI, Claude Code, OpenCode, and OpenAI Codex (CLI + App). Generates AGENTS.md, orchestrator/subagents, skills, governance matrices, and opt-in plugin/MCP recommendations. Uses Canonical IR, MCP approval gates, platform-correct formats, and context-optimized output profiles. Triggers: "set up agents", "scaffold AGENTS.md", "improve my agents", "audit agent setup", "architecture review", "security audit agents", "replicate agents", "configure copilot/claude/opencode/codex", "discover plugins/MCP".'
+description: 'Bootstrap, improve, or replicate compact multi-agent systems across Copilot CLI, Claude Code, OpenCode, OpenAI Codex (CLI + App), and Gemini CLI. Generates AGENTS.md, orchestrator/subagents, skills, governance matrices, and opt-in plugin/MCP recommendations. Uses Canonical IR, MCP approval gates, platform-correct formats, and context-optimized output profiles. Triggers: "set up agents", "scaffold AGENTS.md", "improve my agents", "audit agent setup", "architecture review", "security audit agents", "replicate agents", "configure copilot/claude/opencode/codex/gemini", "discover plugins/MCP".'
 argument-hint: '[init | update | improve | replicate] (omit to auto-detect)'
 ---
 
 # Setup Copilot Agents (multi-platform)
 
-Scaffold or update a complete agent system for the current project across **Copilot CLI**, **Claude Code**, **OpenCode**, and/or **OpenAI Codex (CLI + App)**. Produces a canonical `AGENTS.md` (with **Directory Architecture**, **Agent Roster**, **Capability Matrix**, **Security & Audit Matrix**, **Threat Model**, and **Architecture / Design Decisions**), an **orchestrator + N subagents**, project-scoped **skills**, and **approved** plugins/MCP servers — derived from a structured interview.
+Scaffold or update a complete agent system for the current project across **Copilot CLI**, **Claude Code**, **OpenCode**, **OpenAI Codex (CLI + App)**, and/or **Gemini CLI**. Produces a canonical `AGENTS.md` (with **Directory Architecture**, **Agent Roster**, **Capability Matrix**, **Security & Audit Matrix**, **Threat Model**, and **Architecture / Design Decisions**), an **orchestrator + N subagents**, project-scoped **skills**, and **approved** plugins/MCP servers — derived from a structured interview.
 
 ## When to Use
 
 - Brand-new repository needs an agent setup from scratch (**init**)
 - Existing project should adopt or extend the orchestrator + subagent pattern (**update**)
 - Existing agent system needs an audit and targeted upgrades (**improve**)
-- Agents authored for one runtime need to be ported to another (**replicate** — Copilot ↔ Claude Code ↔ OpenCode ↔ OpenAI Codex)
+- Agents authored for one runtime need to be ported to another (**replicate** — Copilot ↔ Claude Code ↔ OpenCode ↔ OpenAI Codex ↔ Gemini)
 - Discovering relevant plugins / MCP servers from the well-known marketplaces
 
 ## Hard Rules
 
 1. **Always interview first** with `ask_user`. Never assume project type, language, scope, or target platform.
-2. **Detect existing agent footprint on entry.** If any of `AGENTS.md`, `CLAUDE.md`, `opencode.json`, `.github/agents/`, `.claude/agents/`, `.opencode/agents/`, `~/.codex/AGENTS.md` exists, present mode choice with `improve` and `replicate` as first-class options — never silently jump to `update`.
+2. **Detect existing agent footprint on entry.** If any of `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `opencode.json`, `.github/agents/`, `.claude/agents/`, `.opencode/agents/`, `.codex/agents/`, `.gemini/agents/`, `~/.codex/AGENTS.md` exists, present mode choice with `improve` and `replicate` as first-class options — never silently jump to `update`.
 3. **Orchestrator + subagent topology is mandatory.** Subagent count (3 to ~50) is decided dynamically from scope.
 4. **Directory Architecture is generated and enforced.** Every subagent file references it; the orchestrator routes by ownership.
 5. **Per-item opt-in recommendations.** Plugin / skill / MCP candidates are always presented with rationale and explicit `ask_user` choice — never bulk-applied silently.
-6. **MCP config approval gate.** Before writing any MCP config (`.mcp.json`, `opencode.json` › `mcp`, agent `mcp-servers:`), render the proposal and call `ask_user` for approval. No silent MCP writes — ever. Replication re-triggers this gate per new target.
+6. **MCP config approval gate.** Before writing any MCP config (`.mcp.json`, `opencode.json` › `mcp`, agent `mcp-servers:` / `mcp_servers:`, extension/plugin MCP manifests), render the proposal and call `ask_user` for approval. No silent MCP writes — ever. Replication re-triggers this gate per new target.
 7. **Marketplace-first lookup with vendor attribution.** Recommendations come from registries listed in [marketplaces](./references/marketplaces.md), tagged `[Tier · Vendor]` — never invent names or URLs.
 8. **Replication goes through Canonical IR, not pairwise mappings.** See [replication](./references/replication.md). Never write a Copilot→Claude (or any other direction) function; always parse → IR → emit.
 9. **Non-destructive updates.** `cp <file> <file>.bak` before any edit; merge into managed blocks, preserve user-authored content.
@@ -38,6 +38,9 @@ Scaffold or update a complete agent system for the current project across **Copi
 18. **Context budget is a feature.** Default to the `Balanced` output profile from [context optimization](./references/context-optimization.md): keep routing and gates inline, move deep detail behind explicit references, and never duplicate long policy prose in every agent.
 19. **Ask whether agent artifacts are git-tracked or local-only.** Before writing project-scoped agent files, ask the tracking question from [local tracking](./references/local-tracking.md). For local-only project files, write `.git/info/exclude` (never `.gitignore`) and verify with `git check-ignore`.
 20. **Plan handoff is normalized before emission.** Treat VS Code `plan` prompt output, Spec-Kit `/plan`, and user-written plans as upstream planning input only. Convert them to the [handoff contract](./references/handoff.md) / HandoffIR, then emit each selected runtime's native format. Never copy prompt frontmatter or another runtime's agent schema into generated artifacts.
+21. **Runtime drift is source-backed and gated.** Use [runtime updates](./references/runtime-updates.md) before changing platform support. Gemini CLI is supported for local project subagents; remote A2A/extension packaging surfaces remain explicit import/package work.
+22. **Model overrides are optional and source-backed.** Keep `model:` blank by default. Only when the user opts in during interview Q9b, load [models](./references/models.md) for the runtime's accepted format, defaults, and rate-limit sources. Never pin live RPM/TPM numbers in generated files.
+23. **Task assignments use the canonical contract.** Compose every orchestrator → subagent handoff with the [Task Assignment Contract](./references/handoff.md#delegation-packet-canonical-schema). Always fill the Required Minimum; add Expansion Blocks per the [Recommended Packet Form](./references/handoff.md#recommended-packet-form). Subagents run the Acceptance Checklist before doing work and emit results via the Reporting Template; missing required fields trigger one consolidated `clarification_request:` to the orchestrator.
 
 ## Procedure
 
@@ -46,19 +49,22 @@ Scaffold or update a complete agent system for the current project across **Copi
 First question after detecting cwd. Use `ask_user`:
 
 > "Which agent runtime(s) should I configure?"
-> Choices: `["Copilot CLI only (Recommended for GitHub-centric teams)", "Claude Code only", "OpenCode only", "OpenAI Codex only (CLI + App artifacts)", "Copilot CLI + Claude Code", "All four (Copilot + Claude Code + OpenCode + Codex)"]`
+> Choices: `["Copilot CLI only (Recommended for GitHub-centric teams)", "Claude Code only", "OpenCode only", "OpenAI Codex only (CLI + App artifacts)", "Gemini CLI only", "Copilot CLI + Claude Code", "All supported runtimes (Copilot + Claude Code + OpenCode + Codex + Gemini)"]`
 
 Persist the selection. All later phases loop over selected platforms using [platforms.md](./references/platforms.md) as the source of truth for paths and frontmatter.
+
+Gemini CLI emits local subagents at `.gemini/agents/*.md`. See [platforms](./references/platforms.md) and [agent format](./references/agent-format.md) for its non-recursive subagent and `mcp_servers:` rules.
 
 ### Phase 1 — Detect & Choose Mode
 
 1. **Inspect cwd** and detect runtime footprint:
    - Project files: `package.json`, `*.csproj`, `Package.swift`, `build.gradle`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `mkdocs.yml`, `.git/`.
    - Agent artifacts (per runtime):
-     - Copilot CLI: `AGENTS.md`, `.github/agents/`, `.github/skills/`, `.mcp.json`
+     - Copilot CLI: `AGENTS.md`, `.github/agents/*.agent.md`, `.github/agents/*.md` (docs-drift import signal), `.github/skills/`, `.mcp.json`
      - Claude Code: `CLAUDE.md`, `.claude/agents/`, `.claude/skills/`, `.claude/settings.json`
      - OpenCode: `opencode.json`, `.opencode/agents/`, `.opencode/skills/`
      - OpenAI Codex: `AGENTS.md` (orchestrator + project rules), `.codex/agents/*.toml` (specialized subagents), `.codex/config.toml`, `~/.codex/AGENTS.md`, `~/.codex/agents/`; CLI-only plugin/command UX stays documented separately
+     - Gemini CLI: `GEMINI.md`, `.gemini/agents/*.md`, `.gemini/settings.json`, `~/.gemini/GEMINI.md`, `~/.gemini/agents/`
 2. **Decide mode** with `ask_user` — show what was detected:
 
    | Detected footprint | Default offer | Choices |
@@ -170,7 +176,7 @@ Build the plan and show it before writing anything. The plan must include:
 - **Plan Handoff Contract** — accepted planning sources, HandoffIR fields, per-platform format targets, approval boundaries, and verification evidence. Use [handoff](./references/handoff.md).
 - Skills to create.
 - Plugin/MCP candidates **per capability** (Phase 3 fills this).
-- Per-platform file plan (Copilot/Claude/OpenCode/Codex paths the user will actually get).
+- Per-platform file plan (Copilot/Claude/OpenCode/Codex/Gemini paths the user will actually get).
 - **Artifact tracking** — `project-tracked | project-local | personal-global`, plus exclude plan for local-only mode.
 - Git actions (if any).
 - **Output profile & context budget** — `balanced|compact|full`, sections kept inline, overflow targets, and biggest expected agent-memory file.
@@ -201,14 +207,17 @@ See [plugin discovery](./references/plugin-discovery.md) for the comparison-tabl
 If any user-selected candidate from Phase 3 includes an MCP server:
 
 1. Build the proposed config **per platform**:
-   - Copilot CLI / Claude Code → `.mcp.json` (`mcpServers` key)
+   - Copilot CLI → `.mcp.json` (`mcpServers` key) and any approved agent-frontmatter `mcp-servers:`
+   - Claude Code → `.mcp.json` (`mcpServers` key) and any approved project/user-agent `mcpServers`
    - OpenCode → merge into `opencode.json` (`mcp` key)
-2. Render each proposed file verbatim (full JSON).
+   - OpenAI Codex → `.mcp.json` plus any approved per-agent TOML `[mcp_servers.<id>]`
+   - Gemini CLI → approved per-agent `mcp_servers:` blocks in `.gemini/agents/*.md`
+2. Render each proposed file/config block verbatim (full JSON/YAML/TOML as applicable).
 3. `ask_user`:
    > "I'm about to write the MCP configuration above to `<paths>`. Approve?"
    > Choices: `["Approve all (Recommended)", "Approve selectively (per-server)", "Skip MCP entirely"]`
 4. If **selective**, loop per server: `["Include", "Skip"]`.
-5. If **skip**, strip every `mcp-servers:` from generated agents and do not write `.mcp.json` / `opencode.json` `mcp` key.
+5. If **skip**, strip every `mcp-servers:` / `mcpServers` / `mcp_servers:` / TOML `[mcp_servers.*]` surface from generated agents and do not write `.mcp.json` / `opencode.json` `mcp` / extension MCP config.
 6. **No MCP write may occur before this gate returns approval.**
 
 ### Phase 4 — Generate Artifacts (per platform, post-approval)
@@ -216,25 +225,27 @@ If any user-selected candidate from Phase 3 includes an MCP server:
 For each selected platform, look up paths and frontmatter in [platforms.md](./references/platforms.md), then render:
 
 - `AGENTS.md` at repo root → [template](./assets/AGENTS.md.template). Fill **Read First**, **Context Loading Policy**, **Directory Architecture**, **Agent Roster**, **Capability Matrix**, **Plan Handoff Contract**, **Security & Audit Matrix**, **Threat Model**, **Architecture / Design Pattern Decisions**, **ADR Index**, **Quality Gates**, **Skills**, **Plugins/MCP** tables. Use the selected output profile from Phase 1.9; summarize long sections and link overflow details instead of dumping exhaustive prose inline.
+- `GEMINI.md` when Gemini CLI is selected → [template](./assets/GEMINI.md.template). Keep it a compact pointer/sync copy that tells Gemini to load canonical `AGENTS.md`, preserves artifact tracking notes, and routes root-session fan-out because Gemini subagents cannot recursively delegate.
 - Orchestrator — use the **platform-specific template**:
   - **Copilot CLI** → [orchestrator.agent.md.template](./assets/orchestrator.agent.md.template) at `.github/agents/orchestrator.agent.md`.
   - **Claude Code** → [orchestrator.claude.md.template](./assets/orchestrator.claude.md.template) at `.claude/agents/orchestrator.md`. Frontmatter uses `name` + `description`; `tools:` is a comma-separated string; no `mcp-servers:` key (MCP lives in `.mcp.json`).
   - **OpenCode** → [orchestrator.opencode.md.template](./assets/orchestrator.opencode.md.template) at `.opencode/agents/orchestrator.md`. Frontmatter has **no `name:`** (filename is the name); `mode: primary`; model uses `provider/model-id` format; MCP stays in `opencode.json`.
   - **OpenAI Codex (CLI + App)** → `## Orchestrator` heading in `AGENTS.md` (orchestrator and project rules live there; specialized subagents are TOML files).
 - Each subagent — use the **platform-specific template** and fill `{{OWNED_PATHS}}` / `{{READONLY_PATHS}}` from the Directory Architecture:
-  - **Copilot CLI** → [subagent.agent.md.template](./assets/subagent.agent.md.template) at `.github/agents/<name>.agent.md`. Frontmatter: `name`, `description`, optional `tools:` list, optional `mcp-servers:` (hyphenated key).
+  - **Copilot CLI** → [subagent.agent.md.template](./assets/subagent.agent.md.template) at `.github/agents/<name>.agent.md`. Frontmatter: `name`, `description`, optional `tools:` list, optional `mcp-servers:` (hyphenated key). `.github/agents/<name>.md` is recognized only as an upstream docs-drift/import signal, not the default emitter.
   - **Claude Code** → [subagent.claude.md.template](./assets/subagent.claude.md.template) at `.claude/agents/<name>.md`. Frontmatter: `name`, `description`, optional `tools:` as **comma-separated string** (e.g. `Read, Grep, Bash`), optional `disallowedTools:`, `permissionMode:`, `model:`, etc. Do **not** use Copilot tool names or `mcp-servers:`.
   - **OpenCode** → [subagent.opencode.md.template](./assets/subagent.opencode.md.template) at `.opencode/agents/<name>.md`. Frontmatter: **no `name:`** (filename = agent name), `description`, `mode: subagent`, optional `model:` in `provider/model-id` format, optional `permission:` block. Do **not** embed `mcp-servers:` — MCP belongs in `opencode.json`.
   - **OpenAI Codex (CLI + App)** → [subagent.codex.toml.template](./assets/subagent.codex.toml.template) at `.codex/agents/<kebab-name>.toml`. Required fields: `name`, `description`, `developer_instructions` (TOML triple-quoted string). Carry the IR's `tool_allowlist` only if explicitly set (otherwise inherit from parent session). Map IR `model` → `model` and reasoning hints → `model_reasoning_effort` (`low`|`medium`|`high`). Set `sandbox_mode = "read-only"` for read-only subagents. Per-agent MCP servers go under `[mcp_servers.<id>]` in the same file. `AGENTS.md` keeps only the orchestrator section + Directory Architecture / Capability Matrix / Waves. See [Codex layout](./references/platforms.md) and [openai docs](https://developers.openai.com/codex/subagents). CLI-only instructions such as `/agent` are usage notes, not requirements for App compatibility. Also emit/upsert `.codex/config.toml` with `[agents] max_threads = 6` and `max_depth = 1` unless the user supplied other values.
+  - **Gemini CLI** → [subagent.gemini.md.template](./assets/subagent.gemini.md.template) at `.gemini/agents/<kebab-name>.md`. Required fields: `name`, `description`; emit `kind: local`; optional `display_name`, `tools`, `mcp_servers`, `model`, `temperature`, `max_turns`, `timeout_mins`. Use snake_case `mcp_servers:` only after Phase 3.5 approval. Gemini subagents cannot call other subagents, so cross-agent work returns to the orchestrator/root session.
 - Each skill → [template](./assets/skill.template.md) at the platform's skills path.
 - MCP config (only if Phase 3.5 approved) at the platform's MCP path.
 - Drop the [directory-architecture snippet](./assets/directory-architecture.snippet.md) into any agent missing the boundary block.
 - **Orchestrator parallelism clause** — render the wave-aware fan-out instructions per [parallelism](./references/parallelism.md). The orchestrator must invoke all parallel-safe subagents of a wave in a single response (multiple Task-tool calls), await all results, then start the next wave.
 - **Plan handoff contract** — render the HandoffIR fields and platform format targets per [handoff](./references/handoff.md). Agent files receive a concise handoff input/output section; Codex subagents receive it inside `developer_instructions`.
 - **Governance baseline** — render the security, audit, architecture, design-pattern, ADR, and quality-gate sections from Phase 1.8 / Phase 2. Subagents that touch sensitive paths, MCP/tool config, CI/release config, dependency manifests, or architecture boundaries must include explicit security boundaries and audit evidence expectations.
-- **Context optimization** — apply [context optimization](./references/context-optimization.md): compact inline summaries, links for overflow details, concise delegation packets, and no duplicated long policy prose across subagents.
+- **Context optimization** — apply [context optimization](./references/context-optimization.md): compact inline summaries, links for overflow details, concise delegation packets, no duplicated long policy prose across subagents, and **profile-aware compact-mode trimming** for Compact subagents (Security/Architecture/Output sections collapse to one line + link; section anchors stay so validators can find them). Codex TOML always follows the [summary + pointer rule](./references/agent-format.md#codex-toml-summary--pointer-rule). Set `Context freshness: recent` in delegation packets when `AGENTS.md` was loaded this turn.
 - **Artifact tracking** — apply [local tracking](./references/local-tracking.md). In `project-local` mode, update `.git/info/exclude` after writes and verify at least `AGENTS.md` with `git check-ignore -v`.
-- **Spec-Kit block** — if Phase 1.7 recorded `spec_kit_installed = true`, render `assets/spec-kit-block.snippet.md` into the `{{SPEC_KIT_BLOCK}}` placeholder of `AGENTS.md` (substituting `{{RUNTIME}}` per platform: `copilot|claude|codex|opencode`). If `false`, replace the placeholder with an empty string. See [spec-kit](./references/spec-kit.md).
+- **Spec-Kit block** — if Phase 1.7 recorded `spec_kit_installed = true`, render `assets/spec-kit-block.snippet.md` into the `{{SPEC_KIT_BLOCK}}` placeholder of `AGENTS.md` (substituting `{{RUNTIME}}` per platform: `copilot|claude|codex|opencode|gemini`). If `false`, replace the placeholder with an empty string. See [spec-kit](./references/spec-kit.md).
 - **Claude Code AGENT-TEAMS.md** — when Claude Code is among the selected platforms AND the Agent Roster has 3+ subagents marked `team-suitable` (independent + benefits from peer challenge), emit `AGENT-TEAMS.md` documenting: opt-in env var (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), settings.json snippet, suggested teammate roster, token-cost warning, and when to fall back to parallel subagents.
 
 **Project-memory linking** (after AGENTS.md is written):
@@ -242,14 +253,15 @@ For each selected platform, look up paths and frontmatter in [platforms.md](./re
   - **macOS / Linux / WSL**: `bash ./scripts/link-project-memory.sh` → symlinks `CLAUDE.md → AGENTS.md`.
   - **Windows native**: `pwsh -File ./scripts/link-project-memory.ps1` → tries symlink (Developer Mode/admin), falls back to copy with regenerable header (re-runs keep them in sync).
 - OpenCode reads `AGENTS.md` natively — no linking required.
+- Gemini CLI uses `GEMINI.md` as its native context file; when Gemini is selected, keep `GEMINI.md` a compact pointer/sync copy of canonical `AGENTS.md` (same OS-specific symlink/copy caution as Claude).
 
 **Frontmatter rules** (silent-failure traps):
 - `name` MUST match filename basename (kebab-case).
 - Quote any `description` containing colons.
 - Subagent `description` MUST start with `"Use when..."`.
-- Use the **right frontmatter schema per platform** (see [platforms.md](./references/platforms.md) — Copilot uses `mcp-servers:`, Claude uses comma-string `tools:`, OpenCode uses `mode:` plus `permission:`, and Codex subagents use `.toml`).
+- Use the **right frontmatter schema per platform** (see [platforms.md](./references/platforms.md) — Copilot uses `mcp-servers:` and public tool aliases, Claude uses comma-string `tools:`, OpenCode uses `mode:` plus `permission:`, Codex subagents use `.toml`, and Gemini uses `kind: local` plus `mcp_servers:`).
 - Restrict tools per subagent to the minimum needed.
-- The `model:` line is optional in every platform — emit only if the user specified an override.
+- The `model:` line is optional in every platform — emit only if the user specified an override. When users opt in to overrides during interview Q9b, load [models](./references/models.md) for the runtime's accepted format, defaults, and rate-limit sources; never pin live RPM/TPM numbers in generated files.
 
 ### Phase 5 — Update Mode (non-destructive)
 
@@ -267,14 +279,14 @@ Only if user confirmed in Phase 1 AND no `.git/` exists. Pick the script that ma
 ### Phase 7 — Verify & Summarize
 
 1. List every file created/modified with absolute paths, grouped by platform.
-2. Re-read each generated agent/skill: confirm `name` matches filename (Copilot, Claude Code), no `name:` key in OpenCode files (filename is the name), `description` present and starts with `"Use when..."`, no unquoted colons, frontmatter parses for the *target platform's* schema. Confirm Claude Code `tools:` is a comma-separated string — not a YAML list. Confirm OpenCode files have no `mcp-servers:` key. Confirm no `agent: Plan` frontmatter was copied into any generated file.
+2. Re-read each generated agent/skill: confirm `name` matches filename (Copilot, Claude Code, Gemini CLI), no `name:` key in OpenCode files (filename is the name), `description` present and starts with `"Use when..."`, no unquoted colons, frontmatter parses for the *target platform's* schema. Confirm Claude Code `tools:` is a comma-separated string — not a YAML list. Confirm OpenCode files have no `mcp-servers:` key. Confirm Gemini files use `mcp_servers:` (not `mcpServers`) and do not instruct subagents to call subagents. Confirm no `agent: Plan` frontmatter was copied into any generated file.
 3. Verify `AGENTS.md` contains non-empty **Directory Architecture**, **Agent Roster**, **Capability Matrix**.
 4. Verify `AGENTS.md` contains non-empty **Security & Audit Matrix**, **Threat Model**, **Architecture / Design Pattern Decisions**, **ADR Index**, and **Quality Gates**. If a concern is not applicable, it must still have an explicit `n/a` rationale.
 5. Verify security-sensitive files (`.mcp.json`, `opencode.json`, `.env*`, CI/release config, lockfiles, generated scripts) have an owner and evidence requirement in the governance sections.
-6. Verify `AGENTS.md` contains **Plan Handoff Contract**, **Context Loading Policy**, and records the selected output profile.
-7. Verify every generated agent/subagent uses its target runtime's native handoff surface: Markdown body for Copilot/Claude/OpenCode, TOML `developer_instructions` for Codex.
+6. Verify `AGENTS.md` contains **Plan Handoff Contract**, **Context Loading Policy** (including the **Task-Type Routing Map** rows), and records the selected output profile.
+7. Verify every generated agent/subagent uses its target runtime's native handoff surface: Markdown body for Copilot/Claude/OpenCode/Gemini, TOML `developer_instructions` for Codex. Confirm each subagent template includes the **Acceptance Checklist** and **Reporting Template** sections; Codex TOML mirrors them inside `developer_instructions`.
 8. Verify artifact tracking: project-tracked files are visible to git; project-local files are ignored via `.git/info/exclude`; personal-global mode wrote no repo artifacts unless approved.
-9. Print "Try it" examples per selected platform (`copilot`, `claude`, `opencode`, `codex`).
+9. Print "Try it" examples per selected platform (`copilot`, `claude`, `opencode`, `codex`, `gemini`).
 10. Suggest 2–3 next customizations.
 
 ### Phase 8 — Final Wrap-Up (single consolidated ask)
@@ -291,7 +303,7 @@ Skip the entire phase only when `mode == update` and no agents/plugins/MCP chang
 - **Dedicated security/architecture agent or merged role?** Dedicated when the repo handles sensitive data, external tools/MCP, CI/release, regulated domains, monorepos, or user-requested architecture work. Merge into `@reviewer` only for small projects, and keep explicit ownership in the Security & Audit Matrix.
 - **Compact vs balanced vs full output?** Balanced by default. Compact for experienced teams or small repos. Full only for onboarding, audit, or when the user explicitly asks for exhaustive detail. See [context optimization](./references/context-optimization.md).
 - **Git-tracked or local-only?** Teams usually want `project-tracked`; personal experimentation should use `project-local` with `.git/info/exclude`; reusable private agents should use `personal-global`.
-- **Which platform?** Copilot CLI for GitHub-tight teams; Claude Code for Anthropic-first; OpenCode for vendor-neutral / self-hosted; OpenAI Codex for OpenAI-first teams (CLI + App compatible artifacts, using split layout: `AGENTS.md` for orchestrator + rules, `.codex/agents/*.toml` for specialized subagents). Multi-target if uncertain — files coexist cleanly via shared `AGENTS.md` + `.mcp.json`.
+- **Which platform?** Copilot CLI for GitHub-tight teams; Claude Code for Anthropic-first; OpenCode for vendor-neutral / self-hosted; OpenAI Codex for OpenAI-first teams (CLI + App compatible artifacts, using split layout: `AGENTS.md` for orchestrator + rules, `.codex/agents/*.toml` for specialized subagents); Gemini CLI for Google/Gemini-first terminal workflows using `.gemini/agents/*.md`. Multi-target if uncertain — files coexist cleanly via shared `AGENTS.md` + runtime-specific subagent dirs.
 - **`update` vs `improve` vs `replicate`?**
   - `update` regenerates managed blocks against the current plan (still asks before writing).
   - `improve` audits the existing system and proposes a checklist of targeted fixes — user picks which to apply.
@@ -327,6 +339,8 @@ Skip the entire phase only when `mode == update` and no agents/plugins/MCP chang
 - **Assuming agent artifacts should be committed** — always ask tracking mode before writing project files.
 - **Using `.gitignore` for local-only project agents without approval** — local-only mode belongs in `.git/info/exclude`.
 - **Copying plan prompt frontmatter into agent files** — the VS Code `plan` prompt (`agent: Plan`) is an upstream planning surface, not a runtime agent schema. Normalize to HandoffIR, then emit per-platform formats.
+- **Letting Gemini subagents recurse** — Gemini subagents cannot call other subagents; route fan-out through the parent/orchestrator session.
+- **Using Gemini's docs-spelled `mcpServers` in local subagents** — generated local agents must use loader-valid `mcp_servers:` and must pass the MCP approval gate.
 
 ## Output Contract
 

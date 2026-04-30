@@ -1,7 +1,7 @@
 {
   "name": "agents-system-setup",
   "version": "0.7.0",
-  "description": "Bootstrap, update, improve, or replicate multi-agent systems across GitHub Copilot CLI, Claude Code, OpenCode, and OpenAI Codex.",
+  "description": "Bootstrap, update, improve, or replicate multi-agent systems across GitHub Copilot CLI, Claude Code, OpenCode, OpenAI Codex, and Gemini CLI artifacts.",
   "author": "ytthuan",
   "license": "MIT",
   "homepage": "https://github.com/ytthuan/agents-system-setup",
@@ -23,6 +23,7 @@
     "claude-code",
     "opencode",
     "codex",
+    "gemini-cli",
     "mcp",
     "scaffolding",
     "agent-skills",

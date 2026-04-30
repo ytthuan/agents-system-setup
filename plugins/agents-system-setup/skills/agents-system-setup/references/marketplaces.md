@@ -1,6 +1,6 @@
 # Well-Known Marketplaces & Catalogs (lookup order)
 
-> Last verified: 2026-04. Star counts are approximate; check the upstream link for current state.
+> Last verified: 2026-04-29. Star counts are approximate; check the upstream link for current state.
 >
 > Doc anchors:
 > - Copilot CLI plugins: <https://docs.github.com/en/copilot/concepts/agents/copilot-cli/about-cli-plugins>
@@ -9,6 +9,8 @@
 > - Codex CLI plugins (use): <https://developers.openai.com/codex/plugins>
 > - Codex CLI + App subagents: <https://developers.openai.com/codex/subagents>
 > - OpenCode plugins/agents: <https://opencode.ai/docs/agents/>
+> - Gemini CLI subagents: <https://github.com/google-gemini/gemini-cli/blob/main/docs/core/subagents.md>
+> - Gemini CLI extensions: <https://github.com/google-gemini/gemini-cli/blob/main/docs/extensions/index.md>
 
 A "marketplace" is a registry where plugins (which can bundle agents, skills, hooks, MCP server configs, LSP server configs) are published. Always search Tier 1 first, then Tier 2; only fall back to free-text `github-search_repositories` if all of them miss.
 
@@ -22,8 +24,10 @@ A "marketplace" is a registry where plugins (which can bundle agents, skills, ho
 | `anthropics/claude-code` | <https://github.com/anthropics/claude-code> | Anthropic | Claude Code core repo + sub-agent format source-of-truth |
 | `openai/skills` | <https://github.com/openai/skills> | OpenAI | **Skills Catalog for Codex** (~17k★). Authoritative skill registry. |
 | `openai/plugins` | <https://github.com/openai/plugins> | OpenAI | OpenAI plugins (~900★) |
-| `openai/codex` | <https://github.com/openai/codex> | OpenAI | OpenAI Codex core (~77k★); shared artifacts use `AGENTS.md` + `.codex/agents/*.toml` |
+| `openai/codex` | <https://github.com/openai/codex> | OpenAI | OpenAI Codex core (~77k★); shared artifacts use `AGENTS.md` + `.codex/agents/*.toml`; plugin manifests may bundle `skills`, `mcpServers`, `apps`, interface assets, `.app.json`, and `.mcp.json` |
 | `openai/codex-plugin-cc` | <https://github.com/openai/codex-plugin-cc> | OpenAI | Use Codex from Claude Code (cross-runtime bridge, ~15k★) |
+| `google-gemini/gemini-cli` | <https://github.com/google-gemini/gemini-cli> | Google | Gemini CLI docs, local subagent schema, extension format, and source-backed loader behavior. |
+| Gemini CLI extension gallery | <https://geminicli.com/extensions/browse/> | Google/Gemini ecosystem | Discoverable Gemini extensions that may bundle MCP servers, commands, hooks, skills, and subagents. Verify source repo and manifest before recommending. |
 | `modelcontextprotocol/servers` | <https://github.com/modelcontextprotocol/servers> | MCP project | Reference MCP servers (filesystem, github, git, fetch, …) |
 | GitHub Code Security docs | <https://docs.github.com/en/code-security> | GitHub | Source-of-truth for secret scanning, code scanning, dependency review, Dependabot, push protection |
 | OWASP GenAI Security | <https://owasp.org/www-project-top-10-for-large-language-model-applications/> | OWASP | Agentic AI / LLM threat categories and review checklist |
@@ -66,6 +70,15 @@ A "marketplace" is a registry where plugins (which can bundle agents, skills, ho
 |---|---|---|
 | `awesome-opencode/awesome-opencode` | <https://github.com/awesome-opencode/awesome-opencode> | Curated OpenCode plugins, themes, agents, projects (~5.5k★) |
 
+### Gemini CLI
+
+| Source | URL | Notes |
+|---|---|---|
+| `google-gemini/gemini-cli` subagents docs | <https://github.com/google-gemini/gemini-cli/blob/main/docs/core/subagents.md> | Official local subagent format: `.gemini/agents/*.md`, user `~/.gemini/agents/*.md`, extension `agents/*.md`; `@<agent>` invocation; non-recursive subagents. |
+| `google-gemini/gemini-cli` loader schema | <https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/agents/agentLoader.ts> | Source-backed validation: required `name`/`description`, optional `display_name`, `tools`, `mcp_servers`, `model`, `temperature`, `max_turns`, `timeout_mins`; remote A2A fields are import/advanced only. |
+| `google-gemini/gemini-cli` extension docs | <https://github.com/google-gemini/gemini-cli/blob/main/docs/extensions/index.md> | Extension-bundled prompts, MCP servers, commands, hooks, skills, and subagents. |
+| Gemini CLI extension gallery | <https://geminicli.com/extensions/browse/> | Browse extensions, then inspect the source repo/manifest before recommending. |
+
 ### OpenAI Codex / `AGENTS.md` ecosystem
 
 | Source | URL | Notes |
@@ -104,6 +117,8 @@ github-search_repositories topic:claude-code-plugin <capability>
 github-search_repositories topic:claude-code-skills <capability>
 github-search_repositories topic:codex-skills <capability>
 github-search_repositories topic:opencode-skills <capability>
+github-search_repositories topic:gemini-cli-extension <capability>
+github-search_repositories topic:gemini-cli-agent <capability>
 github-search_repositories topic:agent-skills <capability>
 github-search_repositories topic:codeql <capability>
 github-search_repositories topic:openssf <capability>
@@ -161,17 +176,31 @@ Codex marketplace sources accept GitHub shorthand, HTTPS/SSH Git URLs, or a loca
 
 ### OpenCode
 
-OpenCode "plugins" are JS/TS hooks (different shape from the other runtimes). Skill-style content is installed by clone-and-copy under `~/.config/opencode/agents/` (user) or `.opencode/agents/` (project). MCP servers go in `opencode.json` › `mcp`.
+OpenCode "plugins" are JS/TS hooks (different shape from the other runtimes). Skill-style content is installed by clone-and-copy under `~/.config/opencode/skills/` (user) or `.opencode/skills/` (project). Agent Markdown belongs under `~/.config/opencode/agents/` or `.opencode/agents/`. MCP servers go in `opencode.json` › `mcp`.
+
+### Gemini CLI
+
+Artifact-first Gemini usage:
+
+```text
+.gemini/agents/<agent-name>.md
+GEMINI.md
+gemini
+> /agents
+> @<agent-name> <task>
+```
+
+Gemini extension recommendations must identify what the extension actually ships: `gemini-extension.json`, MCP servers (`mcpServers` in extension manifests), commands, hooks, skills, context files, and/or `agents/*.md`. Do not claim a generic Gemini plugin install path for this package. Project-local generated subagents go under `.gemini/agents/*.md`; inline MCP belongs under loader-valid `mcp_servers:` and stays approval-gated.
 
 ## What a plugin can ship (cross-runtime cheat sheet)
 
-| Component                | Copilot | Claude Code | Codex | OpenCode |
-|--------------------------|:---:|:---:|:---:|:---:|
-| Agents (per-file)        | `.github/agents/*.agent.md` | `agents/*.md` | `.codex/agents/*.toml` | `.opencode/agents/*.md` |
-| Skills                   | `skills/<name>/SKILL.md` | `skills/<name>/SKILL.md` | `skills/<name>/SKILL.md` | n/a (use prompts) |
-| Hooks                    | `hooks.json` | `hooks/hooks.json` | (planned) | JS/TS hooks |
-| MCP servers              | `.mcp.json` (or `.github/mcp.json`) | `.mcp.json` (also inline in agent `mcpServers`) | `.mcp.json` (also inline `[mcp_servers.*]` per agent) | `opencode.json` › `mcp` |
-| LSP servers              | `lsp.json` | `.lsp.json` | n/a | n/a |
-| Slash commands           | n/a | `commands/` (legacy) → `skills/` (new) | `skills/` | n/a |
+| Component                | Copilot | Claude Code | Codex | OpenCode | Gemini CLI |
+|--------------------------|:---:|:---:|:---:|:---:|:---:|
+| Agents (per-file)        | `.github/agents/*.agent.md` | `agents/*.md` | `.codex/agents/*.toml` | `.opencode/agents/*.md` | `.gemini/agents/*.md` or extension `agents/*.md` |
+| Skills                   | `skills/<name>/SKILL.md` | `skills/<name>/SKILL.md` | `skills/<name>/SKILL.md` | `.opencode/skills/<name>/SKILL.md` | extension `skills/<name>/SKILL.md` |
+| Hooks                    | `hooks.json` | `hooks/hooks.json` | (planned) | JS/TS hooks | extension hooks |
+| MCP servers              | `.mcp.json` (or `.github/mcp.json`) | `.mcp.json` (also inline in agent `mcpServers`) | `.mcp.json` (also inline `[mcp_servers.*]` per agent) | `opencode.json` › `mcp` | agent `mcp_servers:` or extension `mcpServers` |
+| LSP servers              | `lsp.json` | `.lsp.json` | n/a | n/a | n/a |
+| Slash commands           | n/a | `commands/` (legacy) → `skills/` (new) | `skills/` | n/a | extension `commands/` |
 
 Always inspect a plugin's README before recommending — surface what it actually brings to the user.

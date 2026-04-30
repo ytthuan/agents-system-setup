@@ -82,17 +82,20 @@ Every item below cites a vendor-official doc or a well-known curated catalog. Up
     - Action (Copilot target): present a sub-menu of agents not yet installed; replicate selections through the Canonical IR.
 17. **wshobson/agents** — large multi-runtime subagent collection.
      - Source: <https://github.com/wshobson/agents>
-     - Action: same flow as #9.
+     - Action: same flow as #16.
 18. **VoltAgent/awesome-claude-code-subagents** — curated Claude Code subagents.
      - Source: <https://github.com/VoltAgent/awesome-claude-code-subagents>
-     - Action (Claude target): same flow as #9.
+     - Action (Claude target): same flow as #16.
+19. **Gemini CLI extension gallery** — discover Gemini extensions that can bundle subagents, MCP servers, commands, hooks, and skills.
+     - Source: <https://geminicli.com/extensions/browse/> and <https://github.com/google-gemini/gemini-cli/blob/main/docs/extensions/index.md>
+     - Action (Gemini target): present a source-inspected extension submenu; never install or write MCP config without the approval gate.
 
 ### Operations
 
-19. **Prompt versioning / changelog** — per-agent CHANGELOG for prompt drift.
+20. **Prompt versioning / changelog** — per-agent CHANGELOG for prompt drift.
      - Source (pattern): Anthropic prompt-engineering docs <https://docs.claude.com/en/docs/build-with-claude/prompt-engineering/overview>; OpenAI prompt-engineering guide <https://platform.openai.com/docs/guides/prompt-engineering>.
      - Action: scaffold `prompts/CHANGELOG.md` and a `prompts/` dir mirror of each agent's instructions.
-20. **Cost / usage budgeting** — per-provider usage caps.
+21. **Cost / usage budgeting** — per-provider usage caps.
      - Source: Anthropic <https://docs.claude.com/en/api/admin-api/usage-cost/get-usage-report>; OpenAI <https://platform.openai.com/docs/guides/production-best-practices/managing-rate-limits>.
      - Action: append a `## Budgets` section to `AGENTS.md` with target $/day per agent + alert hook.
 
@@ -100,8 +103,8 @@ Every item below cites a vendor-official doc or a well-known curated catalog. Up
 
 | Signal from earlier phases     | Items shown                              |
 |--------------------------------|------------------------------------------|
-| domain == software-dev         | 1, 2 (always also: 3–15, 19, 20)         |
-| domain != software-dev         | 3–8, 13, 14, 19, 20                      |
+| domain == software-dev         | 1, 2 (always also: 3–15, 20, 21)         |
+| domain != software-dev         | 3–8, 13, 14, 20, 21                      |
 | any MCP server selected        | 8 (always)                               |
 | GitHub repo detected           | 10                                       |
 | release/package/CI detected    | 11                                       |
@@ -110,6 +113,7 @@ Every item below cites a vendor-official doc or a well-known curated catalog. Up
 | Claude target included         | 6, 18                                    |
 | Copilot target included        | 16                                       |
 | Multi-runtime                  | 17                                       |
+| Gemini target included         | 19                                       |
 
 ## Output addendum
 

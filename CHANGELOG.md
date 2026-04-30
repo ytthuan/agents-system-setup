@@ -19,6 +19,25 @@ All notable changes to this plugin are documented here. Format: [Keep a Changelo
 
 ## [Unreleased]
 
+### Added
+
+- Public docs now present five supported runtimes: Copilot CLI, Claude Code, OpenCode, OpenAI Codex (CLI + App), and Gemini CLI artifact support.
+- Runtime Update Audit reference tracks latest upstream format drift for Copilot CLI, Claude Code, OpenCode, OpenAI Codex, and Gemini CLI support.
+- Validator guardrails keep runtime drift notes, supported-vs-candidate status, and refreshed schema markers from regressing.
+- Per-runtime model constraints reference (`references/models.md`) documents accepted `model:` formats, defaults, and source-linked rate-limit pointers; interview Q9b stays optional and points at the new reference.
+- Output contract now records `Model overrides:` (none vs per-agent overrides) so users can see at a glance whether runtime defaults or explicit ids are in effect.
+- Context engine sharpened: `references/handoff.md` is now the single source of truth for the Delegation Packet; orchestrator templates and `references/context-optimization.md` link to it instead of restating the schema. New Task-Type Routing Map and context-freshness rule cut redundant reads, and a Codex TOML "summary + pointer" rule keeps `developer_instructions` compact. Output contract now reports a `Context budget` line with measured surface sizes.
+- Validator adds warn-only context-budget checks for AGENTS.md template Read First length, Codex `developer_instructions` line count, and managed-block drift across re-runs.
+- Task Assignment Contract: orchestrator → subagent handoff schema expanded with Required Minimum + opt-in Expansion Blocks (Goal & Definition of Done, Scope, File Inventory, Background, Reproduction, Constraints, Assumptions, Known Risks, Verification Protocol, Reporting Protocol, Coordination, Size & Timebox, Clarification Protocol). Subagent templates now include Acceptance Checklist + Reporting Template; Codex TOML mirrors both inside `developer_instructions`. Output contract records `Task assignment quality:` and `Clarifications requested:`.
+
+### Changed
+
+- Copilot guidance now records the `.agent.md` vs `.md` documentation drift while keeping `.agent.md` as the emitted format.
+- Claude Code guidance now distinguishes project/user/session subagent fields from plugin-shipped agent field restrictions.
+- OpenCode guidance now prefers `permission:` over deprecated `tools:` and lists the current permission key set.
+- Codex guidance now covers `job_max_runtime_seconds`, `spawn_agents_on_csv`, richer plugin component references, apps, and marketplace metadata.
+- README and DESIGN now describe Gemini CLI as artifact-first support and explicitly avoid inventing a Gemini plugin install path.
+
 ## [0.6.1] - 2026-04-25
 
 ### Added

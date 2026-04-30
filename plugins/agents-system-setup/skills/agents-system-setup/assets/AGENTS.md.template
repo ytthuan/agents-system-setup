@@ -1,6 +1,6 @@
 # {{PROJECT_NAME}}
 
-> Agents guide — see https://agents.md/ for the spec. This file is the canonical agent memory and is also surfaced to **Claude Code** (via `CLAUDE.md` symlink), **OpenCode** (native `AGENTS.md` support), and **OpenAI Codex** (CLI + App project memory when repo artifacts are available).
+> Agents guide — see https://agents.md/ for the spec. This file is the canonical agent memory and is also surfaced to **Claude Code** (via `CLAUDE.md` symlink), **OpenCode** (native `AGENTS.md` support), **OpenAI Codex** (CLI + App project memory when repo artifacts are available), and **Gemini CLI** (via compact `GEMINI.md` pointer/sync copy).
 
 <!-- agents-system-setup:managed:start -->
 
@@ -12,7 +12,7 @@
 - **Frameworks:** {{FRAMEWORKS}}
 - **Tests:** {{TEST_FRAMEWORK}}
 - **Deployment:** {{DEPLOYMENT}}
-- **Target platforms:** {{TARGET_PLATFORMS}}  <!-- e.g., copilot-cli, claude-code, opencode, codex-cli -->
+- **Target platforms:** {{TARGET_PLATFORMS}}  <!-- e.g., copilot-cli, claude-code, opencode, codex-cli, gemini-cli -->
 - **Output profile:** {{CONTEXT_PROFILE}}  <!-- balanced | compact | full -->
 - **Agent artifact tracking:** {{ARTIFACT_TRACKING}}  <!-- project-tracked | project-local | personal-global -->
 
@@ -43,6 +43,25 @@ This repo uses an **orchestrator + subagent** model. The orchestrator (`@orchest
 - **Load on demand:** full marketplace research, full platform schemas, detailed threat rationale, long ADRs/examples.
 - **Overflow details:** {{DETAIL_REFERENCES}}
 - **Rule:** if a detail is moved out of this file, link it here so agents can find it.
+
+### Task-Type Routing Map
+
+Use this table to decide which references each agent loads beyond `AGENTS.md` Read First. The orchestrator picks the task tag and surfaces it in the Task Assignment so subagents can short-circuit. See [`references/handoff.md`](plugins/agents-system-setup/skills/agents-system-setup/references/handoff.md#recommended-packet-form) for the per-tag Recommended Packet Form (short-form vs full-form).
+
+| Task tag | Always load | Load when applicable | Safe to skip | Recommended packet form |
+|---|---|---|---|---|
+| `read-only-research` | Read First, Directory Architecture | Topology if topology questions | Security & Audit detail, Threat Model long rationale | short-form |
+| `code-edit` | Read First, Directory Architecture, owning agent boundary | Quality Gates row for this path | Marketplace research, full platform schemas | short-form (≤2 files) · full-form when >2 files or shared boundary |
+| `security-write` | Security & Audit Matrix, Threat Model, owning agent boundary | Security/Audit reference rows for the change | Long marketplace candidate research | full-form |
+| `mcp-write` | MCP approval gate, Security & Audit Matrix | Plugin/MCP rendering reference | Architecture Decisions detail | full-form |
+| `replication` | Replication contract, Plan Handoff Contract, Output Contract | Models reference for explicit overrides | Project-specific quality gate detail | full-form |
+| `release` | Quality Gates, manifests, version sync rules | Runtime update audit | Long architecture rationale | full-form |
+| `docs-only` | Read First | Quality Gates only if doc CI exists | Security/MCP gates unless docs touch credentials | short-form |
+| `bug-fix` | Read First, Directory Architecture, owning agent boundary | Quality Gates row, repro logs, related ADRs | Long marketplace research | full-form (Reproduction block required) |
+
+### Context Freshness
+
+If `AGENTS.md` was already loaded this turn, prefer `Context freshness: recent` in delegated packets so subagents skip the row-by-row reload and read only the rows for the current task tag.
 
 ## Directory Architecture
 

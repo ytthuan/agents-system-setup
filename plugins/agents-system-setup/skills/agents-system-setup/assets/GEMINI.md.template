@@ -1,0 +1,27 @@
+# {{PROJECT_NAME}} Gemini CLI Context
+
+> Gemini CLI project memory. Canonical multi-runtime policy lives in `AGENTS.md`; this file keeps Gemini's native `GEMINI.md` surface compact and synchronized.
+
+<!-- agents-system-setup:platform: gemini-cli -->
+<!-- agents-system-setup:managed:start -->
+
+## Read First
+
+1. Read `AGENTS.md` first for Directory Architecture, Agent Roster, Security & Audit Matrix, Threat Model, Architecture Decisions, ADR Index, Quality Gates, and artifact tracking.
+2. Use `.gemini/agents/*.md` local subagents when a task matches their `description`.
+3. Keep fan-out in this root Gemini session. Gemini subagents cannot recursively call other subagents; cross-agent work returns here.
+4. Do not write `mcp_servers:` or extension MCP config unless the MCP approval gate has shown and approved the exact YAML or JSON block.
+
+## Local Subagents
+
+- Project agents: `.gemini/agents/<name>.md`
+- User agents: `~/.gemini/agents/<name>.md`
+- Required frontmatter: `name`, `description`
+- Default kind: `local`
+- MCP key: `mcp_servers` (snake_case)
+
+## Canonical Context
+
+Load `AGENTS.md` for the full project memory and treat this file as a Gemini-native pointer. If this file is a copy rather than a symlink, regenerate it whenever the managed `AGENTS.md` block changes.
+
+<!-- agents-system-setup:managed:end -->

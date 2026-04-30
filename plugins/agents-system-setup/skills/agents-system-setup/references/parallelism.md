@@ -6,10 +6,10 @@ Generated agent systems must exploit parallelism wherever the work is independen
 
 | Primitive | What it is | Where it lives | Coordination model |
 |---|---|---|---|
-| **Parallel subagents** | Multiple `Task`-tool invocations in **one orchestrator turn**, each in its own context window | Copilot CLI, Claude Code, OpenCode, OpenAI Codex (CLI + App subagent workflows where repo artifacts are available) | Fan-out from one orchestrator; results return to the orchestrator only |
+| **Parallel subagents** | Multiple subagent invocations in **one orchestrator turn**, each in its own context window or child session | Copilot CLI (`Task`/`agent` tools and optional `/fleet`), Claude Code (tool-based subagents), OpenCode (`task` + `@agent`), OpenAI Codex (child agent threads), Gemini CLI (root agent calls subagent tools / `@agent`) | Fan-out from one orchestrator; results return to the orchestrator only |
 | **Agent teams** (Claude Code only, experimental) | Independent Claude instances that **message each other directly**, with a shared task list | Claude Code only — requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` | Lead + teammates; teammates communicate peer-to-peer |
 
-Source: https://docs.anthropic.com/en/docs/claude-code/sub-agents · https://docs.anthropic.com/en/docs/claude-code/agent-teams
+Sources: https://docs.github.com/en/copilot/concepts/agents/copilot-cli/fleet · https://docs.anthropic.com/en/docs/claude-code/sub-agents · https://docs.anthropic.com/en/docs/claude-code/agent-teams · https://opencode.ai/docs/agents/ · https://developers.openai.com/codex/subagents · https://github.com/google-gemini/gemini-cli/blob/main/docs/core/subagents.md
 
 ## When to use which (decision flow)
 
@@ -45,14 +45,15 @@ The orchestrator prompt (Phase 4) is rendered with explicit fan-out instructions
 
 ## Orchestrator prompt patterns (per runtime)
 
-### Copilot CLI / OpenCode / OpenAI Codex (parallel subagents)
+### Copilot CLI / OpenCode / OpenAI Codex / Gemini CLI (parallel subagents)
 
 ```markdown
 ## Coordination protocol
 
 For independent work, **fan out**: invoke all parallel-safe subagents in a
-single turn using multiple Task-tool calls in one response. Wait for all
-results. Synthesize. Then start the next wave.
+single turn using the runtime's native subagent call surface (Task/agent tool,
+@agent, or child agent threads). Wait for all results. Synthesize. Then start
+the next wave.
 
 Sequential is the default ONLY when:
 - A subagent's owns_paths overlap another's
@@ -61,6 +62,12 @@ Sequential is the default ONLY when:
 
 Never serialize parallel-safe work.
 ```
+
+Runtime-specific notes:
+- **Copilot CLI:** the orchestrator may use multiple subagent calls directly, or the user can start with `/fleet` to ask Copilot to decompose independent subtasks. Custom agents can be referenced with `@<custom-agent-name>` inside a `/fleet` prompt.
+- **OpenCode:** primary agents can invoke subagents automatically or via `@<agent-name>`; users inspect child sessions with the child/parent session keybinds.
+- **Codex:** child agent threads are explicitly requested and visible in the CLI/App. Use `.codex/config.toml` `[agents] max_threads = 6`, `max_depth = 1` as safe defaults.
+- **Gemini CLI:** subagents cannot recursively call other subagents. Keep all parallel fan-out in the root/orchestrator session and tell workers to return cross-boundary work rather than delegating.
 
 ### Claude Code (agent team option)
 
@@ -78,6 +85,8 @@ competing debug hypotheses; cross-layer refactors):
 
 Otherwise, default to parallel subagents (fan-out / collect).
 ```
+
+Claude decision rule: use **subagents** when workers only need to return results to the main session; use the **Agent tool** as the invocation mechanism for those subagents; use **agent teams** only when independent Claude instances need to discuss, challenge findings, claim tasks, or coordinate without routing every message through the lead.
 
 ## Generator obligations
 

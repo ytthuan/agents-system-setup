@@ -1,6 +1,6 @@
 # Multi-Platform Emission Reference
 
-This skill targets four agent runtimes. The user picks one or more in **Phase 0** of the interview; the generator loops over the selection.
+This skill targets five agent runtimes. The user picks one or more in **Phase 0** of the interview; the generator loops over the selection. Runtime drift and supported-surface decisions are tracked in [runtime-updates](./runtime-updates.md).
 
 ## Supported Platforms
 
@@ -10,31 +10,42 @@ This skill targets four agent runtimes. The user picks one or more in **Phase 0*
 | **Claude Code** | https://docs.anthropic.com/en/docs/claude-code/sub-agents |
 | **OpenCode** | https://opencode.ai/docs/agents/ · https://opencode.ai/docs/mcp-servers/ |
 | **OpenAI Codex (CLI + App)** | https://github.com/openai/codex · https://agents.md · https://developers.openai.com/codex/subagents |
+| **Gemini CLI** | https://github.com/google-gemini/gemini-cli/blob/main/docs/core/subagents.md · https://github.com/google-gemini/gemini-cli/blob/main/docs/extensions/index.md |
 
 ## Path / Format Matrix
 
-| Artifact | Copilot CLI | Claude Code | OpenCode | OpenAI Codex (CLI + App) |
-|---|---|---|---|---|
-| Agents | `.github/agents/<name>.agent.md` | `.claude/agents/<name>.md` | `.opencode/agents/<name>.md` | orchestrator + project rules in `AGENTS.md`; **specialized subagents in `.codex/agents/<name>.toml`** (project) or `~/.codex/agents/` (user) |
-| Skills | `.github/skills/<name>/SKILL.md` | `.claude/skills/<name>/SKILL.md` | `.opencode/skills/<name>/SKILL.md` | not supported natively — describe in `AGENTS.md` |
-| MCP servers | `.mcp.json` (root) | `.mcp.json` (root, shared with Copilot) | `opencode.json` › `"mcp": { ... }` | `.mcp.json` (root, shared) |
-| Hooks | `.github/hooks/*.json` | `.claude/settings.json` › `"hooks"` | `.opencode/hooks/` | not supported |
-| Project memory | `AGENTS.md` (root) | `CLAUDE.md` (symlink → `AGENTS.md` on macOS/Linux; copy on Windows) | `AGENTS.md` (native) | `AGENTS.md` (native — primary consumer in Codex CLI + App artifact flows) |
-| Personal memory | `~/.copilot/AGENTS.md` | `~/.claude/CLAUDE.md` | `~/.config/opencode/AGENTS.md` | `~/.codex/AGENTS.md` |
+| Artifact | Copilot CLI | Claude Code | OpenCode | OpenAI Codex (CLI + App) | Gemini CLI |
+|---|---|---|---|---|---|
+| Agents | Emit `.github/agents/<name>.agent.md`; also recognize `.github/agents/<name>.md` as an upstream docs drift/import signal | `.claude/agents/<name>.md` | Markdown default: `.opencode/agents/<name>.md`; JSON import/update surface: `opencode.json` top-level `agent` | orchestrator + project rules in `AGENTS.md`; **specialized subagents in `.codex/agents/<name>.toml`** (project) or `~/.codex/agents/` (user) | `.gemini/agents/<name>.md` (project local subagent) or `~/.gemini/agents/<name>.md` (user); extension `agents/*.md` is import/package surface |
+| Skills | `.github/skills/<name>/SKILL.md` | `.claude/skills/<name>/SKILL.md` | `.opencode/skills/<name>/SKILL.md` | not supported natively — describe in `AGENTS.md` | Gemini extensions can bundle `skills/<name>/SKILL.md`; project generation documents skills unless packaging an extension |
+| MCP servers | `.mcp.json` (root) | `.mcp.json` (root, shared with Copilot) | `opencode.json` › `"mcp": { ... }` | `.mcp.json` (root, shared) | per-agent `mcp_servers:` in `.gemini/agents/*.md`; extension manifests use `mcpServers`; all MCP writes are approval-gated |
+| Hooks | `.github/hooks/*.json` | `.claude/settings.json` › `"hooks"` | `.opencode/hooks/` | not supported | Gemini extension hooks / settings only when packaging an extension |
+| Project memory | `AGENTS.md` (root) | `CLAUDE.md` (symlink → `AGENTS.md` on macOS/Linux; copy on Windows) | `AGENTS.md` (native) | `AGENTS.md` (native — primary consumer in Codex CLI + App artifact flows) | `GEMINI.md` is Gemini's native context file; keep it a compact pointer/sync copy of canonical `AGENTS.md` when Gemini is selected |
+| Personal memory | `~/.copilot/AGENTS.md` | `~/.claude/CLAUDE.md` | `~/.config/opencode/AGENTS.md` | `~/.codex/AGENTS.md` | `~/.gemini/GEMINI.md` plus `~/.gemini/agents/` |
 
 ## Agent Frontmatter — per platform
 
 ### Copilot CLI (`.agent.md`)
+
+The emitter writes `.github/agents/<name>.agent.md`. GitHub concept docs also mention `.github/agents/<name>.md`; treat that as a detection/import signal until the authoritative CLI behavior supports switching the emitter.
+
 ```yaml
 ---
 name: planner
 description: 'Use when ...'
 model: claude-sonnet-4.6        # optional
-tools: [view, grep, glob, bash] # optional whitelist
+tools: [read, search, execute]  # optional public aliases; omit = all tools
 mcp-servers:                    # optional, hyphenated key
   github: { command: npx, args: [...], env: {...} }
 ---
 ```
+
+Copilot source-backed runtime notes:
+- Custom agents are agent profiles. The main Copilot agent can run them as subagents in a separate context window, automatically by description, explicitly by `/agent`, by prompt mention, or programmatically with `copilot --agent <name> --prompt ...`.
+- Prefer public tool aliases in generated `tools:`: `execute`, `read`, `edit`, `search`, `agent`, `web`, `todo`. Compatible aliases such as `Bash`, `Read`, `Grep`, `Glob`, `Task`, and MCP-prefixed names are import-safe, but emit aliases to keep profiles portable across Copilot surfaces.
+- `agent` / `custom-agent` / `Task` enables one custom agent to invoke another. Grant it only to orchestrator-style agents; read-only reviewers should not be able to spawn broad workers.
+- `/fleet` is a parent-orchestrated mode for independent subtasks. The generator's wave table should be usable as a `/fleet` prompt, but `/fleet` is optional CLI UX — do not make generated files depend on it.
+- If `mcp-servers:` appears in frontmatter, the Phase 3.5 MCP approval gate must have rendered and approved it first.
 
 ### Claude Code (`.md` under `.claude/agents/`)
 Only `name` + `description` required. Defaults: `model: inherit`, all tools inherited from parent. Source: https://docs.claude.com/en/docs/claude-code/sub-agents
@@ -53,7 +64,14 @@ color: blue                      # optional UI color
 # Also: maxTurns, hooks, memory (user|project|local), background, effort, initialPrompt
 ---
 ```
-> Tool names are Claude's canonical names (`Read`, `Edit`, `Write`, `Bash`, `Grep`, `Glob`, `Task`, `WebFetch`). Do **not** copy Copilot tool names verbatim. Scope precedence: managed settings > `--agents` CLI > project (`.claude/agents/`) > user (`~/.claude/agents/`) > plugin.
+> Tool names are Claude's canonical names (`Read`, `Edit`, `Write`, `Bash`, `Grep`, `Glob`, `Agent`, `WebFetch`). Do **not** copy Copilot tool names verbatim. Scope precedence: managed settings > `--agents` CLI > project (`.claude/agents/`) > user (`~/.claude/agents/`) > plugin.
+>
+> Project/user/session agents and plugin-shipped agents are not the same schema surface. Project/user/session agents may use richer fields such as `mcpServers`, `hooks`, and `permissionMode`; plugin-shipped agents must not rely on unsupported fields such as `hooks`, `mcpServers`, or `permissionMode`.
+>
+> Distinguish three Claude primitives:
+> 1. **Subagent definition** — a Markdown file or `--agents` JSON object describing a specialist.
+> 2. **Tool-based subagent invocation** — Claude delegates through its `Agent` tool inside the current session; the worker reports back only to the caller and cannot recursively spawn subagents.
+> 3. **Agent teams** — experimental separate Claude Code instances enabled by `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`; teammates can message each other directly and use a shared task list. Emit `AGENT-TEAMS.md` only as opt-in guidance with token-cost warnings.
 
 ### OpenCode (`.md` under `.opencode/agents/` or `~/.config/opencode/agents/`)
 Only `description` required. Filename = agent name. `tools:` is deprecated — prefer `permission`. Source: https://opencode.ai/docs/agents/
@@ -77,7 +95,11 @@ permission:                                                # preferred over depr
     "code-reviewer": allow
 ---
 ```
-> MCP servers live in `opencode.json` › `mcp`, NOT in agent frontmatter. Built-in primaries: `build`, `plan`. Built-in subagents: `general`, `explore`. Extra top-level keys (e.g. `reasoningEffort`) pass through as provider model options.
+> MCP servers live in `opencode.json` › `mcp`, NOT in agent frontmatter. Built-in primaries: `build`, `plan`. Built-in subagents: `general`, `explore`. Hidden system agents may exist for runtime internals such as compaction/title/summary. Extra top-level keys (e.g. `reasoningEffort`) pass through as provider model options.
+>
+> Permission keys: `read`, `edit`, `glob`, `grep`, `list`, `bash`, `task`, `external_directory`, `todowrite`, `webfetch`, `websearch`, `codesearch`, `lsp`, `skill`, `question`, `doom_loop`. Prefer `permission:` for new configs; `tools:` is deprecated.
+>
+> Primary agents are selected directly (Tab / configured `switch_agent` keybind). Subagents are invoked automatically by primary agents or manually with `@<agent-name>`. When a subagent creates a child session, users navigate with `session_child_first`, `session_child_cycle`, `session_child_cycle_reverse`, and `session_parent`; include these as "Try it" notes, not schema fields. Gate subagent spawning with `permission.task` when an agent should only call specific workers.
 
 ### OpenAI Codex CLI + App — split layout
 
@@ -105,7 +127,7 @@ Codex uses shared project artifacts that are compatible with both Codex CLI and 
 
 ```toml
 name = "reviewer"
-description = "PR reviewer focused on correctness, security, and missing tests."
+description = "Use when reviewing PRs for correctness, security, and missing tests."
 model = "gpt-5.4"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
@@ -121,11 +143,56 @@ nickname_candidates = ["Atlas", "Delta", "Echo"]
 
 ```toml
 [agents]
-max_threads = 6   # default 6
-max_depth = 1     # default 1; raise only if you truly need recursive delegation
+max_threads = 6                  # default 6
+max_depth = 1                    # default 1; raise only if you truly need recursive delegation
+job_max_runtime_seconds = 1800   # optional global job timeout
 ```
 
 Codex reads `.mcp.json` at repo root (shared with Copilot/Claude). Per-agent MCP servers may also be declared inline via `[mcp_servers.<id>]` in the agent's TOML.
+
+For high-volume row-per-agent fan-out, Codex exposes `spawn_agents_on_csv`; document it as an advanced workflow rather than a default orchestrator requirement. Codex plugin manifests may also point to `skills`, `mcpServers`, `apps`, interface assets, `.app.json`, and `.mcp.json`; keep those component references in plugin docs and never auto-write MCP/app config without the approval gate.
+
+Codex source-backed runtime notes:
+- Current Codex releases enable subagent workflows by default, but Codex only spawns subagents when explicitly asked. The orchestrator may say "spawn one agent per row/concern" and Codex handles child threads, waits for results, and returns a consolidated response.
+- Subagents inherit the current sandbox policy and live runtime approval overrides. A custom TOML `sandbox_mode` can narrow defaults, but interactive `/approvals` or `--yolo` choices still apply to spawned child sessions.
+- `agents.max_threads` caps concurrent open child threads; `agents.max_depth = 1` is the safe default to avoid recursive fan-out; `agents.job_max_runtime_seconds` supplies the default timeout for CSV jobs.
+- `spawn_agents_on_csv` requires an input CSV, an instruction template, and exactly one `report_agent_job_result` call per worker. Exported CSV status and metadata are an advanced batch workflow, not the default multi-agent topology.
+- Plugin marketplace files can live at `.agents/plugins/marketplace.json`, `.claude-plugin/marketplace.json`, or user-level `~/.agents/plugins/marketplace.json`; plugin roots keep `.codex-plugin/plugin.json` plus optional `skills/`, `.mcp.json`, `.app.json`, and `assets/`.
+
+### Gemini CLI (`.md` under `.gemini/agents/` or `~/.gemini/agents/`)
+
+Gemini CLI local subagents are Markdown files with YAML frontmatter and a body system prompt. Source: https://github.com/google-gemini/gemini-cli/blob/main/docs/core/subagents.md
+
+```yaml
+---
+name: security-auditor              # REQUIRED — lowercase slug; match filename basename by convention
+description: Use when reviewing code for vulnerabilities and security regressions.
+kind: local                         # optional; default local
+display_name: Security Auditor      # optional presentation label
+tools:                              # optional allowlist; omit = inherit parent tools
+  - read_file
+  - grep_search
+  - run_shell_command
+mcp_servers:                        # optional per-agent MCP; approval-gated
+  docs:
+    command: node
+    args: ["server.js"]
+model: gemini-3-flash-preview       # optional; default inherit
+temperature: 0.2                    # optional; default 1
+max_turns: 10                       # optional; default 30
+timeout_mins: 10                    # optional; default 10
+---
+
+You are a focused security auditor...
+```
+
+Gemini source-backed runtime notes:
+- The main agent can delegate automatically by description or explicitly with `@<agent-name>`. The subagent appears to the parent as a tool.
+- Subagents run in isolated context loops and cannot call other subagents. Even `tools: ['*']` does not expose subagent tools to a subagent. Keep fan-out at the root/orchestrator session.
+- `tools:` supports wildcards such as `*`, `mcp_*`, and `mcp_<server>_*`. Prefer narrow allowlists for reviewers and docs agents.
+- The docs prose shows `mcpServers`, but the loader schema validates `mcp_servers`. Emit snake_case `mcp_servers:` and normalize imported camelCase examples with a warning.
+- Remote A2A subagents (`kind: remote`, `agent_card_url`, `agent_card_json`, `auth`) are advanced/import-only; do not emit them by default.
+- Gemini extensions can bundle subagents, skills, MCP servers, commands, hooks, and context files. Treat extension packaging as marketplace/plugin work, not the default project-agent path.
 
 ## MCP Configuration — per platform
 
@@ -158,6 +225,20 @@ Codex reads `.mcp.json` at repo root (shared with Copilot/Claude). Per-agent MCP
 ```
 > OpenCode merges `opencode.json` non-destructively when other config keys exist — preserve them.
 
+### Gemini CLI (`mcp_servers:` in agent frontmatter)
+```yaml
+---
+name: docs-researcher
+description: Use when verifying framework APIs through approved docs MCP tools.
+kind: local
+mcp_servers:
+  docs:
+    command: node
+    args: ["server.js"]
+---
+```
+> Gemini agent-local MCP is isolated to that subagent. Do not write `mcp_servers:` until Phase 3.5 approval has shown the exact YAML block.
+
 ## Plan Handoff Placement
 
 Plan prompt output is normalized to HandoffIR before emission; never copy the source prompt frontmatter into runtime agent files.
@@ -168,6 +249,7 @@ Plan prompt output is normalized to HandoffIR before emission; never copy the so
 | Claude Code | Markdown body section inside `.claude/agents/<name>.md`; frontmatter remains Claude-only. |
 | OpenCode | Markdown body section inside `.opencode/agents/<name>.md`; frontmatter remains OpenCode-only and MCP stays in `opencode.json`. |
 | OpenAI Codex (CLI + App) | TOML `developer_instructions` in `.codex/agents/<name>.toml`; `AGENTS.md` keeps only orchestrator/project-level handoff summary. CLI-only commands stay in usage notes, not required artifact behavior. |
+| Gemini CLI | Markdown body section inside `.gemini/agents/<name>.md`; frontmatter remains Gemini-only. Cross-agent handoff says "return to orchestrator" because Gemini subagents cannot call other subagents. |
 
 ## Project-Memory Linking
 
@@ -175,6 +257,8 @@ If both Copilot/OpenCode (use `AGENTS.md`) and Claude Code (uses `CLAUDE.md`) ar
 
 - **macOS/Linux**: `ln -s AGENTS.md CLAUDE.md`
 - **Windows**: copy `AGENTS.md` → `CLAUDE.md` and prepend `<!-- generated from AGENTS.md — re-copy on every update -->`. Re-copy on each `update` run.
+
+If Gemini CLI is selected, keep `GEMINI.md` as a compact pointer or sync copy of canonical `AGENTS.md` because Gemini's native context file is `GEMINI.md`. Use the same OS-specific symlink/copy caution as Claude Code.
 
 Detect platform with `uname -s` (Darwin/Linux ⇒ symlink; otherwise copy).
 
@@ -184,6 +268,8 @@ Detect platform with `uname -s` (Darwin/Linux ⇒ symlink; otherwise copy).
 for platform in selected_platforms:
     paths   = PATH_MATRIX[platform]
     fmt     = FRONTMATTER[platform]
+    if platform == "gemini-cli":
+        write("GEMINI.md", render("assets/GEMINI.md.template"))
     for agent in agents:
         write(paths.agents / f"{agent.name}{paths.agent_suffix}",
               render(agent, fmt))
@@ -198,5 +284,7 @@ link_project_memory(selected_platforms)
 
 - Writing Copilot frontmatter to a `.claude/agents/*.md` file (Claude will silently ignore unknown keys).
 - Using `mcp-servers:` (hyphen) in OpenCode — OpenCode uses top-level `mcp` in `opencode.json`, not per-agent.
-- Symlinking `CLAUDE.md` on Windows.
+- Using `mcpServers` or `mcp-servers` in Gemini local subagents — emit `mcp_servers:` and keep the MCP gate.
+- Symlinking `CLAUDE.md` or `GEMINI.md` on Windows.
 - Overwriting `opencode.json` instead of merging the `mcp` key.
+- Letting Gemini subagents recursively invoke other subagents — the runtime blocks this, so route fan-out through the parent/orchestrator session.
