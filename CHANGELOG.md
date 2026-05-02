@@ -2,7 +2,7 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
-## [Unreleased]
+## [0.9.0] - 2026-05-02
 
 ### Added
 
@@ -16,21 +16,6 @@ All notable changes to this plugin are documented here. Format: [Keep a Changelo
 
 - Replication into Copilot CLI now fills `tools:` from the role-derived profile when the source IR has no explicit tools list; user-set tool lists still pass through unchanged. Tool-name canonicalization adds a `vscode_host → vscode` row.
 - Orchestrator template always renders `tools: [vscode, execute, read, agent, edit, search, todo]`. Subagent template documents the role → profile mapping and records the chosen profile via `<!-- agents-system-setup:tools-profile: {{TOOLS_PROFILE}} -->`.
-
-## [0.7.0] - 2026-04-27
-
-### Added
-
-- Plan Handoff Contract guidance normalizes VS Code Plan agent output, Spec-Kit `/plan`, and user-written plans into HandoffIR before runtime-specific emission.
-- Generated `AGENTS.md`, orchestrator, Markdown subagent, and Codex TOML templates now include concise handoff input/output fields.
-- Validator guardrail `check_plan_handoff_policy` keeps the handoff reference, template markers, and output contract from regressing.
-- Validator guardrail `check_codex_cli_app_compatibility` keeps Codex setup and replication docs compatible with shared CLI + App artifacts without overclaiming App plugin installation.
-
-### Changed
-
-- Platform references now consistently describe four runtimes and clarify OpenCode's `permission:`-based agent schema.
-- Codex setup, replication, templates, output contract, and README now distinguish shared **OpenAI Codex CLI + App** artifacts from CLI-only plugin and slash-command workflows.
-- `AGENTS.md` templates now name OpenAI Codex as a native project-memory consumer alongside Claude Code and OpenCode.
 
 ## [0.8.0] - 2026-04-30
 
@@ -52,6 +37,21 @@ All notable changes to this plugin are documented here. Format: [Keep a Changelo
 - OpenCode guidance now prefers `permission:` over deprecated `tools:` and lists the current permission key set.
 - Codex guidance now covers `job_max_runtime_seconds`, `spawn_agents_on_csv`, richer plugin component references, apps, and marketplace metadata.
 - README and DESIGN now describe Gemini CLI as artifact-first support and explicitly avoid inventing a Gemini plugin install path.
+
+## [0.7.0] - 2026-04-27
+
+### Added
+
+- Plan Handoff Contract guidance normalizes VS Code Plan agent output, Spec-Kit `/plan`, and user-written plans into HandoffIR before runtime-specific emission.
+- Generated `AGENTS.md`, orchestrator, Markdown subagent, and Codex TOML templates now include concise handoff input/output fields.
+- Validator guardrail `check_plan_handoff_policy` keeps the handoff reference, template markers, and output contract from regressing.
+- Validator guardrail `check_codex_cli_app_compatibility` keeps Codex setup and replication docs compatible with shared CLI + App artifacts without overclaiming App plugin installation.
+
+### Changed
+
+- Platform references now consistently describe four runtimes and clarify OpenCode's `permission:`-based agent schema.
+- Codex setup, replication, templates, output contract, and README now distinguish shared **OpenAI Codex CLI + App** artifacts from CLI-only plugin and slash-command workflows.
+- `AGENTS.md` templates now name OpenAI Codex as a native project-memory consumer alongside Claude Code and OpenCode.
 
 ## [0.6.1] - 2026-04-25
 
