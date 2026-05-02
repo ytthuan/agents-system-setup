@@ -49,7 +49,7 @@ copilot
 > /agents-system-setup
 ```
 
-Reads the root `plugin.json` and exposes the bundled skill as `/agents-system-setup`.
+Reads the root `plugin.json` and exposes the bundled skill as `/agents-system-setup`. Generated Copilot CLI agents apply a [Standard Tool Profile](./plugins/agents-system-setup/skills/agents-system-setup/references/platforms.md#copilot-cli-standard-tool-profiles) by default — `tools: [vscode, execute, read, agent, edit, search, todo]` for the orchestrator and edit-capable subagents, narrows to `[read, search]` for reviewers/auditors, and offers `runner` / `research` / `inherit` variants via interview Q9c.
 
 ### Claude Code
 

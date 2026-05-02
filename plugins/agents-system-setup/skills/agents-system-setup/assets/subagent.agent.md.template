@@ -7,9 +7,22 @@ description: 'Use when {{TRIGGER_PHRASES}}. {{ONE_LINE_RESPONSIBILITY}}.'
 ---
 
 <!-- agents-system-setup:platform: copilot-cli -->
+<!-- agents-system-setup:tools-profile: {{TOOLS_PROFILE}} -->
 <!-- agents-system-setup:replicated-from: {{REPLICATION_SOURCE}} -->
 
 # {{AGENT_DISPLAY_NAME}}
+
+<!--
+Copilot CLI Standard Tool Profiles (see references/platforms.md#copilot-cli-standard-tool-profiles):
+  standard  → tools: [vscode, execute, read, agent, edit, search, todo]   (orchestrator + edit-capable)
+  read-only → tools: [read, search]                                       (reviewer/auditor/security/architecture)
+  runner    → tools: [execute, read, search, todo]                        (tester/release helper)
+  research  → tools: [read, search, web, todo]                            (research/docs gatherer)
+  inherit   → omit `tools:` line                                          (explicit user opt-out)
+The renderer fills {{OPTIONAL_TOOLS_BLOCK}} from the role → profile mapping. Reviewers
+must NOT receive `agent`, `execute`, or `edit`; orchestrator-style agents are the only
+place where `agent` should appear.
+-->
 
 ## Role
 {{ROLE_PARAGRAPH}}

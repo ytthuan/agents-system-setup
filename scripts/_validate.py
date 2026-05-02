@@ -1546,6 +1546,8 @@ def check_runtime_update_policy() -> None:
         "Model overrides",
         "Acceptance Checklist",
         "Task assignment quality",
+        "check_copilot_tool_profile",
+        "Copilot CLI Standard Tool Profiles",
     ):
         if marker not in validator_text:
             err(f"scripts/_validate.py: missing runtime validator marker `{marker}`")
@@ -1557,6 +1559,106 @@ def check_runtime_update_policy() -> None:
         compat = data.get("compatibility", {})
         if isinstance(compat, dict) and "gemini-cli" in compat and not isinstance(compat["gemini-cli"], str):
             err(f"{manifest.relative_to(REPO).as_posix()}: compatibility.gemini-cli must be a version string when present")
+
+
+def check_copilot_tool_profile() -> None:
+    """Hard-enforce the Copilot CLI Standard Tool Profile across docs + templates.
+
+    Source: https://docs.github.com/en/copilot/reference/custom-agents-configuration
+    The 7 documented public aliases (execute, read, edit, search, agent, web, todo) plus
+    `vscode` (the VS Code chat-host tool set, harmlessly ignored on non-VS-Code surfaces
+    per the documented "All unrecognized tool names are ignored" rule) form the
+    `standard` profile. Reviewers/auditors get the narrower `read-only` profile.
+    """
+    require_contains(
+        SKILL_ROOT / "references" / "platforms.md",
+        (
+            "Copilot CLI Standard Tool Profiles",
+            "[vscode, execute, read, agent, edit, search, todo]",
+            "`standard`",
+            "`read-only`",
+            "`runner`",
+            "`research`",
+            "`inherit`",
+            "Role → Profile mapping",
+            "VS Code chat-host tool set",
+            "All unrecognized tool names are ignored",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "agent-format.md",
+        (
+            "vscode",
+            "Copilot CLI Standard Tool Profiles",
+            "Apply the [Copilot CLI Standard Tool Profiles]",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "orchestrator.agent.md.template",
+        (
+            "tools: [vscode, execute, read, agent, edit, search, todo]",
+            "agents-system-setup:tools-profile: standard",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "subagent.agent.md.template",
+        (
+            "Copilot CLI Standard Tool Profiles",
+            "[vscode, execute, read, agent, edit, search, todo]",
+            "[read, search]",
+            "[execute, read, search, todo]",
+            "[read, search, web, todo]",
+            "agents-system-setup:tools-profile: {{TOOLS_PROFILE}}",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "interview.md",
+        (
+            "9c. Copilot CLI Tool Profile",
+            "copilot_tools_profile",
+            "Standard profile",
+            "[vscode, execute, read, agent, edit, search, todo]",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "Copilot CLI Standard Tool Profiles",
+            "[vscode, execute, read, agent, edit, search, todo]",
+            "agents-system-setup:tools-profile",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "replication.md",
+        (
+            "Copilot CLI tool fill rule",
+            "[vscode, execute, read, agent, edit, search, todo]",
+            "vscode_host",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "runtime-updates.md",
+        (
+            "vscode",
+            "Standard Tool Profile",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "output-contract.md",
+        (
+            "Copilot CLI tools profile",
+        ),
+    )
+
+    # Warn-only: orchestrator.agent.md.template's tools list must contain `agent`
+    # (orchestrator needs to delegate). Subagent template's role-aware comment must
+    # NOT grant `agent` to read-only or runner profiles (least privilege).
+    orch_text = (SKILL_ROOT / "assets" / "orchestrator.agent.md.template").read_text(encoding="utf-8")
+    if "tools: [vscode, execute, read, agent, edit, search, todo]" not in orch_text:
+        err("orchestrator.agent.md.template: missing standard tools line "
+            "`tools: [vscode, execute, read, agent, edit, search, todo]`")
+    if ", agent," not in orch_text and "agent," not in orch_text and ", agent]" not in orch_text:
+        err("orchestrator.agent.md.template: orchestrator needs `agent` in its tools to delegate")
 
 
 # ---------- main ----------
@@ -1579,6 +1681,7 @@ def main() -> int:
     check_plan_handoff_policy()
     check_codex_cli_app_compatibility()
     check_runtime_update_policy()
+    check_copilot_tool_profile()
 
     if WARNINGS:
         print("\nWARNINGS:")

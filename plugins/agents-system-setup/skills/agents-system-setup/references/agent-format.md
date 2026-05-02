@@ -17,11 +17,13 @@ name: <kebab-case-name>           # MUST match filename basename
 description: 'Use when ... <trigger keywords>.'
 model: claude-sonnet-4.6          # OPTIONAL
 tools:                            # OPTIONAL whitelist; omit = inherit all
+  - vscode                        # public alias for the VS Code chat-host tool set (safe baseline)
   - execute                       # public alias for shell tools
   - read                          # public alias for file read/view
   - edit
   - search                        # public alias for grep/glob
   - agent                         # only for orchestrator-style agents
+  - todo                          # public alias for TodoWrite
 mcp-servers:                      # OPTIONAL — hyphenated key
   github:
     command: npx
@@ -33,7 +35,9 @@ mcp-servers:                      # OPTIONAL — hyphenated key
 (prompt body)
 ```
 
-> Use Copilot's documented tool aliases for new output: `execute`, `read`, `edit`, `search`, `agent`, `web`, `todo`. Product-specific aliases (`Bash`, `Read`, `Grep`, `Glob`, `Task`) are accepted by Copilot as compatible aliases, but emitting the public aliases keeps profiles portable. `/fleet` can use these custom agents for parallel subtasks; it is an optional CLI workflow, not a file schema.
+> Use Copilot's documented tool aliases for new output: `vscode`, `execute`, `read`, `edit`, `search`, `agent`, `web`, `todo`. Product-specific aliases (`Bash`, `Read`, `Grep`, `Glob`, `Task`) are accepted by Copilot as compatible aliases, but emitting the public aliases keeps profiles portable. `/fleet` can use these custom agents for parallel subtasks; it is an optional CLI workflow, not a file schema.
+>
+> Apply the [Copilot CLI Standard Tool Profiles](./platforms.md#copilot-cli-standard-tool-profiles) at emit time: `standard` (`[vscode, execute, read, agent, edit, search, todo]`) for orchestrators and edit-capable subagents, `read-only` (`[read, search]`) for reviewers/auditors, `runner` for testers/release helpers, `research` for documentation gatherers, or `inherit` to omit `tools:` entirely. The role → profile mapping is the source of truth for Phase 4 generation.
 
 ## Claude Code (`.claude/agents/<name>.md`)
 

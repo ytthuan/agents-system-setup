@@ -19,7 +19,8 @@ Use this contract at the end of `init`, `update`, `improve`, and `replicate` flo
 ✅ Plan handoff: <present | n/a with rationale> (source: <VS Code plan prompt | Spec-Kit /plan | user plan | none>)
 ✅ Runtime format targets: <copilot .agent.md | claude .md | opencode .md | codex .toml (CLI + App compatible artifacts) | gemini .md | n/a>
 ✅ Model overrides: <none — runtime defaults | per-agent overrides set: <agent → id list>>
-✅ Runtime drift notes: <none | Copilot .agent.md/.md docs drift + tool aliases | Claude plugin/project schema split + agent teams | OpenCode permission migration + child sessions | Codex additive schema + CSV/plugin config | Gemini promoted + mcp_servers normalization>
+✅ Copilot CLI tools profile: <standard | read-only | runner | research | inherit | minimal | custom> (per Q9c; standard renders as `tools: [vscode, execute, read, agent, edit, search, todo]` for orchestrator + edit-capable, narrows to `[read, search]` for reviewers/auditors)
+✅ Runtime drift notes: <none | Copilot .agent.md/.md docs drift + tool aliases + standard tool profile | Claude plugin/project schema split + agent teams | OpenCode permission migration + child sessions | Codex additive schema + CSV/plugin config | Gemini promoted + mcp_servers normalization>
 ✅ Artifact tracking: <project-tracked | project-local | personal-global>
 ✅ Local exclude: <.git/info/exclude updated | n/a>
 ✅ Security & audit baseline: <present | n/a with rationale>

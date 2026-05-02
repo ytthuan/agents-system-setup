@@ -2,6 +2,21 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [Unreleased]
+
+### Added
+
+- **Copilot CLI Standard Tool Profile.** Generated Copilot CLI agents now apply a documented role-aware tool profile: `standard` (`tools: [vscode, execute, read, agent, edit, search, todo]`) for orchestrator and edit-capable subagents, `read-only` (`[read, search]`) for reviewers/auditors, `runner` (`[execute, read, search, todo]`) for testers, `research` (`[read, search, web, todo]`) for docs/research gatherers, and `inherit` (omit `tools:`) for explicit opt-out.
+- `vscode` added to the recognized public alias set in `references/platforms.md` and `references/agent-format.md`. The `vscode` tool exposes the VS Code chat-host tool set when the agent runs inside VS Code Chat; Copilot CLI ignores unknown aliases harmlessly per the documented "All unrecognized tool names are ignored" rule, so it ships safely as a baseline.
+- New interview question Q9c (`copilot_tools_profile`) lets users pick `Standard | Minimal | Custom | Inherit`. Default = Standard.
+- Output contract reports the chosen profile via `Copilot CLI tools profile:`.
+- Validator guardrail `check_copilot_tool_profile` keeps the standard tool profile, marker `<!-- agents-system-setup:tools-profile: <profile> -->`, and orchestrator-must-have-`agent` rule from regressing.
+
+### Changed
+
+- Replication into Copilot CLI now fills `tools:` from the role-derived profile when the source IR has no explicit tools list; user-set tool lists still pass through unchanged. Tool-name canonicalization adds a `vscode_host → vscode` row.
+- Orchestrator template always renders `tools: [vscode, execute, read, agent, edit, search, todo]`. Subagent template documents the role → profile mapping and records the chosen profile via `<!-- agents-system-setup:tools-profile: {{TOOLS_PROFILE}} -->`.
+
 ## [0.7.0] - 2026-04-27
 
 ### Added

@@ -1,10 +1,12 @@
 ---
 name: orchestrator
 description: 'Use when starting any non-trivial task in this project. Top-level coordinator that decomposes work, writes a plan, enforces the Directory Architecture from AGENTS.md, and delegates to specialized subagents. Owns the end-to-end task lifecycle and final report.'
+tools: [vscode, execute, read, agent, edit, search, todo]
 {{OPTIONAL_MODEL_LINE}}
 ---
 
 <!-- agents-system-setup:platform: copilot-cli -->
+<!-- agents-system-setup:tools-profile: standard -->
 
 # Orchestrator
 

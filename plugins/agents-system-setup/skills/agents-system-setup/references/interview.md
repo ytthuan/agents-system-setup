@@ -50,6 +50,11 @@ Use `ask_user` for **every** question. One question per call. Multiple-choice wh
 - Choices: `["No, use platform default for all (Recommended)", "Yes, I'll specify per agent"]`
 - If yes: loop per agent. Before each prompt, surface the runtime's accepted format from [models.md](./models.md) (Copilot internal id, Claude alias or full id, OpenCode `provider/model-id`, Codex `gpt-5.x` plus optional `model_reasoning_effort`, Gemini local id). Freeform input; `inherit` or blank skips that agent. Warn when the supplied id does not match the documented format and ask whether to keep it.
 
+## 9c. Copilot CLI Tool Profile (only if Copilot CLI is among selected runtimes)
+- Q: "How should I set the `tools:` allowlist for Copilot CLI agents? See [Copilot CLI Standard Tool Profiles](./platforms.md#copilot-cli-standard-tool-profiles) for the full mapping."
+- Choices: `["Standard profile (Recommended) — [vscode, execute, read, agent, edit, search, todo] for orchestrator/implementer; [read, search] for reviewers/auditors; runner/research profile for testers/docs gatherers", "Minimal — emit only the read-only profile [read, search] everywhere; require explicit per-agent opt-in for execute/edit/agent", "Custom — I will edit per-agent after generation; emit no default", "Inherit — omit tools: line; agents inherit all parent tools"]`
+- Default: `Standard profile`. Persist as `copilot_tools_profile`. The renderer applies the role → profile mapping in Phase 4 unless the user picked `Custom` or `Inherit`. `Minimal` overrides every role to `read-only`. `Custom` leaves `tools:` blank in subagents but still emits the standard line on the orchestrator (the orchestrator needs `agent` to delegate).
+
 ## 10. Plugin / Skill / MCP Discovery Scope
 - Q: "Which capabilities should I look up in the marketplaces (github/awesome-copilot, github/copilot-plugins, anthropics/skills, openai/skills, OpenCode catalogs, Gemini extensions)? (comma-separated, e.g., 'playwright, azure, postgres')"
 - Freeform. Allow `skip`.

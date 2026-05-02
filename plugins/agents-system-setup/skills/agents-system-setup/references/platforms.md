@@ -33,19 +33,47 @@ The emitter writes `.github/agents/<name>.agent.md`. GitHub concept docs also me
 ---
 name: planner
 description: 'Use when ...'
-model: claude-sonnet-4.6        # optional
-tools: [read, search, execute]  # optional public aliases; omit = all tools
-mcp-servers:                    # optional, hyphenated key
+model: claude-sonnet-4.6                               # optional
+tools: [vscode, execute, read, agent, edit, search, todo]  # Standard Tool Profile (recommended default)
+mcp-servers:                                           # optional, hyphenated key
   github: { command: npx, args: [...], env: {...} }
 ---
 ```
 
 Copilot source-backed runtime notes:
 - Custom agents are agent profiles. The main Copilot agent can run them as subagents in a separate context window, automatically by description, explicitly by `/agent`, by prompt mention, or programmatically with `copilot --agent <name> --prompt ...`.
-- Prefer public tool aliases in generated `tools:`: `execute`, `read`, `edit`, `search`, `agent`, `web`, `todo`. Compatible aliases such as `Bash`, `Read`, `Grep`, `Glob`, `Task`, and MCP-prefixed names are import-safe, but emit aliases to keep profiles portable across Copilot surfaces.
+- Prefer public tool aliases in generated `tools:`: `vscode`, `execute`, `read`, `edit`, `search`, `agent`, `web`, `todo`. Compatible aliases such as `Bash`, `Read`, `Grep`, `Glob`, `Task`, and MCP-prefixed names are import-safe, but emit public aliases to keep profiles portable across Copilot surfaces.
+- `vscode` exposes the VS Code chat-host tool set (e.g., `vscode/extensions`, `vscode/runCommands`) when the agent runs inside VS Code Chat. Copilot CLI and other surfaces ignore it harmlessly per the documented "All unrecognized tool names are ignored" rule, so it is safe to ship as a baseline.
 - `agent` / `custom-agent` / `Task` enables one custom agent to invoke another. Grant it only to orchestrator-style agents; read-only reviewers should not be able to spawn broad workers.
 - `/fleet` is a parent-orchestrated mode for independent subtasks. The generator's wave table should be usable as a `/fleet` prompt, but `/fleet` is optional CLI UX — do not make generated files depend on it.
 - If `mcp-servers:` appears in frontmatter, the Phase 3.5 MCP approval gate must have rendered and approved it first.
+
+#### Copilot CLI Standard Tool Profiles
+
+Generated Copilot CLI agents apply one of these named profiles (selected per role at emit time; user can override via the interview):
+
+| Profile | `tools:` allowlist | Use for |
+|---|---|---|
+| `standard` (default for orchestrator + edit-capable subagents) | `[vscode, execute, read, agent, edit, search, todo]` | Orchestrator, implementer, runner, edit-capable specialist |
+| `read-only` (default for reviewers/auditors) | `[read, search]` | `@reviewer`, `@security`, `@architecture`, `@docs-reviewer`, any agent with empty `Owns:` paths |
+| `runner` (no edit, can shell + report) | `[execute, read, search, todo]` | `@tester`, CI/release helper |
+| `research` (read + web + todo) | `[read, search, web, todo]` | Research/documentation gatherers |
+| `inherit` (omit `tools:`) | (omitted) | Explicit user opt-out — agent receives parent's full toolbelt |
+
+Role → Profile mapping (case-insensitive substring on the agent name or role) used during emission:
+
+| Role pattern | Profile |
+|---|---|
+| `orchestrator`, `planner`, `coordinator` | `standard` |
+| `reviewer`, `auditor`, `security`, `architect`, `governance` | `read-only` |
+| `tester`, `qa`, `runner`, `release` | `runner` |
+| `research`, `docs`, `discovery`, `intake` | `research` |
+| anything else with non-empty `Owned paths` | `standard` |
+| anything else with empty `Owned paths` | `read-only` |
+
+Sources:
+- Copilot custom-agent config reference: <https://docs.github.com/en/copilot/reference/custom-agents-configuration> (tool aliases + "all unrecognized tool names are ignored").
+- VS Code custom agents (`.github/agents/*.agent.md` is shared with Copilot CLI): <https://code.visualstudio.com/docs/copilot/customization/custom-agents>.
 
 ### Claude Code (`.md` under `.claude/agents/`)
 Only `name` + `description` required. Defaults: `model: inherit`, all tools inherited from parent. Source: https://docs.claude.com/en/docs/claude-code/sub-agents

@@ -99,7 +99,7 @@ enabled: true
 | `description` | `description:` ✅ | `description:` ✅ | `description:` ✅ | TOML `description` ✅ | `description:` ✅; drives automatic delegation |
 | `role_prompt` | body ✅ | body ✅ | body ✅ | TOML `developer_instructions` (triple-quoted) ✅ | Markdown body system prompt ✅ |
 | `model.family` | `model: claude-sonnet-4.6` ✅ | `model: sonnet` ✅ | `model: anthropic/claude-sonnet-4-5` ✅ | TOML `model = "gpt-5.4"` ✅ + optional `model_reasoning_effort = "low\|medium\|high"` | `model: gemini-...` ✅ plus `temperature:` |
-| `tools.*` (bool map) | `tools: [read, search, edit, execute, agent]` aliases ✅ | `tools: Read, Grep, ...` (comma string allowlist) + optional `disallowedTools:` denylist — map names | `permission: { edit, bash, webfetch }` ✅ (legacy `tools: { ... }` map is **deprecated**) | model `sandbox_mode` (`read-only`\|`workspace-write`); fine-grained tool list not enforced — drop with warning ⚠️ | `tools:` allowlist ✅; map only known Gemini tool names and warn on unknown/discovered-only tools |
+| `tools.*` (bool map) | `tools: [vscode, execute, read, agent, edit, search, todo]` aliases ✅ (apply [Standard Tool Profile](./platforms.md#copilot-cli-standard-tool-profiles) per role; reviewers narrow to `[read, search]`) | `tools: Read, Grep, ...` (comma string allowlist) + optional `disallowedTools:` denylist — map names | `permission: { edit, bash, webfetch }` ✅ (legacy `tools: { ... }` map is **deprecated**) | model `sandbox_mode` (`read-only`\|`workspace-write`); fine-grained tool list not enforced — drop with warning ⚠️ | `tools:` allowlist ✅; map only known Gemini tool names and warn on unknown/discovered-only tools |
 | `mcp_refs` | per-agent `mcp-servers:` *or* central `.mcp.json` | central `.mcp.json` only ⚠️ | central `opencode.json` › `mcp` only ⚠️ | central `.mcp.json` ✅ **and/or** per-agent `[mcp_servers.<id>]` table inside the agent's TOML ✅ | per-agent `mcp_servers:` ✅; extension `mcpServers` import/package surface ⚠️ |
 | `permission.edit` | n/a — drop with warning ❌ | n/a — drop with warning ❌ | `permission.edit:` ✅ | mapped to `sandbox_mode` (read-only ↔ no edits) ✅ | map to narrower `tools:` and/or policy-engine guidance ⚠️ |
 | `permission.bash_deny_patterns` | n/a ❌ | n/a ❌ | `permission.bash:` map ✅ | n/a ❌ | policy-engine `subagent` rules can enforce command prefixes ⚠️ |
@@ -130,8 +130,18 @@ enabled: true
 | `glob` | `search` (compatible: `Glob`) | `Glob` | `glob` | runtime-discovered glob/search tool; warn if unknown |
 | `webfetch` | `web` | `WebFetch` | `webfetch` | runtime-discovered web tool or MCP tool; warn if unknown |
 | `task` | `agent` (compatible: `custom-agent`, `Task`) | `Agent` | `task` | n/a inside subagents; root can use `@<agent>` / subagent tools |
+| `vscode_host` (chat-host integration) | `vscode` (Copilot CLI ignores unknown tools harmlessly per docs; safe baseline) | n/a — drop with warning ❌ | n/a — drop with warning ❌ | n/a — drop with warning ❌ |
 
 The IR uses the lowercase canonical names. Renderers translate **at emit time only** — never round-trip through another platform's name set.
+
+#### Copilot CLI tool fill rule (replication target)
+
+When emitting Copilot CLI from IR:
+
+1. If the source AgentIR has an explicit non-empty `tools:` set, translate via the canonicalization table and pass through.
+2. Otherwise, fill `tools:` from the role-derived [Standard Tool Profile](./platforms.md#copilot-cli-standard-tool-profiles): `standard` for orchestrator/edit-capable, `read-only` for reviewers/auditors, `runner` for testers/release, `research` for docs/research, `inherit` only when the user explicitly opted out (Q9c).
+3. Always include `vscode` in the `standard` profile (safe — unrecognized aliases are ignored on non-VS-Code surfaces).
+4. Surface the chosen profile in the lossiness report; record the marker `<!-- agents-system-setup:tools-profile: <profile> -->` in the emitted file body header.
 
 ### Codex CLI + App compatibility rule
 
