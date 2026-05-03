@@ -14,6 +14,7 @@ description: 'Use when {{TRIGGER_PHRASES}}. {{ONE_LINE_RESPONSIBILITY}}.'
 
 <!-- agents-system-setup:platform: claude-code -->
 <!-- agents-system-setup:replicated-from: {{REPLICATION_SOURCE}} -->
+{{OPTIONAL_MCP_APPROVAL_MARKER}}
 
 # {{AGENT_DISPLAY_NAME}}
 
@@ -65,13 +66,13 @@ If implementation would change a public API, module boundary, data model, servic
 - Dependencies / wave: {{HANDOFF_DEPENDENCIES}}
 - Required approvals: {{HANDOFF_APPROVALS}}
 
-> Full Task Assignment Contract: see [`references/handoff.md`](../../plugins/agents-system-setup/skills/agents-system-setup/references/handoff.md#delegation-packet-canonical-schema). Use short-form for simple tasks; full-form (Goal & Definition of Done, Scope, File Inventory, Verification Protocol, Reporting Protocol, etc.) when the task touches multiple files, security/MCP/CI/release surfaces, or fan-out waves.
+> Full Task Assignment Contract: use `AGENTS.md` > **Plan Handoff Contract**. Use short-form for simple tasks; full-form (Goal & Definition of Done, Scope, File Inventory, Verification Protocol, Reporting Protocol, etc.) when the task touches multiple files, security/MCP/CI/release surfaces, or fan-out waves.
 
 ## Acceptance Checklist
 
 Before doing work I confirm the Task Assignment is well-formed:
 
-1. All twelve required-minimum fields are present and non-empty.
+1. All twelve Required Minimum fields from `AGENTS.md` > **Plan Handoff Contract** are present and non-empty.
 2. `File Inventory.to_modify` (when used) intersects only my Owned paths.
 3. `File Inventory.to_read_only` (when used) does not include any path I own exclusively.
 4. `Required approvals` lists every approval the task could trigger, or `none`.

@@ -15,6 +15,7 @@ description = "Use when {{TRIGGER_PHRASES}}. {{ONE_LINE_RESPONSIBILITY}}."
 # model = "{{MODEL}}"
 # model_reasoning_effort = "{{REASONING_EFFORT}}"   # low | medium | high
 # sandbox_mode = "{{SANDBOX_MODE}}"                  # read-only | workspace-write
+# The renderer MUST emit sandbox_mode = "read-only" for reviewer/auditor/security/architect/governance roles or empty Owned paths.
 # nickname_candidates = ["Atlas", "Delta", "Echo"]  # presentation hint in CLI/App activity
 
 # developer_instructions MUST include: Directory Boundaries, Security & Audit
@@ -26,7 +27,7 @@ description = "Use when {{TRIGGER_PHRASES}}. {{ONE_LINE_RESPONSIBILITY}}."
 developer_instructions = """
 {{DEVELOPER_INSTRUCTIONS}}
 
-# Apply the Codex TOML summary + pointer rule from references/agent-format.md.
+# Apply the Codex TOML summary + pointer rule: lead with the role and point to AGENTS.md rows by name.
 # Lead with the role; reference AGENTS.md rows by name; expand the checklist
 # below only when this agent owns MCP/secrets/CI/release/dependency surfaces.
 
@@ -37,7 +38,7 @@ Context Load Order:
 4. Referenced detail docs only when needed.
 
 Task Assignment Acceptance Checklist:
-- All twelve required-minimum fields present and non-empty.
+- All twelve Required Minimum fields from AGENTS.md > Plan Handoff Contract are present and non-empty.
 - File Inventory.to_modify only intersects my Owned paths.
 - File Inventory.to_read_only excludes paths I own exclusively.
 - Required approvals lists every approval the task could trigger, or none.
@@ -81,6 +82,7 @@ Output Contract:
 """
 
 # Optional per-agent MCP server allowlist (also reads repo-root .mcp.json).
+# {{OPTIONAL_MCP_APPROVAL_COMMENT}}
 # [mcp_servers.{{MCP_ID}}]
 # url = "{{MCP_URL}}"
 

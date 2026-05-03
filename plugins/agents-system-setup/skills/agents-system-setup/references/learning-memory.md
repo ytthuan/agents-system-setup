@@ -20,7 +20,7 @@ Ask per project before writing memory artifacts.
 | `project-tracked` | `docs/agents/learnings.md` | Optional `.agents-system-setup/learnings.jsonl` only after approval | Team wants shared durable learning |
 | `project-local` | `.agents-system-setup/memory/learnings.md` or `.agents-system-setup/memory/learnings.jsonl` | `.agents-system-setup/learnings.jsonl` | Personal learning for this checkout |
 | `personal-global` | User/global memory path outside the repo | User-local DB/JSONL | Cross-project personal learning |
-| `disabled` | none | none | User opts out |
+| `disabled` | none | none | User opts out; Learning Check is still emitted and always returns `none` |
 
 Default guidance: recommend `project-tracked` for teams and `project-local` for
 personal setups. Respect the artifact tracking decision from
@@ -87,11 +87,14 @@ learning_proposal:
    Architecture explicitly gives them ownership of the memory path.
 2. The orchestrator collects proposals during Integrate / Verify.
 3. New low-risk project learnings may be appended by the memory owner.
-4. Updating, overwriting, or superseding an old learning requires orchestrator
+4. Sensitive new learnings require orchestrator and security-owner approval when
+   tagged `risk` or when `applies_to` matches MCP, CI/release, dependency,
+   secret, or generated-script paths.
+5. Updating, overwriting, or superseding an old learning requires orchestrator
    approval. The approval must identify the old learning id and the evidence.
-5. Superseded learnings are marked `status: superseded`; do not silently delete
+6. Superseded learnings are marked `status: superseded`; do not silently delete
    prior memory.
-6. If memory storage writes a tracked project file and the run has not already
+7. If memory storage writes a tracked project file and the run has not already
    approved tracked artifacts, ask before writing.
 
 ## Privacy and security rules

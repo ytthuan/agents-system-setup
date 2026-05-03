@@ -126,6 +126,19 @@ Or be explicit:
 
 For Gemini CLI, there is no `/plugin install` or `/agents-system-setup` command documented by this repo. Use Gemini normally after generated `.gemini/agents/*.md` artifacts are present, then call the generated subagents with `@<agent-name>`.
 
+## Wizard flow
+
+The wizard starts by detecting the current repo, then shows a compact profile:
+existing agent artifacts, recommended mode, inferred project type, and target
+runtime defaults. For low-risk repos, you can accept detected/safe defaults for
+non-gated setup questions. The wizard still asks explicitly for artifact
+tracking, MCP/config approvals, plan approval, and security-sensitive writes.
+
+Agent behavior choices are grouped together: optional model overrides, Copilot
+CLI tool profile, output detail (`Balanced` by default), and Memory & Learning
+profile. Model overrides are opt-in and scoped by all agents, role, or
+exceptions so large rosters do not trigger one prompt per agent.
+
 ## Parallel subagents & Claude Code agent teams
 
 The generated orchestrator always fans out **parallel-safe subagents** in one wave (multiple `Task` calls in a single response), then awaits before the next wave. Parallel-safety is computed automatically from the Directory Architecture — see [parallelism reference](./plugins/agents-system-setup/skills/agents-system-setup/references/parallelism.md).

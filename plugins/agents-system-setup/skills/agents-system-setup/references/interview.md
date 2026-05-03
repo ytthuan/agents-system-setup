@@ -2,22 +2,40 @@
 
 Use `ask_user` for **every** question. One question per call. Multiple-choice when possible (the runtime adds a freeform option automatically — never include "Other" in choices).
 
-## 0. Platform Selection (FIRST question after detection)
-- Q: "Which agent runtime(s) should I configure?"
-- Choices: `["Copilot CLI only (Recommended for GitHub-centric teams)", "Claude Code only", "OpenCode only", "OpenAI Codex only (CLI + App artifacts)", "Gemini CLI only", "Copilot CLI + Claude Code", "All supported runtimes (Copilot + Claude Code + OpenCode + Codex + Gemini)"]`
+## 0. Opening prompt (detect first, then choose mode/platforms)
+
+- Detect the current footprint before asking. Show a compact profile card:
+  detected project type, existing agent artifacts, recommended mode, and inferred
+  target runtime(s).
+- Q: "I detected `<footprint>`. How should I proceed?"
+- Choices: `["Improve current setup (Recommended when artifacts exist)", "Init new setup", "Replicate / sync to another runtime", "Update managed blocks", "Cancel"]`
+- Then ask target runtimes only when the mode needs them:
+  `["Copilot CLI only (Recommended for GitHub-centric teams)", "Claude Code only", "OpenCode only", "OpenAI Codex only (CLI + App artifacts)", "Gemini CLI only", "Copilot CLI + Claude Code", "All supported runtimes (Copilot + Claude Code + OpenCode + Codex + Gemini)"]`
 
 ## 1. Purpose
 - Q: "In one sentence, what does this project do?"
 - Freeform.
 
-## 2. Mode
-- Detect first. Ask only if ambiguous:
-- Q: "I detected `<existing files>`. Should I run in **init** or **update** mode?"
-- Choices: `["update (Recommended)", "init (overwrite existing as new setup)"]`
+## 2. Mode follow-up
+- Q0 is the mode decision. Do not ask a second mode question during the normal
+  flow.
+- Re-prompt only when detection or the initial answer is ambiguous, using the
+  full Q0 choice set:
+  `["Improve current setup (Recommended when artifacts exist)", "Init new setup", "Replicate / sync to another runtime", "Update managed blocks", "Cancel"]`
+- Never offer overwrite. If the user wants a fresh setup near existing
+  artifacts, treat it as additive init or route through update/improve.
 
 ## 3. Project Type
 - Q: "What type of project is this?"
 - Choices: `["Documentation site", "Web — .NET", "Web — Node.js/TypeScript", "Web — Python", "Web — Go", "Web — Other", "iOS app", "Android app", "CLI tool", "Library / SDK", "Monorepo", "Data / ML", "Infrastructure / DevOps"]`
+
+After showing detected purpose/type/language/test/deploy values, offer a fast
+path for non-gated questions:
+
+- Q: "Use detected and safe defaults for remaining non-gated setup questions?"
+- Choices: `["Yes — use detected/safe defaults (Recommended)", "No — ask each setup question"]`
+- This shortcut must not skip artifact tracking, MCP approval, plan approval,
+  or security-sensitive write gates.
 
 ## 4. Languages
 - Q: "Primary language(s)? (comma-separated)"
@@ -45,19 +63,41 @@ Use `ask_user` for **every** question. One question per call. Multiple-choice wh
 - Q: "Suggested subagents: <list>. Accept, add, or remove?"
 - Freeform with the suggested list pre-printed.
 
-## 9b. Per-Agent Model Override (optional, ask only if user wants to set models)
-- Q: "Want to set a custom model for any agent? Each runtime has its own accepted format and plan-tier rate limits — see [models](./models.md). Leave blank to keep the runtime's default and stay portable."
-- Choices: `["No, use platform default for all (Recommended)", "Yes, I'll specify per agent"]`
-- If yes: loop per agent. Before each prompt, surface the runtime's accepted format from [models.md](./models.md) (Copilot internal id, Claude alias or full id, OpenCode `provider/model-id`, Codex `gpt-5.x` plus optional `model_reasoning_effort`, Gemini local id). Freeform input; `inherit` or blank skips that agent. Warn when the supplied id does not match the documented format and ask whether to keep it.
+## 9b. Advanced agent behavior
 
-## 9c. Copilot CLI Tool Profile (only if Copilot CLI is among selected runtimes)
-- Q: "How should I set the `tools:` allowlist for Copilot CLI agents? See [Copilot CLI Standard Tool Profiles](./platforms.md#copilot-cli-standard-tool-profiles) for the full mapping."
-- Choices: `["Standard profile (Recommended) — [vscode, execute, read, agent, edit, search, todo] for orchestrator/implementer; [read, search] for reviewers/auditors; runner/research profile for testers/docs gatherers", "Minimal — emit only the read-only profile [read, search] everywhere; require explicit per-agent opt-in for execute/edit/agent", "Custom — I will edit per-agent after generation; emit no default", "Inherit — omit tools: line; agents inherit all parent tools"]`
-- Default: `Standard profile`. Persist as `copilot_tools_profile`. The renderer applies the role → profile mapping in Phase 4 unless the user picked `Custom` or `Inherit`. `Minimal` overrides every role to `read-only`. `Custom` leaves `tools:` blank in subagents but still emits the standard line on the orchestrator (the orchestrator needs `agent` to delegate).
+Ask these choices together after topology so users compare the tradeoffs in one
+place. Skip runtime-specific questions when that runtime is not selected.
+
+### Per-Agent Model Override policy (optional)
+
+- Q: "How should agent model overrides work? Defaults avoid rate-limit and portability issues."
+- Choices: `["No overrides — use platform defaults (Recommended)", "One model for all agents", "By role/profile", "Exceptions only"]`
+- If not `No overrides`, load [models](./models.md) and prompt only for the chosen scope. Do not loop over every agent unless the user explicitly picks per-agent exceptions. Warn when a supplied id does not match the documented runtime format.
+
+### 9c. Copilot CLI Tool Profile (only if Copilot CLI is selected)
+
+- Q: "How should I set Copilot CLI `tools:` allowlists?"
+- Choices: `["Standard least-privilege by role (Recommended)", "Read-only everywhere", "Inherit parent tools", "Custom after generation"]`
+- Default: `Standard profile` / `Standard least-privilege by role`. Persist as `copilot_tools_profile`. The detailed mapping lives in the plan and [Copilot CLI Standard Tool Profiles](./platforms.md#copilot-cli-standard-tool-profiles): orchestrator/edit-capable agents get `[vscode, execute, read, agent, edit, search, todo]`; reviewers/auditors get `[read, search]`; runner/research profiles stay narrow.
+
+### Output profile / context budget
+
+- Q: "How much detail should generated agent files include?"
+- Choices: `["Balanced (Recommended)", "Compact", "Full"]`
+- Record as `output_profile`. If the user is unsure, choose `Balanced`.
+
+### 11i. Memory & Learning profile
+
+- Q: "How should generated agents store durable learnings from past work?"
+- Choices: `["Project-tracked curated memory (Recommended for teams)", "Project-local / untracked memory (Recommended for personal setup)", "Personal/global memory outside this repo", "Disabled"]`
+- Record as `learning_memory_profile`.
+- Do not ask a separate blocking Learning Check question by default. Record `learning_gate_strength = recommended` and `learning_update_policy = overwrite requires orchestrator approval`. Only make Learning Check blocking when the user explicitly requests it.
 
 ## 10. Plugin / Skill / MCP Discovery Scope
 - Q: "Which capabilities should I look up in the marketplaces (github/awesome-copilot, github/copilot-plugins, anthropics/skills, openai/skills, OpenCode catalogs, Gemini extensions)? (comma-separated, e.g., 'playwright, azure, postgres')"
 - Freeform. Allow `skip`.
+- If the Phase 1.8 external-tools answer has already been recorded as `No external tools`, default this to `skip` and do not enter Phase 3 unless the user explicitly adds capabilities.
+- If the external-tools answer is not available yet, derive likely capabilities from the detected stack, ask the user to confirm or edit the list, and later keep it skipped if the security intake confirms `No external tools` without explicit capabilities.
 
 ## 10b. MCP Approval Mode (only if any MCP server is among selections later)
 - Q: "How should I handle MCP server config writes when we get to the approval gate?"
@@ -79,15 +119,15 @@ Use [security-audit-architecture](./security-audit-architecture.md). Ask only qu
 - Q: "Will agents call external systems or MCP servers?"
 - Choices: `["No external tools", "Approved internal tools only", "Public APIs", "MCP servers", "Unsure"]`
 
-### 11d. Audit evidence
+### 11d. Audit evidence (infer unless risk requires asking)
 - Q: "What audit evidence should agents preserve?"
 - Choices: `["Diff summary only", "Test/build evidence", "Security findings", "Decision records / ADRs", "Compliance evidence", "Unsure"]`
 
-### 11e. Architecture style
+### 11e. Architecture style (infer unless ambiguous)
 - Q: "What architecture style should the agents preserve or move toward?"
 - Choices: `["Layered", "Clean/Hexagonal", "Event-driven", "Microservices", "Modular monolith", "Serverless", "CLI/library", "Unsure"]`
 
-### 11f. Critical qualities
+### 11f. Critical qualities (infer safe defaults, then show in plan)
 - Q: "Which quality attributes matter most?"
 - Choices: `["Security", "Reliability", "Maintainability", "Performance", "Cost", "Accessibility", "Compliance"]`
 
@@ -95,19 +135,11 @@ Use [security-audit-architecture](./security-audit-architecture.md). Ask only qu
 - Q: "Any architecture or design anti-patterns to avoid?"
 - Freeform. Allow blank.
 
-### 11h. Output profile / context budget
-- Q: "How much detail should generated agent files include?"
-- Choices: `["Balanced (Recommended)", "Compact", "Full"]`
-- Record as `output_profile`. If the user is unsure, choose `Balanced`.
-
-### 11i. Memory & Learning profile
-- Q: "How should generated agents store durable learnings from past work?"
-- Choices: `["Project-tracked curated memory (Recommended for teams)", "Project-local / untracked memory (Recommended for personal setup)", "Personal/global memory outside this repo", "Disabled"]`
-- Record as `learning_memory_profile`.
-- Follow-up Q: "Should the Learning Check be blocking before agents finish?"
-- Choices: `["Recommended / non-blocking (Default)", "Mandatory before done", "Disabled"]`
-- Record as `learning_gate_strength`. Default: `recommended`. Always record `learning_update_policy = overwrite requires orchestrator approval`.
-- If hooks/scripts are requested, show the exact runtime-specific hook/config proposal and ask before writing.
+Ask 11d-11g only when the profile card indicates sensitive data, auth, MCP,
+release/deploy risk, regulated context, or when the user declined safe defaults.
+Otherwise infer conservative defaults into the plan and let the user edit before
+writes. If hooks/scripts are requested, show the exact runtime-specific
+hook/config proposal and ask before writing.
 
 ## 12. Git
 - Only if no `.git/` present.

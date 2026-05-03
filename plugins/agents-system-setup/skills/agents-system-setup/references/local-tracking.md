@@ -58,6 +58,10 @@ opencode.json
 
 Only include paths the skill actually created or modified. If a file already exists and is tracked, do not hide it; ask before changing strategy.
 
+## Privacy callout
+
+`.git/info/exclude` is checkout-local and is not a security boundary. Never hard-code secrets in `.mcp.json`, `opencode.json`, agent `mcp-servers:` / `mcp_servers:`, or Codex `[mcp_servers.<id>]` blocks — always reference environment variables such as `${VAR}`. Excluding a file from git does not protect it from collaborators, local backups, shell history, or other tools that can read the checkout.
+
 ## Anti-patterns
 
 - Writing project-scoped agent files without asking tracking mode.

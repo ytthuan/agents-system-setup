@@ -166,9 +166,14 @@ Validators warn when a Codex subagent's `developer_instructions` block grows bey
 
 Codex shared artifact rules:
 - **Required fields**: `name`, `description`, `developer_instructions`. Missing any → silent skip.
-- **`name` is the source of truth** (filename is convention only). Custom files may override built-ins (`default`, `worker`, `explorer`) by reusing the name.
+- **`name` is the source of truth and generated files keep it equal to the filename stem**. Imported custom files may differ, but replication should report that as drift; built-ins (`default`, `worker`, `explorer`) may still be overridden by reusing the name.
 - **Global config** in `.codex/config.toml`: `[agents] max_threads = 6`, `max_depth = 1`, and optional `job_max_runtime_seconds` defaults.
 - MCP servers can be shared via `.mcp.json` at repo root *or* declared per-agent inside the TOML.
+- Read-only identity rule: Codex agents whose `name` or filename stem identifies
+  them as reviewer, auditor, security, architect, or governance roles set
+  `sandbox_mode = "read-only"`. Agents with empty Owned paths should also be
+  read-only at generation time; validators can enforce identity surfaces, but
+  cannot infer Owned paths from TOML alone.
 - Skills: per-agent enable/disable via `[[skills.config]]` array entries.
 - `nickname_candidates` are display hints for Codex CLI and App activity views; they are not routing keys.
 - Advanced fan-out: `spawn_agents_on_csv` can launch a row-per-agent workflow. Document it as an explicit workflow, not a default generated behavior; every worker must report exactly once with `report_agent_job_result`.
@@ -246,7 +251,7 @@ The VS Code `plan` prompt (`agent: Plan`) and Spec-Kit `/plan` output are planni
 
 | Pattern | Copilot CLI | Claude Code | OpenCode | OpenAI Codex (CLI + App) | Gemini CLI |
 |---|---|---|---|---|---|
-| Read-only reviewer | `tools: [read, search, execute]` | `tools: Read, Grep, Glob, Bash` | `permission: { edit: deny, bash: ask, webfetch: deny }` | `sandbox_mode = "read-only"` in `.codex/agents/<name>.toml` | `tools: [read_file, grep_search]`; no subagent recursion |
+| Read-only reviewer | `tools: [read, search]` | `tools: Read, Grep, Glob` | `permission: { edit: deny, bash: deny, webfetch: deny }` | `sandbox_mode = "read-only"` in `.codex/agents/<name>.toml` | `tools: [read_file, grep_search]`; no subagent recursion |
 | Implementer (full) | omit `tools:` or include `edit`/`execute` aliases | omit `tools:` | omit `permission:` or set scoped `ask` rules | `sandbox_mode = "workspace-write"` (or omit to inherit) | omit `tools:` to inherit, or explicitly allow edit/shell tools available in the user's Gemini tool registry |
 | Docs writer | `tools: [read, edit, search]` | `tools: Read, Edit, Write` | `permission: { edit: allow, bash: deny, webfetch: ask }` | `sandbox_mode = "workspace-write"`; describe scope in `developer_instructions` | `tools: [read_file, grep_search]` plus write tools only when docs paths are owned |
 
@@ -257,5 +262,79 @@ The VS Code `plan` prompt (`agent: Plan`) and Spec-Kit `/plan` output are planni
 - **OpenCode** — central `opencode.json` `mcp` key only; agents reference by name via the runtime's discovery.
 - **OpenAI Codex (CLI + App)** — central `.mcp.json` plus optional per-agent `[mcp_servers.<id>]` in TOML where supported; keep approval-gated and surface any App support uncertainty as lossiness.
 - **Gemini CLI** — per-agent `mcp_servers:` in `.gemini/agents/*.md` for local subagents; extension manifests use `mcpServers`. Emit only after Phase 3.5 approval.
+
+## Optional placeholder substitution table
+
+Renderers must replace these placeholders before writing generated runtime
+agent directories. Literal `{{OPTIONAL_...}}` placeholders are allowed only in
+this repository's templates under `assets/`.
+
+General default: when a feature is off, unsupported, or not applicable, replace
+the placeholder with an empty string and remove the surrounding blank line or
+empty YAML/TOML key. When a feature is on, render the runtime-native line or
+block exactly at the placeholder indentation. Never leave a literal optional
+placeholder in generated runtime agent directories.
+
+| Placeholder | On form | Off / not-applicable form |
+|---|---|---|
+| `{{OPTIONAL_MODEL_LINE}}` | Runtime-native model line, for example `model: <id>` in YAML frontmatter. | Empty string. |
+| `{{OPTIONAL_TOOLS_BLOCK}}` | Runtime-native tools allowlist, for example Copilot YAML list, Claude comma string, or Gemini YAML list. | Empty string to inherit/default tools. |
+| `{{OPTIONAL_MCP_SERVERS_BLOCK}}` | Approved runtime-native MCP block: Copilot `mcp-servers:`, Claude `mcpServers:`, or Gemini `mcp_servers:`. | Empty string and no MCP key. |
+| `{{OPTIONAL_MCP_APPROVAL_MARKER}}` | Markdown body marker `<!-- agents-system-setup:mcp-approved: <approval-ref> -->`. | Skipped marker `<!-- agents-system-setup:mcp-skipped: no MCP written -->` when MCP was considered; otherwise empty string. |
+| `{{OPTIONAL_MCP_APPROVAL_COMMENT}}` | Top-level Codex TOML comment body `agents-system-setup:mcp-approved: <approval-ref>` rendered as `# agents-system-setup:mcp-approved: <approval-ref>`. | `agents-system-setup:mcp-skipped: no MCP written` when skipped, or `agents-system-setup:mcp-not-applicable` when no MCP was considered. |
+| `{{OPTIONAL_PERMISSION_TASK_BLOCK}}` | OpenCode primary-agent `permission.task` block with `"*": deny` first and approved roster entries set to `allow`, or `"*": ask` only after explicit approval. | Empty string for non-OpenCode/non-primary agents; for OpenCode primary agents with no delegated subagents, render `"*": deny`. |
+| `{{OPTIONAL_DISPLAY_NAME_LINE}}` | Gemini `display_name: <human-readable name>`. | Empty string. |
+| `{{OPTIONAL_TEMPERATURE_LINE}}` | Runtime-native `temperature: <number>` line. | Empty string. |
+| `{{OPTIONAL_MAX_TURNS_LINE}}` | Runtime-native max-turn line: Claude `maxTurns: <int>` or Gemini `max_turns: <int>`. | Empty string. |
+| `{{OPTIONAL_TIMEOUT_MINS_LINE}}` | Gemini `timeout_mins: <int>`. | Empty string. |
+| `{{OPTIONAL_STEPS_LINE}}` | OpenCode `steps: <int>`. | Empty string. |
+| `{{OPTIONAL_HIDDEN_LINE}}` | OpenCode `hidden: true` or `hidden: false` when the plan explicitly sets visibility. | Empty string to use OpenCode's default. |
+| `{{OPTIONAL_PERMISSION_BLOCK}}` | OpenCode subagent `permission:` block with least-privilege `deny`/`ask` defaults and any approved scoped `allow` rules. | Empty string to inherit default permissions only when the plan permits it. |
+| `{{OPTIONAL_DISALLOWED_TOOLS_BLOCK}}` | Claude `disallowedTools: <comma-separated tool list>`. | Empty string. |
+| `{{OPTIONAL_PERMISSION_MODE_LINE}}` | Claude `permissionMode: <mode>` when explicitly selected. | Empty string. |
+| `{{OPTIONAL_EFFORT_LINE}}` | Claude `effort: <low|medium|high|xhigh|max>` when explicitly selected. | Empty string. |
+| `{{OPTIONAL_ISOLATION_LINE}}` | Claude `isolation: worktree` when the plan requests isolated worktrees. | Empty string. |
+| `{{OPTIONAL_SKILLS_BLOCK}}` | Claude `skills: [...]` block when skills are explicitly attached to that subagent. | Empty string. |
+
+### MCP approval placeholders
+
+`{{OPTIONAL_MCP_APPROVAL_MARKER}}` is Markdown-safe and belongs in the agent
+body, not frontmatter. `{{OPTIONAL_MCP_APPROVAL_COMMENT}}` is Codex TOML-safe:
+the template prefixes it with `# `, so the renderer substitutes the comment body
+without a leading `#`.
+
+For Codex TOML, place the resulting approval comment as a **top-level TOML
+comment** before any `[mcp_servers.<id>]`, `[[mcp_servers]]`, or
+`[[mcp_servers.<id>]]` table. Do not put approval evidence inside
+`developer_instructions` or inside an MCP table.
+
+### `{{OPTIONAL_PERMISSION_TASK_BLOCK}}` (OpenCode primary YAML frontmatter)
+
+Default approved roster gate:
+
+```yaml
+permission:
+  task:
+    "*": deny
+    "<subagent-name>": allow
+```
+
+MCP skipped or no delegated subagents:
+
+```yaml
+permission:
+  task:
+    "*": deny
+```
+
+Human-approved broad delegation must stay non-permissive by default:
+
+```yaml
+permission:
+  task:
+    "*": ask
+```
+
+Never emit `permission.task` with `"*": allow`.
 
 **Any change to MCP requires the Phase 3.5 approval gate.**

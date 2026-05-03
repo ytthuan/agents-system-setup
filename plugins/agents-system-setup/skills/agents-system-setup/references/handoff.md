@@ -170,7 +170,7 @@ Do not include unrelated roster rows, marketplace research, or full platform sch
 
 Subagents run this before doing work and return one consolidated clarification question if any required field is missing.
 
-1. All twelve required-minimum fields are present and non-empty.
+1. All twelve required-minimum fields are present and non-empty: Task, Source plan, Owned paths, Read-only paths, Relevant gates, Constraints, Dependencies / wave, Required approvals, Runtime format target, Expected output, Context freshness, and Lossiness.
 2. `File Inventory.to_modify` (when used) intersects only `Owned paths`.
 3. `File Inventory.to_read_only` (when used) does not include any path the agent owns exclusively.
 4. `Required approvals` lists every approval the task could trigger, or `none`.
@@ -195,6 +195,7 @@ Evidence:
 Gates touched: <list with status>
 Risks / escalations: <list or "none">
 Handoff status: accepted | completed | blocked | returned-to-orchestrator
+Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>
 ```
 
 ## Verification

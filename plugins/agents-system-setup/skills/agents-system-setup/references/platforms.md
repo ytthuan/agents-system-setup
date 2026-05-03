@@ -46,7 +46,7 @@ Copilot source-backed runtime notes:
 - `vscode` exposes the VS Code chat-host tool set (e.g., `vscode/extensions`, `vscode/runCommands`) when the agent runs inside VS Code Chat. Copilot CLI and other surfaces ignore it harmlessly per the documented "All unrecognized tool names are ignored" rule, so it is safe to ship as a baseline.
 - `agent` / `custom-agent` / `Task` enables one custom agent to invoke another. Grant it only to orchestrator-style agents; read-only reviewers should not be able to spawn broad workers.
 - `/fleet` is a parent-orchestrated mode for independent subtasks. The generator's wave table should be usable as a `/fleet` prompt, but `/fleet` is optional CLI UX — do not make generated files depend on it.
-- If `mcp-servers:` appears in frontmatter, the Phase 3.5 MCP approval gate must have rendered and approved it first.
+- If `mcp-servers:` appears in frontmatter, the Phase 3.5 MCP approval gate must have rendered and approved it first, and the rendered agent must carry an `agents-system-setup:mcp-approved` marker.
 
 #### Copilot CLI Standard Tool Profiles
 
@@ -127,7 +127,26 @@ permission:                                                # preferred over depr
 >
 > Permission keys: `read`, `edit`, `glob`, `grep`, `list`, `bash`, `task`, `external_directory`, `todowrite`, `webfetch`, `websearch`, `codesearch`, `lsp`, `skill`, `question`, `doom_loop`. Prefer `permission:` for new configs; `tools:` is deprecated.
 >
-> Primary agents are selected directly (Tab / configured `switch_agent` keybind). Subagents are invoked automatically by primary agents or manually with `@<agent-name>`. When a subagent creates a child session, users navigate with `session_child_first`, `session_child_cycle`, `session_child_cycle_reverse`, and `session_parent`; include these as "Try it" notes, not schema fields. Gate subagent spawning with `permission.task` when an agent should only call specific workers.
+> Primary agents are selected directly (Tab / configured `switch_agent` keybind). Subagents are invoked automatically by primary agents or manually with `@<agent-name>`. When a subagent creates a child session, users navigate with `session_child_first`, `session_child_cycle`, `session_child_cycle_reverse`, and `session_parent`; include these as "Try it" notes, not schema fields. Gate subagent spawning with `permission.task` when an agent should only call specific workers. Generated orchestrators default to `permission.task` with `"*": deny` plus explicit roster-agent allows.
+
+#### Canonical OpenCode primary task gate
+
+OpenCode primary agents must gate subagent spawning with a `permission.task`
+mapping. The wildcard/default entry must be `deny` or `ask`; never emit
+`"*": allow`.
+
+```yaml
+permission:
+  task:
+    "*": deny
+    "reviewer": allow
+    "tester": allow
+```
+
+Use `permission.task: { "*": ask }` only when the user explicitly approves
+broad runtime-selected delegation. See the
+[optional placeholder substitution table](./agent-format.md#optional-placeholder-substitution-table)
+for the generated `{{OPTIONAL_PERMISSION_TASK_BLOCK}}` forms.
 
 ### OpenAI Codex CLI + App — split layout
 

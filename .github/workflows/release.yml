@@ -34,19 +34,32 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          for f in plugin.json .claude-plugin/plugin.json .codex-plugin/plugin.json .agents/plugins/marketplace.json; do
+          for f in plugin.json .claude-plugin/plugin.json .codex-plugin/plugin.json plugins/agents-system-setup/.claude-plugin/plugin.json plugins/agents-system-setup/.codex-plugin/plugin.json .agents/plugins/marketplace.json .claude-plugin/marketplace.json; do
             python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$f"
           done
       - name: Parse all manifests (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          @('plugin.json','.claude-plugin/plugin.json','.codex-plugin/plugin.json','.agents/plugins/marketplace.json') |
+          @('plugin.json','.claude-plugin/plugin.json','.codex-plugin/plugin.json','plugins/agents-system-setup/.claude-plugin/plugin.json','plugins/agents-system-setup/.codex-plugin/plugin.json','.agents/plugins/marketplace.json','.claude-plugin/marketplace.json') |
             ForEach-Object { Get-Content $_ -Raw | ConvertFrom-Json | Out-Null }
+
+  markdownlint:
+    name: Markdown lint
+    needs: [validate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: DavidAnson/markdownlint-cli2-action@v23
+        with:
+          globs: |
+            **/*.md
+            !node_modules
+            !.git
 
   release:
     name: Publish GitHub Release
-    needs: [validate, smoke-matrix]
+    needs: [validate, smoke-matrix, markdownlint]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -63,14 +76,60 @@ jobs:
         run: |
           set -e
           want="${{ steps.ver.outputs.version }}"
-          for f in plugin.json .claude-plugin/plugin.json .codex-plugin/plugin.json; do
+          for f in plugin.json .claude-plugin/plugin.json .codex-plugin/plugin.json plugins/agents-system-setup/.claude-plugin/plugin.json plugins/agents-system-setup/.codex-plugin/plugin.json; do
             got=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['version'])" "$f")
             if [ "$got" != "$want" ]; then
               echo "✗ $f version is $got but tag is v$want"
               exit 1
             fi
           done
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          want = os.environ["WANT"]
+          path = ".claude-plugin/marketplace.json"
+          data = json.load(open(path, encoding="utf-8"))
+          checks = []
+          metadata_version = data.get("metadata", {}).get("version")
+          if metadata_version:
+              checks.append((f"{path}:metadata.version", metadata_version))
+          for index, plugin in enumerate(data.get("plugins", [])):
+              version = plugin.get("version") if isinstance(plugin, dict) else None
+              if version:
+                  checks.append((f"{path}:plugins[{index}].version", version))
+          for label, got in checks:
+              if str(got) != want:
+                  print(f"✗ {label} is {got} but tag is v{want}")
+                  sys.exit(1)
+          PY
           echo "✓ All manifests match tag v$want"
+        env:
+          WANT: ${{ steps.ver.outputs.version }}
+
+      - name: Verify changelog entry exists
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          import sys
+
+          ver = os.environ["VER"]
+          text = open("CHANGELOG.md", encoding="utf-8").read()
+          if not re.search(rf"^## \[{re.escape(ver)}\][^\n]*$", text, re.M):
+              print(f"CHANGELOG.md is missing a versioned section for [{ver}]. Move [Unreleased] notes before tagging.")
+              sys.exit(1)
+          unreleased = re.search(r"^## \[Unreleased\]\s*(.*?)(?=^## \[|\Z)", text, re.M | re.S)
+          if unreleased:
+              body = re.sub(r"<!--.*?-->", "", unreleased.group(1), flags=re.S)
+              body = re.sub(r"^### .*$", "", body, flags=re.M).strip()
+              if body:
+                  print("CHANGELOG.md still has non-empty [Unreleased] content. Finalize or intentionally clear it before tagging.")
+                  sys.exit(1)
+          PY
+        env:
+          VER: ${{ steps.ver.outputs.version }}
 
       - name: Extract changelog section for this version
         id: changelog

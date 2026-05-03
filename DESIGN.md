@@ -32,11 +32,17 @@ Public runtime support spans **Copilot CLI**, **Claude Code**, **OpenCode**, **O
 
 ## Phase-by-phase reasoning
 
-### Phase 0 — Platform Selection (FIRST)
+### Phase 0 — Detect Footprint & Choose Mode (FIRST)
 
-**Why first?** Every later decision (paths, frontmatter, script extension, MCP file format) depends on which runtimes are targeted. Asking later means re-doing work.
+**Why first?** The existing footprint determines whether the safest path is
+`improve`, `update`, `replicate`, or `init`. Asking for runtime targets before
+this choice can steer users toward regeneration when they meant targeted audit
+or sync.
 
-**Why a multi-select?** Many teams run two or more runtimes side-by-side; the plugin must handle that natively.
+**Why not platform-first?** Runtime targets depend on mode: `init` / `update`
+ask generation targets after the mode choice, `improve` defaults to detected
+runtimes unless scope expansion is needed, and `replicate` asks source/target
+runtimes inside the replication branch.
 
 ### Phase 1 — Detect & Choose Mode
 
@@ -67,6 +73,21 @@ Public runtime support spans **Copilot CLI**, **Claude Code**, **OpenCode**, **O
 **Why ask this explicitly?** Some users want exhaustive onboarding docs; others want the shortest useful agent memory. The default `Balanced` profile keeps routing, ownership, security/audit, architecture, and quality gates inline while moving long rationale into references.
 
 **Why not use collapsible Markdown?** Models still receive the text. Real context optimization means shorter inline text plus explicit load-on-demand references.
+
+**Why group advanced agent behavior?** Model overrides, Copilot CLI tools,
+output detail, and memory profile all affect generated agent behavior. Asking
+them together keeps the interview short and makes rate-limit/tooling tradeoffs
+visible without one prompt per subagent.
+
+### Phase 1.10 — Memory & Learning Profile
+
+**Why recommended, not blocking?** Durable learning is useful only when it
+captures real conventions or mistakes. A non-blocking Learning Check preserves
+the habit while allowing `none` for routine tasks.
+
+**Why approval for overwrites and sensitive new learnings?** Memory becomes
+future instruction. Updates that touch security, MCP, CI/release, dependencies,
+secrets, or generated scripts need the same governance as other risky writes.
 
 ### Phase 2 — Plan (Directory Architecture, Roster, Matrix, Governance)
 

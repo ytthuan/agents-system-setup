@@ -22,8 +22,13 @@ fi
 "$python_bin" -c "import yaml" 2>/dev/null || \
   "$python_bin" -m pip install --quiet --user --disable-pip-version-check pyyaml 2>/dev/null || true
 
+set +e
 "$python_bin" scripts/_validate.py
 status=$?
+set -e
+if [[ $status -ne 0 ]]; then
+  echo "[FAIL] scripts/_validate.py reported validation errors (exit $status); continuing line-ending checks."
+fi
 
 # Line-ending policy: *.sh must be LF, *.ps1 must be CRLF (per .gitattributes).
 fail=0
@@ -42,7 +47,9 @@ while IFS= read -r -d '' f; do
   fi
 done < <(find . -type f -name '*.ps1' -not -path './.git/*' -print0)
 
-if [[ $fail -ne 0 ]]; then
+if [[ $status -ne 0 ]]; then
+  exit "$status"
+elif [[ $fail -ne 0 ]]; then
   exit 1
 fi
-exit $status
+exit 0

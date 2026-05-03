@@ -48,6 +48,9 @@ if hasattr(sys.stdout, "reconfigure"):
 REPO = Path(__file__).resolve().parent.parent
 ERRORS: list[str] = []
 WARNINGS: list[str] = []
+SUPPORTED_RUNTIMES = ("copilot-cli", "claude-code", "opencode", "codex-cli", "gemini-cli")
+YAML_FALLBACK_WARNED = False
+YAML_FALLBACK_IN_USE = False
 
 
 def err(msg: str) -> None:
@@ -108,6 +111,15 @@ def check_manifests() -> None:
             versions[rel] = str(v)
         if "name" in data and not re.fullmatch(r"[a-z0-9][a-z0-9-]*", str(data["name"])):
             err(f"{rel}: name `{data['name']}` must be lowercase kebab-case")
+        if rel == "plugin.json":
+            compat = data.get("compatibility")
+            if not isinstance(compat, dict):
+                err(f"{rel}: compatibility must be a mapping")
+            else:
+                for runtime in SUPPORTED_RUNTIMES:
+                    value = compat.get(runtime)
+                    if not isinstance(value, str) or not value:
+                        err(f"{rel}: compatibility must include `{runtime}` as a version string")
 
     # marketplace
     rel = MARKETPLACE.relative_to(REPO).as_posix()
@@ -200,6 +212,27 @@ def check_schema_files() -> None:
 FRONTMATTER_RE = re.compile(r"^---\r?\n(.*?)\r?\n---\r?\n", re.DOTALL)
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 CODEX_NICKNAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9 _-]{0,31}$")
+READ_ONLY_IDENTITY_RE = re.compile(
+    r"(^|[-_])(reviewer|review|auditor|audit|security|architect|architecture|governance)($|[-_])",
+    re.IGNORECASE,
+)
+
+
+def is_codex_read_only_identity(*values: Any) -> bool:
+    """Return True for unambiguous read-only identity surfaces.
+
+    Scope this to identity surfaces (name and filename stem), not descriptions,
+    so descriptive text does not create read-only false positives. Empty Owned
+    paths are also read-only at generation time, but this validator cannot infer
+    Owned paths from TOML alone.
+    """
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        normalized = re.sub(r"[^a-z0-9]+", "-", value.casefold()).strip("-")
+        if READ_ONLY_IDENTITY_RE.search(normalized):
+            return True
+    return False
 
 
 def parse_scalar(value: str) -> Any:
@@ -210,6 +243,11 @@ def parse_scalar(value: str) -> Any:
         return raw
     if (raw.startswith("'") and raw.endswith("'")) or (raw.startswith('"') and raw.endswith('"')):
         return raw[1:-1]
+    if raw.startswith("[") and raw.endswith("]"):
+        inner = raw[1:-1].strip()
+        if not inner:
+            return []
+        return [parse_scalar(part.strip()) for part in inner.split(",")]
     lowered = raw.lower()
     if lowered == "true":
         return True
@@ -227,54 +265,133 @@ def parse_scalar(value: str) -> Any:
 
 
 def parse_simple_yaml(body: str) -> Any:
-    """Tiny fallback for the top-level YAML shapes used by runtime frontmatter."""
-    lines = [line.rstrip("\r") for line in body.splitlines()]
-    significant = [line for line in lines if line.strip() and not line.lstrip().startswith("#")]
-    if not significant:
-        return {}
-    if significant[0].lstrip().startswith("- "):
-        items: list[dict[str, Any]] = []
-        current: dict[str, Any] | None = None
-        for line in significant:
-            stripped = line.strip()
-            if stripped.startswith("- "):
-                current = {}
-                items.append(current)
-                stripped = stripped[2:].strip()
-                if not stripped:
-                    continue
-            if current is not None and ":" in stripped:
-                key, _, value = stripped.partition(":")
-                current[key.strip()] = parse_scalar(value)
-        return items
+    """Tiny fallback for the YAML shapes used by runtime frontmatter.
 
-    out: dict[str, Any] = {}
-    current_list_key: str | None = None
-    for line in significant:
-        stripped = line.strip()
-        if current_list_key and stripped.startswith("- "):
-            out.setdefault(current_list_key, []).append(parse_scalar(stripped[2:]))
+    It is not a full YAML parser. It covers the repository's simple mappings,
+    nested permission blocks, scalar lists, and remote-agent lists well enough to
+    avoid false positives when PyYAML is unavailable.
+    """
+    rows: list[tuple[int, str]] = []
+    for line in body.splitlines():
+        raw = line.rstrip("\r")
+        if not raw.strip() or raw.lstrip().startswith("#"):
             continue
-        current_list_key = None
-        if ":" not in stripped:
-            continue
+        indent = len(raw) - len(raw.lstrip(" "))
+        rows.append((indent, raw.strip()))
+    if not rows:
+        return {}
+
+    def parse_key(raw_key: str) -> str:
+        key = raw_key.strip()
+        if (key.startswith("'") and key.endswith("'")) or (key.startswith('"') and key.endswith('"')):
+            return key[1:-1]
+        return key
+
+    def split_key_value(stripped: str) -> tuple[str, str]:
         key, _, value = stripped.partition(":")
-        key = key.strip()
-        value = value.strip()
-        if not value:
-            out[key] = []
-            current_list_key = key
-        else:
-            out[key] = parse_scalar(value)
-    return out
+        return parse_key(key), value.strip()
+
+    def parse_block(index: int, indent: int) -> tuple[Any, int]:
+        if index < len(rows) and rows[index][1].startswith("- "):
+            return parse_list(index, indent)
+        return parse_mapping(index, indent)
+
+    def parse_list(index: int, indent: int) -> tuple[list[Any], int]:
+        result: list[Any] = []
+        while index < len(rows):
+            line_indent, stripped = rows[index]
+            if line_indent < indent or not stripped.startswith("- "):
+                break
+            if line_indent > indent:
+                index += 1
+                continue
+            tail = stripped[2:].strip()
+            if not tail:
+                next_index = index + 1
+                if next_index < len(rows) and rows[next_index][0] > line_indent:
+                    child, index = parse_block(next_index, rows[next_index][0])
+                    result.append(child)
+                else:
+                    result.append(None)
+                    index += 1
+                continue
+            if ":" in tail and not tail.startswith(('"', "'")):
+                key, value = split_key_value(tail)
+                item: dict[str, Any] = {}
+                if value:
+                    item[key] = parse_scalar(value)
+                    index += 1
+                else:
+                    next_index = index + 1
+                    if next_index < len(rows) and rows[next_index][0] > line_indent:
+                        child, index = parse_block(next_index, rows[next_index][0])
+                        item[key] = child
+                    else:
+                        item[key] = None
+                        index += 1
+                if index < len(rows) and rows[index][0] > line_indent:
+                    extra, index = parse_mapping(index, rows[index][0])
+                    if isinstance(extra, dict):
+                        item.update(extra)
+                result.append(item)
+            else:
+                result.append(parse_scalar(tail))
+                index += 1
+        return result, index
+
+    def parse_mapping(index: int, indent: int) -> tuple[dict[str, Any], int]:
+        out: dict[str, Any] = {}
+        while index < len(rows):
+            line_indent, stripped = rows[index]
+            if line_indent < indent or stripped.startswith("- "):
+                break
+            if line_indent > indent:
+                index += 1
+                continue
+            if ":" not in stripped:
+                index += 1
+                continue
+            key, value = split_key_value(stripped)
+            if value in {"|", ">"}:
+                block_lines: list[str] = []
+                index += 1
+                while index < len(rows) and rows[index][0] > line_indent:
+                    block_lines.append(rows[index][1])
+                    index += 1
+                out[key] = "\n".join(block_lines) if value == "|" else " ".join(block_lines)
+                continue
+            if value:
+                out[key] = parse_scalar(value)
+                index += 1
+                continue
+
+            next_index = index + 1
+            if next_index < len(rows) and rows[next_index][0] > line_indent:
+                child, index = parse_block(next_index, rows[next_index][0])
+                out[key] = child
+            elif next_index < len(rows) and rows[next_index][1].startswith("- "):
+                child, index = parse_list(next_index, rows[next_index][0])
+                out[key] = child
+            else:
+                out[key] = None
+                index += 1
+        return out, index
+
+    parsed, _ = parse_block(0, rows[0][0])
+    return parsed
 
 
 def parse_yaml_document(body: str) -> Any:
+    global YAML_FALLBACK_IN_USE, YAML_FALLBACK_WARNED
     try:
         import yaml  # type: ignore
 
         return yaml.safe_load(body) or {}
     except ImportError:
+        YAML_FALLBACK_IN_USE = True
+        if not YAML_FALLBACK_WARNED:
+            warn("PyYAML not installed; using limited fallback parser — results may be unreliable")
+            YAML_FALLBACK_WARNED = True
         return parse_simple_yaml(body)
 
 
@@ -370,14 +487,17 @@ LINK_RE = re.compile(r"\[[^\]]+\]\((\.[^)#?]+)(?:#[^)]*)?\)")
 
 
 def check_internal_links() -> None:
-    for path in REPO.rglob("*.md"):
-        if ".git" in path.parts:
+    candidates = set(REPO.rglob("*.md")) | set(REPO.rglob("*.template")) | set(REPO.rglob("*.snippet.md"))
+    for path in sorted(candidates):
+        if ".git" in path.parts or "node_modules" in path.parts:
             continue
         try:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
         for m in LINK_RE.finditer(text):
+            if "{{" in m.group(1) or "}}" in m.group(1):
+                continue
             target = (path.parent / m.group(1)).resolve()
             if not target.exists():
                 err(f"{path.relative_to(REPO)}: broken link → {m.group(1)}")
@@ -438,6 +558,8 @@ def check_codex_toml_agents() -> None:
             sandbox = data.get("sandbox_mode")
             if sandbox and sandbox not in ("read-only", "workspace-write"):
                 warn(f"{rel}: sandbox_mode `{sandbox}` is not one of the documented values (read-only|workspace-write)")
+            if is_codex_read_only_identity(data.get("name"), toml_path.stem) and sandbox != "read-only":
+                err(f"{rel}: read-only reviewer/auditor/security/architect/governance Codex agents must set sandbox_mode = \"read-only\"")
             for key in ("job_max_runtime_seconds",):
                 value = data.get(key)
                 if value is not None and (not isinstance(value, int) or isinstance(value, bool) or value <= 0):
@@ -632,6 +754,8 @@ def check_opencode_markdown_agents() -> None:
         except UnicodeDecodeError:
             err(f"{rel}: not valid UTF-8")
             continue
+        split = split_frontmatter(text)
+        frontmatter_body = split[0] if split else ""
         fm = parse_frontmatter(text)
         if fm is None:
             err(f"{rel}: missing or unparseable OpenCode YAML frontmatter")
@@ -643,6 +767,26 @@ def check_opencode_markdown_agents() -> None:
         mode = fm.get("mode")
         if mode is not None and mode not in valid_modes:
             err(f"{rel}: OpenCode `mode` must be one of primary|subagent|all")
+        if mode == "primary":
+            permission = fm.get("permission")
+            task_permission = permission.get("task") if isinstance(permission, dict) else None
+            fallback_permission_task_text = (
+                YAML_FALLBACK_IN_USE
+                and re.search(r"(?m)^\s*permission\s*:", frontmatter_body)
+                and re.search(r"(?m)^\s*task\s*:", frontmatter_body)
+            )
+            if not isinstance(permission, dict):
+                if fallback_permission_task_text:
+                    warn(f"{rel}: PyYAML fallback could not verify nested OpenCode `permission.task`; install PyYAML for strict validation")
+                else:
+                    err(f"{rel}: OpenCode primary agents must gate subagent invocation with `permission.task`")
+            elif not isinstance(task_permission, dict):
+                if fallback_permission_task_text:
+                    warn(f"{rel}: PyYAML fallback could not verify nested OpenCode `permission.task`; install PyYAML for strict validation")
+                else:
+                    err(f"{rel}: OpenCode primary agents must set `permission.task` as a mapping with `\"*\": deny` or `\"*\": ask`")
+            elif task_permission.get("*") not in {"deny", "ask"}:
+                err(f"{rel}: OpenCode primary `permission.task` must include `\"*\": deny` or `\"*\": ask`; permissive wildcard allow is not allowed")
         for key in ("mcp-servers", "mcpServers"):
             if key in fm:
                 err(f"{rel}: OpenCode agents must not set `{key}`; configure MCP in opencode.json `mcp`")
@@ -770,6 +914,21 @@ def require_not_contains(path: Path, needles: tuple[str, ...]) -> None:
             err(f"{rel}: forbidden stale runtime marker `{needle}`")
 
 
+def require_matches(path: Path, patterns: tuple[str, ...]) -> None:
+    rel = path.relative_to(REPO).as_posix()
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        err(f"{rel}: required governance file is missing")
+        return
+    except UnicodeDecodeError:
+        err(f"{rel}: not valid UTF-8")
+        return
+    for pattern in patterns:
+        if not re.search(pattern, text, re.MULTILINE):
+            err(f"{rel}: missing required governance pattern `{pattern}`")
+
+
 def check_governance_baseline() -> None:
     """The skill must keep security, audit, architecture, and design-pattern
     governance as first-class generated outputs, not optional wrap-up notes.
@@ -846,6 +1005,329 @@ def check_governance_baseline() -> None:
     )
 
 
+SECRET_SHAPE_RE = re.compile(
+    r"("
+    r"gh[psour]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|"
+    r"AIza[A-Za-z0-9_-]{35}|glpat-[A-Za-z0-9_-]{20,}|"
+    r"(?:sk|rk)_live_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{20,}|"
+    r"xox[abprs]-[A-Za-z0-9-]{20,}|AKIA[0-9A-Z]{16}|"
+    r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}|"
+    r"AccountKey=[A-Za-z0-9+/=]{20,}|SharedAccessSignature=[^\s'\"<>]{20,}|"
+    r"-----BEGIN [A-Z ]*PRIVATE KEY-----"
+    r")"
+)
+ENV_PLACEHOLDER_RE = re.compile(
+    r"\$\{[A-Za-z_][A-Za-z0-9_]*\}|\{env:[A-Za-z_][A-Za-z0-9_]*\}"
+)
+OPTIONAL_PLACEHOLDER_RE = re.compile(r"\{\{OPTIONAL_[A-Z0-9_]+\}\}")
+MCP_FRONTMATTER_KEYS = {"mcp-servers", "mcp_servers", "mcpServers"}
+CODEX_MCP_TABLE_RE = re.compile(
+    r"(?m)^\s*(?:\[\s*mcp_servers(?:\.[^\]\s#]+)?\s*\]|\[\[\s*mcp_servers(?:\.[^\]\s#]+)?\s*\]\])\s*(?:#.*)?$"
+)
+
+
+def _env_placeholder_spans(line: str) -> list[tuple[int, int]]:
+    return [match.span() for match in ENV_PLACEHOLDER_RE.finditer(line)]
+
+
+def _span_inside_any(start: int, end: int, spans: list[tuple[int, int]]) -> bool:
+    return any(span_start <= start and end <= span_end for span_start, span_end in spans)
+
+
+def _is_runtime_agent_path(path: Path) -> bool:
+    rel = path.relative_to(REPO).as_posix()
+    agent_dirs = (
+        ".github/agents/",
+        ".claude/agents/",
+        ".opencode/agents/",
+        ".codex/agents/",
+        ".gemini/agents/",
+    )
+    return any(part in rel for part in agent_dirs)
+
+
+def _has_structural_mcp_config(path: Path, text: str) -> bool:
+    """Detect actual MCP config surfaces, not prose mentioning key names."""
+    if path.suffix == ".toml":
+        return bool(CODEX_MCP_TABLE_RE.search(text))
+    if path.suffix != ".md":
+        return False
+    split = split_frontmatter(text)
+    if split is None:
+        return False
+    try:
+        document = parse_yaml_document(split[0])
+    except Exception:
+        return False
+    if not isinstance(document, dict):
+        return False
+    for key in MCP_FRONTMATTER_KEYS:
+        value = document.get(key)
+        if value not in (None, "", [], {}):
+            return True
+    return False
+
+
+def _is_mcp_or_memory_surface(path: Path) -> bool:
+    rel = path.relative_to(REPO).as_posix()
+    if ".git" in path.parts or "node_modules" in path.parts or not path.is_file():
+        return False
+    lower_name = path.name.lower()
+    if rel in {"AGENTS.md", "GEMINI.md"}:
+        return True
+    if path.name in {".mcp.json", "opencode.json"}:
+        return True
+    if path.suffix == ".json" and (
+        lower_name.startswith("mcp") or lower_name.startswith(".mcp") or lower_name.endswith("mcp.json")
+    ):
+        return True
+    if path.name == "config.toml" and ".codex" in path.parts:
+        return True
+    if path.name in {"settings.json", "settings.local.json"} and ".claude" in path.parts:
+        return True
+    if path.name == "settings.json" and ".gemini" in path.parts:
+        return True
+    if _is_runtime_agent_path(path) and path.suffix in {".md", ".toml"}:
+        return True
+    if path.suffix in {".template", ".md"} and str(SKILL_ROOT / "assets") in str(path):
+        return "mcp" in path.read_text(encoding="utf-8", errors="ignore").lower()
+    return ("learning" in lower_name or "learnings" in lower_name) and path.suffix in {".md", ".jsonl"}
+
+
+def check_mcp_approval_gate() -> None:
+    """Keep MCP writes explicit, approval-gated, and auditable."""
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "MCP config approval gate",
+            "Phase 3.5 — MCP Config Approval Gate (mandatory",
+            "No MCP write may occur before this gate returns approval",
+            "Replication re-triggers this gate per new target",
+            "agents-system-setup:mcp-approved",
+            "x-agents-system-setup",
+            "<config>.agents-system-setup.approval.json",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "replication.md",
+        (
+            "MCP APPROVAL GATE",
+            "Replication must re-trigger the MCP approval gate",
+            "approvals",
+            "artifact_tracking",
+            "overwrites",
+            "x-agents-system-setup",
+            "<config>.agents-system-setup.approval.json",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "platforms.md",
+        (
+            "agents-system-setup:mcp-approved",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "orchestrator.agent.md.template",
+        (
+            ".mcp.json",
+            "Route security-sensitive work",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "orchestrator.claude.md.template",
+        (
+            ".mcp.json",
+            "Route security-sensitive work",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "orchestrator.opencode.md.template",
+        (
+            "opencode.json",
+            "Route security-sensitive work",
+            "{{OPTIONAL_PERMISSION_TASK_BLOCK}}",
+        ),
+    )
+    for rel in (
+        "subagent.agent.md.template",
+        "subagent.claude.md.template",
+        "subagent.opencode.md.template",
+        "subagent.gemini.md.template",
+    ):
+        require_contains(
+            SKILL_ROOT / "assets" / rel,
+            (
+                "{{OPTIONAL_MCP_APPROVAL_MARKER}}",
+            ),
+        )
+    require_contains(
+        SKILL_ROOT / "assets" / "subagent.codex.toml.template",
+        (
+            "{{OPTIONAL_MCP_APPROVAL_COMMENT}}",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "agent-format.md",
+        (
+            "Optional placeholder substitution table",
+            "{{OPTIONAL_MCP_APPROVAL_MARKER}}",
+            "{{OPTIONAL_MCP_APPROVAL_COMMENT}}",
+            "{{OPTIONAL_PERMISSION_TASK_BLOCK}}",
+            "Never emit `permission.task` with `\"*\": allow`",
+        ),
+    )
+
+    for path in REPO.rglob("*"):
+        if not path.is_file() or ".git" in path.parts or "node_modules" in path.parts:
+            continue
+        if not _is_runtime_agent_path(path) or path.suffix not in {".md", ".toml"}:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        has_mcp = _has_structural_mcp_config(path, text)
+        if has_mcp and "agents-system-setup:mcp-approved" not in text:
+            err(f"{path.relative_to(REPO).as_posix()}: MCP block present without approval marker — re-run Phase 3.5")
+
+
+def _central_mcp_server_names(path: Path) -> set[str]:
+    if path.name not in {".mcp.json", "opencode.json"}:
+        return set()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+        return set()
+    if not isinstance(data, dict):
+        return set()
+    if path.name == ".mcp.json":
+        block = data.get("mcpServers") or data.get("mcp")
+    else:
+        block = data.get("mcp")
+    if not isinstance(block, dict):
+        return set()
+    return {str(name) for name, value in block.items() if not str(name).startswith("x-") and value is not None}
+
+
+def _metadata_covers_mcp_servers(metadata: Any, server_names: set[str]) -> bool:
+    if not isinstance(metadata, dict):
+        return False
+    approval = metadata.get("mcp_approval")
+    if not isinstance(approval, dict):
+        approval = metadata
+    servers = approval.get("servers") or approval.get("server_names") or approval.get("approved_servers")
+    if isinstance(servers, dict):
+        covered = {str(name) for name in servers}
+    elif isinstance(servers, list):
+        covered = {str(name) for name in servers}
+    elif servers == "all":
+        covered = set(server_names)
+    else:
+        covered = set()
+    if not server_names.issubset(covered):
+        return False
+    has_decision = bool(approval.get("decision") or approval.get("approval_state"))
+    has_actor = bool(approval.get("approved_by") or approval.get("approval_ref") or approval.get("owner"))
+    has_evidence = bool(approval.get("evidence") or approval.get("verification_evidence"))
+    return has_decision and has_actor and has_evidence
+
+
+def _central_mcp_approval_sidecars(path: Path) -> tuple[Path, ...]:
+    rel_token = path.relative_to(REPO).as_posix().replace("/", "__")
+    return (
+        path.with_name(f"{path.name}.agents-system-setup.approval.json"),
+        REPO / ".agents-system-setup" / "mcp-approvals" / f"{rel_token}.json",
+    )
+
+
+def _central_mcp_config_has_approval_evidence(path: Path, server_names: set[str]) -> bool:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+        return False
+    if isinstance(data, dict) and _metadata_covers_mcp_servers(data.get("x-agents-system-setup"), server_names):
+        return True
+    for sidecar in _central_mcp_approval_sidecars(path):
+        try:
+            sidecar_data = json.loads(sidecar.read_text(encoding="utf-8"))
+        except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError, OSError):
+            continue
+        if _metadata_covers_mcp_servers(sidecar_data.get("x-agents-system-setup", sidecar_data), server_names):
+            return True
+    return False
+
+
+def check_central_mcp_approval_evidence() -> None:
+    """Central MCP configs with server names need durable approval metadata."""
+    for path in REPO.rglob("*"):
+        if not path.is_file() or ".git" in path.parts or "node_modules" in path.parts:
+            continue
+        if path.name not in {".mcp.json", "opencode.json"}:
+            continue
+        server_names = _central_mcp_server_names(path)
+        if not server_names:
+            continue
+        if not _central_mcp_config_has_approval_evidence(path, server_names):
+            rel = path.relative_to(REPO).as_posix()
+            names = ", ".join(sorted(server_names))
+            err(f"{rel}: central MCP config has servers ({names}) without `x-agents-system-setup` approval metadata or approval sidecar")
+
+
+def check_optional_placeholder_leaks() -> None:
+    """Generated runtime agent directories must not contain template placeholders."""
+    for path in REPO.rglob("*"):
+        if not path.is_file() or ".git" in path.parts or "node_modules" in path.parts:
+            continue
+        if not _is_runtime_agent_path(path) or path.suffix not in {".md", ".toml"}:
+            continue
+        rel = path.relative_to(REPO).as_posix()
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        match = OPTIONAL_PLACEHOLDER_RE.search(text)
+        if match:
+            err(f"{rel}: unresolved optional placeholder `{match.group(0)}` in generated runtime agent directory")
+
+
+def check_optional_placeholder_table() -> None:
+    """agent-format.md must document every optional placeholder used by assets."""
+    placeholders: set[str] = set()
+    for path in (SKILL_ROOT / "assets").rglob("*"):
+        if not path.is_file():
+            continue
+        try:
+            placeholders.update(OPTIONAL_PLACEHOLDER_RE.findall(path.read_text(encoding="utf-8")))
+        except (UnicodeDecodeError, OSError):
+            continue
+    try:
+        table_text = (SKILL_ROOT / "references" / "agent-format.md").read_text(encoding="utf-8")
+    except (FileNotFoundError, UnicodeDecodeError):
+        err("references/agent-format.md: missing optional placeholder substitution table")
+        return
+    for placeholder in sorted(placeholders):
+        if placeholder not in table_text:
+            err(f"references/agent-format.md: optional placeholder table missing `{placeholder}`")
+
+
+def check_mcp_secret_shape() -> None:
+    """MCP config and learning memory must use env placeholders, not inline tokens."""
+    for path in REPO.rglob("*"):
+        if not _is_mcp_or_memory_surface(path):
+            continue
+        rel = path.relative_to(REPO).as_posix()
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        for line_no, line in enumerate(text.splitlines(), start=1):
+            placeholder_spans = _env_placeholder_spans(line)
+            for match in SECRET_SHAPE_RE.finditer(line):
+                if _span_inside_any(match.start(), match.end(), placeholder_spans):
+                    continue
+                err(f"{rel}:{line_no}: secret-shaped value in MCP or learning surface; use an environment variable placeholder")
+
+
 # ---------- 13: context optimization ----------
 
 def check_context_optimization() -> None:
@@ -883,6 +1365,7 @@ def check_context_optimization() -> None:
             "Recommended Packet Form",
             "Acceptance Checklist",
             "Reporting Template",
+            "Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>",
             "Clarification Protocol",
         ),
     )
@@ -937,7 +1420,8 @@ def check_context_optimization() -> None:
         (
             "## Context Load Order",
             "## Delegation Packet",
-            "delegation-packet-canonical-schema",
+            "AGENTS.md",
+            "Plan Handoff Contract",
             "Context freshness: recent",
         ),
     )
@@ -945,14 +1429,16 @@ def check_context_optimization() -> None:
         SKILL_ROOT / "assets" / "orchestrator.claude.md.template",
         (
             "## Delegation Packet",
-            "delegation-packet-canonical-schema",
+            "AGENTS.md",
+            "Plan Handoff Contract",
         ),
     )
     require_contains(
         SKILL_ROOT / "assets" / "orchestrator.opencode.md.template",
         (
             "## Delegation Packet",
-            "delegation-packet-canonical-schema",
+            "AGENTS.md",
+            "Plan Handoff Contract",
         ),
     )
     require_contains(
@@ -1107,6 +1593,8 @@ def check_local_tracking_policy() -> None:
             "git check-ignore",
             "GEMINI.md",
             ".gemini/agents/",
+            "not a security boundary",
+            "always reference environment variables",
         ),
     )
     require_contains(
@@ -1159,6 +1647,8 @@ def check_plan_handoff_policy() -> None:
             "Gemini CLI",
             "developer_instructions",
             ".gemini/agents/",
+            "These twelve fields are mandatory",
+            "Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>",
         ),
     )
     require_contains(
@@ -1175,6 +1665,22 @@ def check_plan_handoff_policy() -> None:
         (
             "## Plan Handoff Contract",
             "{{HANDOFF_SOURCES}}",
+            "Canonical required fields (12)",
+            "Task",
+            "Source plan",
+            "Owned paths",
+            "Read-only paths",
+            "Relevant gates",
+            "Constraints",
+            "Dependencies / wave",
+            "Required approvals",
+            "Runtime format target",
+            "Expected output",
+            "Context freshness",
+            "Lossiness",
+            "Expansion fields",
+            "Owning agent",
+            "Evidence",
             "{{PLATFORM_FORMAT_NOTES}}",
             "{{HANDOFF_EVIDENCE}}",
         ),
@@ -1183,7 +1689,7 @@ def check_plan_handoff_policy() -> None:
         SKILL_ROOT / "assets" / "orchestrator.agent.md.template",
         (
             "Plan Handoff Contract",
-            "delegation-packet-canonical-schema",
+            "AGENTS.md",
         ),
     )
     require_contains(
@@ -1191,7 +1697,7 @@ def check_plan_handoff_policy() -> None:
         (
             "agents-system-setup:platform: claude-code",
             "Plan Handoff Contract",
-            "delegation-packet-canonical-schema",
+            "AGENTS.md",
         ),
     )
     require_contains(
@@ -1199,7 +1705,8 @@ def check_plan_handoff_policy() -> None:
         (
             "agents-system-setup:platform: opencode",
             "mode: primary",
-            "delegation-packet-canonical-schema",
+            "{{OPTIONAL_PERMISSION_TASK_BLOCK}}",
+            "AGENTS.md",
         ),
     )
     require_contains(
@@ -1373,7 +1880,6 @@ def check_runtime_update_policy() -> None:
         runtime_updates,
         (
             "Runtime Update Audit",
-            "Last verified: 2026-04-29",
             "Copilot CLI",
             ".github/agents/<name>.md",
             ".github/agents/<name>.agent.md",
@@ -1393,6 +1899,7 @@ def check_runtime_update_policy() -> None:
             "agent_card_json",
         ),
     )
+    require_matches(runtime_updates, (r"Last verified: \d{4}-\d{2}-\d{2}",))
     require_contains(
         SKILL_ROOT / "SKILL.md",
         (
@@ -1448,6 +1955,8 @@ def check_runtime_update_policy() -> None:
             "surface_lossiness",
             "Gemini CLI",
             "gemini-cli",
+            "Tool-name canonicalization",
+            "agent spawning is implicit",
             "mcp_servers",
             "agent_card_url",
             "agent_card_json",
@@ -1456,12 +1965,12 @@ def check_runtime_update_policy() -> None:
     require_contains(
         SKILL_ROOT / "references" / "marketplaces.md",
         (
-            "Last verified: 2026-04-29",
             "Gemini CLI",
             ".gemini/agents/*.md",
             "skills`, `mcpServers`, `apps`",
         ),
     )
+    require_matches(SKILL_ROOT / "references" / "marketplaces.md", (r"Last verified: \d{4}-\d{2}-\d{2}",))
     require_contains(
         SKILL_ROOT / "references" / "output-contract.md",
         (
@@ -1550,6 +2059,11 @@ def check_runtime_update_policy() -> None:
         "Copilot CLI Standard Tool Profiles",
         "check_learning_memory_policy",
         "Memory & Learning System",
+        "SUPPORTED_RUNTIMES",
+        "check_mcp_approval_gate",
+        "check_mcp_secret_shape",
+        "check_optional_placeholder_leaks",
+        "agents-system-setup:mcp-approved",
     ):
         if marker not in validator_text:
             err(f"scripts/_validate.py: missing runtime validator marker `{marker}`")
@@ -1593,6 +2107,8 @@ def check_copilot_tool_profile() -> None:
             "vscode",
             "Copilot CLI Standard Tool Profiles",
             "Apply the [Copilot CLI Standard Tool Profiles]",
+            "Read-only reviewer",
+            "tools: [read, search]",
         ),
     )
     require_contains(
@@ -1662,6 +2178,22 @@ def check_copilot_tool_profile() -> None:
     if ", agent," not in orch_text and "agent," not in orch_text and ", agent]" not in orch_text:
         err("orchestrator.agent.md.template: orchestrator needs `agent` in its tools to delegate")
 
+    for rel in (
+        "references/agent-format.md",
+        "assets/subagent.agent.md.template",
+        "references/platforms.md",
+        "references/replication.md",
+    ):
+        path = SKILL_ROOT / rel
+        require_not_contains(
+            path,
+            (
+                "[read, search, execute]",
+                "[read, execute, search]",
+                "read-only → tools: [read, search, execute]",
+            ),
+        )
+
 
 def check_learning_memory_policy() -> None:
     """Keep the generated memory and reinforcement-learning loop intact."""
@@ -1672,6 +2204,8 @@ def check_learning_memory_policy() -> None:
             "Learning Check contract",
             "overwrite requires orchestrator approval",
             "no secrets or raw credentials",
+            "Sensitive new learnings require orchestrator and security-owner approval",
+            "Learning Check is still emitted and always returns `none`",
             "Operational ledger",
             "Optional hook/script support",
             "Learning Index",
@@ -1718,6 +2252,7 @@ def check_learning_memory_policy() -> None:
                 "Reflect & Learn",
                 "Learning Check",
                 "overwrite",
+                "Sensitive new learnings require orchestrator and security-owner approval",
                 "Never store secrets or raw credentials",
             ),
         )
@@ -1850,6 +2385,11 @@ def main() -> int:
     check_claude_plugin_agent_fields()
     check_replication_ledger()
     check_governance_baseline()
+    check_mcp_approval_gate()
+    check_central_mcp_approval_evidence()
+    check_optional_placeholder_leaks()
+    check_optional_placeholder_table()
+    check_mcp_secret_shape()
     check_context_optimization()
     check_local_tracking_policy()
     check_plan_handoff_policy()

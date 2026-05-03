@@ -1,41 +1,35 @@
 # Output Contract
 
-Use this contract at the end of `init`, `update`, `improve`, and `replicate` flows. Keep the user-facing summary concise; include full detail only when useful or requested.
+Use this contract at the end of `init`, `update`, `improve`, and `replicate` flows. Keep the user-facing summary concise; include full detail only when useful or requested. For `Compact` and `Balanced`, lead with an 8-line summary, then warnings/approvals, then detail-on-request.
 
 ```text
-✅ Mode: <init|update|improve|replicate>
-✅ Platforms: <copilot-cli, claude-code, opencode, codex-cli (OpenAI Codex CLI + App artifacts), gemini-cli>
-✅ Detected footprint: <list of pre-existing artifacts, or "none">
-✅ Files created: <count>     (per platform: <breakdown>)
-✅ Files updated (with .bak): <count>
-✅ Subagents: <list>
-✅ Skills: <list>
-✅ Plugins selected: <list with [Tier · Vendor] and /plugin install (or platform-equivalent)>
-✅ Plugins skipped: <list>
-✅ MCP servers: <selected list> (approval: <approve-all | selective | skipped>)
-✅ Context profile: <balanced | compact | full>
-✅ Context split: <inline sections + overflow reference paths>
-✅ Largest memory file: <path + approximate line count>
-✅ Plan handoff: <present | n/a with rationale> (source: <VS Code plan prompt | Spec-Kit /plan | user plan | none>)
-✅ Runtime format targets: <copilot .agent.md | claude .md | opencode .md | codex .toml (CLI + App compatible artifacts) | gemini .md | n/a>
-✅ Model overrides: <none — runtime defaults | per-agent overrides set: <agent → id list>>
-✅ Copilot CLI tools profile: <standard | read-only | runner | research | inherit | minimal | custom> (per Q9c; standard renders as `tools: [vscode, execute, read, agent, edit, search, todo]` for orchestrator + edit-capable, narrows to `[read, search]` for reviewers/auditors)
-✅ Runtime drift notes: <none | Copilot .agent.md/.md docs drift + tool aliases + standard tool profile | Claude plugin/project schema split + agent teams | OpenCode permission migration + child sessions | Codex additive schema + CSV/plugin config | Gemini promoted + mcp_servers normalization>
-✅ Artifact tracking: <project-tracked | project-local | personal-global>
-✅ Local exclude: <.git/info/exclude updated | n/a>
-✅ Security & audit baseline: <present | n/a with rationale>
-✅ Threat model: <present | n/a with rationale>
-✅ Architecture decisions: <count + ADR refs, or n/a with rationale>
-✅ Quality gates: <build/test/lint/security/supply-chain/architecture evidence>
-✅ Project memory link: <symlink | copy | n/a>
-✅ Learning memory: <disabled | project-tracked | project-local | personal-global> (owner: <@orchestrator | @memory-steward | n/a>, path: <path | n/a>)
-✅ Learning check: <checked agents>/<total agents>, proposals=<n>, accepted=<n>, deferred=<n>
-✅ Learning updates: <new ids | updated ids | superseded ids | none>
-✅ Git: <initialized | left untouched | already present>
-✅ Wrap-up add-ons selected: <list with source URL, or "none">
-✅ Wrap-up add-ons skipped: <list, or "none">
-✅ Codex subagent files (if codex-cli target): <list of .codex/agents/*.toml, or "none"; generated as CLI + App compatible artifacts>
-✅ Gemini subagent files (if gemini-cli target): <list of .gemini/agents/*.md, or "none"; non-recursive local subagents>
+✅ Mode/platforms: <mode> · <selected platforms only>
+✅ Footprint: <pre-existing artifacts summary>
+✅ Files: created=<n>, updated=<n with .bak>, platform breakdown=<compact>
+✅ Agents: subagents=<n>, skills=<n>, waves=<n>
+✅ Gates: security/audit=<present|n/a>, threat model=<present|n/a>, architecture=<count|n/a>, quality gates=<summary>
+✅ Context profile: <balanced|compact|full>; Context split: <inline + overflow refs>; budget=<largest surfaces>
+✅ Plan handoff: <present|n/a>, task assignment quality=<short|full, required minimum filled, clarification count>
+✅ Learning memory: <disabled|project-tracked|project-local|personal-global>, Learning check=<checked>/<total>, updates=<ids|none>
+
+Warnings / approvals:
+- MCP servers: <selected list> (approval: <approve-all | selective | skipped>; marker: <present|n/a>)
+- Runtime format targets: <copilot .agent.md | claude .md | opencode .md | codex .toml | gemini .md | n/a>
+- Artifact tracking: <project-tracked | project-local | personal-global>; Local exclude: <.git/info/exclude updated | n/a>
+- Model overrides: <none — runtime defaults | scoped overrides set>
+- Copilot CLI tools profile: <standard | read-only | runner | research | inherit | minimal | custom>
+- Runtime drift notes: <only notes relevant to selected platforms>
+- Learning updates: <new ids | updated ids | superseded ids | deferred ids | none>
+- Git: <initialized | left untouched | already present>
+- Wrap-up add-ons: selected=<list or none>, skipped=<list or none>
+
+Details on request:
+- Full file list by platform
+- Full subagent and skill list
+- Full plugin/MCP recommendation table with [Tier · Vendor]
+- Full governance matrices and ADR refs
+- Codex subagent files: <selected-platform only list of .codex/agents/*.toml; CLI + App compatible artifacts>
+- Gemini subagent files: <selected-platform only list of .gemini/agents/*.md; non-recursive local subagents>
 
 # replicate mode adds:
 ✅ Source runtime: <copilot-cli | claude-code | opencode | codex-cli | gemini-cli>
@@ -53,12 +47,12 @@ Use this contract at the end of `init`, `update`, `improve`, and `replicate` flo
 ✅ Requires-human: <count>
 
 Try it:
-  copilot          # then: "@orchestrator <task>"
-  copilot /fleet   # optional: ask Copilot to parallelize the wave plan
-  claude           # then: invoke a subagent
-  opencode         # then: pick a primary or @mention a subagent; inspect child sessions
-  codex            # CLI: /agent to switch threads; CLI + App artifacts: AGENTS.md plus .codex/agents/*.toml
-  gemini           # then: "@<agent-name> <task>" or rely on description-based delegation
+  <render selected runtimes only; omit every unselected runtime>
+  - If `copilot` selected: `copilot` then `@orchestrator <task>`; optional `copilot /fleet` for the wave plan
+  - If `claude` selected: `claude` then invoke a subagent
+  - If `opencode` selected: `opencode` then pick a primary or `@mention` a subagent; inspect child sessions
+  - If `codex-cli` selected: `codex`; CLI can use `/agent`; CLI + App artifacts are `AGENTS.md` plus `.codex/agents/*.toml`
+  - If `gemini-cli` selected: `gemini` then `@<agent-name> <task>` or rely on description-based delegation
 
 Suggested next customizations:
   - <suggestion 1>

@@ -122,17 +122,17 @@ enabled: true
 
 ### Tool-name canonicalization
 
-| IR canonical | Copilot CLI | Claude Code | OpenCode | Gemini CLI |
-|---|---|---|---|---|
-| `read` | `read` (compatible: `view`, `Read`) | `Read` | `read` | `read_file` |
-| `write` | `edit` (compatible: `Write`) | `Write` | `write` | runtime-discovered write tool; warn if unknown |
-| `edit` | `edit` | `Edit` | `edit` | runtime-discovered edit tool; warn if unknown |
-| `bash` | `execute` (compatible: `shell`, `Bash`, `powershell`) | `Bash` | `bash` | `run_shell_command` |
-| `grep` | `search` (compatible: `Grep`) | `Grep` | `grep` | `grep_search` |
-| `glob` | `search` (compatible: `Glob`) | `Glob` | `glob` | runtime-discovered glob/search tool; warn if unknown |
-| `webfetch` | `web` | `WebFetch` | `webfetch` | runtime-discovered web tool or MCP tool; warn if unknown |
-| `task` | `agent` (compatible: `custom-agent`, `Task`) | `Agent` | `task` | n/a inside subagents; root can use `@<agent>` / subagent tools |
-| `vscode_host` (chat-host integration) | `vscode` (Copilot CLI ignores unknown tools harmlessly per docs; safe baseline) | n/a — drop with warning ❌ | n/a — drop with warning ❌ | n/a — drop with warning ❌ |
+| IR canonical | Copilot CLI | Claude Code | OpenCode | OpenAI Codex (CLI + App) | Gemini CLI |
+|---|---|---|---|---|---|
+| `read` | `read` (compatible: `view`, `Read`) | `Read` | `read` | n/a — sandbox governs access; drop with warning | `read_file` |
+| `write` | `edit` (compatible: `Write`) | `Write` | `write` | `sandbox_mode = "workspace-write"` when approved; otherwise drop with warning | runtime-discovered write tool; warn if unknown |
+| `edit` | `edit` | `Edit` | `edit` | `sandbox_mode = "workspace-write"` when approved; otherwise drop with warning | runtime-discovered edit tool; warn if unknown |
+| `bash` | `execute` (compatible: `shell`, `Bash`, `powershell`) | `Bash` | `bash` | n/a — drop with warning | `run_shell_command` |
+| `grep` | `search` (compatible: `Grep`) | `Grep` | `grep` | n/a — sandbox governs access; drop with warning | `grep_search` |
+| `glob` | `search` (compatible: `Glob`) | `Glob` | `glob` | n/a — sandbox governs access; drop with warning | runtime-discovered glob/search tool; warn if unknown |
+| `webfetch` | `web` | `WebFetch` | `webfetch` | n/a — drop with warning unless represented by approved MCP | runtime-discovered web tool or MCP tool; warn if unknown |
+| `task` | `agent` (compatible: `custom-agent`, `Task`) | `Agent` | `task` | agent spawning is implicit; `sandbox_mode` and instructions constrain the spawned session | n/a inside subagents; root can use `@<agent>` / subagent tools |
+| `vscode_host` (chat-host integration) | `vscode` (Copilot CLI ignores unknown tools harmlessly per docs; safe baseline) | n/a — drop with warning ❌ | n/a — drop with warning ❌ | n/a — drop with warning ❌ | n/a — drop with warning ❌ |
 
 The IR uses the lowercase canonical names. Renderers translate **at emit time only** — never round-trip through another platform's name set.
 
@@ -169,7 +169,12 @@ Triggered when the user picks **mode: `replicate`** in Phase 1, or when Phase 1 
                         Also flag surface lossiness, such as source CLI-only usage
                         instructions that must not become required Codex App behavior.
 6. MCP APPROVAL GATE  → re-run Phase 3.5 against any MCPServerIR that will be
-                        emitted into a target the user hasn't approved before.
+                         emitted into a target the user hasn't approved before.
+                        Central MCP configs (`.mcp.json`, `opencode.json`) must
+                        carry approval evidence for the emitted server names in
+                        top-level `x-agents-system-setup` metadata when
+                        schema-safe, or in a sibling
+                        `<config>.agents-system-setup.approval.json` sidecar.
 7. EMIT per target    → write per-platform paths + frontmatter/TOML (platforms.md)
                         with `<!-- agents-system-setup:replicated-from: <source> -->`
                         marker just under the frontmatter.
@@ -182,12 +187,38 @@ Triggered when the user picks **mode: `replicate`** in Phase 1, or when Phase 1 
                         treat the file as a malformed agent.
                         Each line:
                         `{"ts":"<ISO8601>","source":"<runtime>","targets":["..."],
-                         "files":[{"path":"...","sha256":"..."}]}`
+                         "files":[{"path":"...","sha256":"..."}],
+                         "approvals":{"mcp":{"decision":"approve_all|selective|skip",
+                         "servers":["..."]},"artifact_tracking":"project-tracked|project-local|personal-global",
+                         "overwrites":[{"path":"...","approved_by":"orchestrator"}]}}`
 9. VERIFY round-trip  → re-parse the emitted files back to IR; assert structural
                         equality on (name, description, tools-canonical, mcp_refs,
                         governance metadata that the target can represent).
                         Surface any drift.
 ```
+
+### Central MCP config approval evidence
+
+When replication writes a central MCP config with server names, the config needs
+machine-readable approval evidence:
+
+```json
+{
+  "x-agents-system-setup": {
+    "mcp_approval": {
+      "decision": "approve_all",
+      "servers": ["github"],
+      "approved_by": "orchestrator",
+      "evidence": "Phase 3.5 approval transcript or plan reference"
+    }
+  }
+}
+```
+
+If the runtime rejects extension keys, write a sibling sidecar named
+`<config>.agents-system-setup.approval.json` with the same `mcp_approval`
+object. Replication ledgers may reference this evidence, but the central config
+or sidecar remains the validator-facing proof.
 
 ## 4. Improve Mode (audit + targeted upgrade)
 
@@ -206,7 +237,7 @@ Different from `update` (which re-runs the generator) and `replicate` (which cop
 4. PROPOSE deltas as a checklist. For each item show: file, issue, suggested
    fix, blast radius, source reference, and evidence required. ask_user
    multi-select which to apply.
-5. APPLY only the approved deltas, with .bak backups (Phase 5 mechanics).
+5. APPLY only the approved deltas, with .bak backups (Phase 5 mechanics). Any delta that adds or changes MCP config must re-run Phase 3.5 before writing.
 6. SUMMARY: applied / skipped / requires-human counts.
 ```
 

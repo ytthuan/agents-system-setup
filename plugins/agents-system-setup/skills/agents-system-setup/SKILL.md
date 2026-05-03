@@ -45,18 +45,28 @@ Scaffold or update a complete agent system for the current project across **Copi
 
 ## Procedure
 
-### Phase 0 — Platform Selection
+### Phase 0 — Detect Footprint & Choose Mode
 
-First question after detecting cwd. Use `ask_user`:
+Inspect cwd before the first question. Detect the project and agent footprint
+from Phase 1, then show a compact profile card: detected project type, existing
+agent artifacts by runtime, recommended mode, and inferred current runtime(s).
+Ask mode before any runtime/platform expansion:
 
-> "Which agent runtime(s) should I configure?"
-> Choices: `["Copilot CLI only (Recommended for GitHub-centric teams)", "Claude Code only", "OpenCode only", "OpenAI Codex only (CLI + App artifacts)", "Gemini CLI only", "Copilot CLI + Claude Code", "All supported runtimes (Copilot + Claude Code + OpenCode + Codex + Gemini)"]`
+> "I detected `<footprint>`. How should I proceed?"
+> Choices: `["Improve current setup (Recommended when artifacts exist)", "Init new setup", "Replicate / sync to another runtime", "Update managed blocks", "Cancel"]`
 
-Persist the selection. All later phases loop over selected platforms using [platforms.md](./references/platforms.md) as the source of truth for paths and frontmatter.
+Persist the selected mode. Do **not** ask target runtimes before this mode
+choice. After mode is known:
+
+- `init` / `update`: ask which runtime(s) to generate unless the user's request already names them.
+- `improve`: default scope to detected runtime(s); ask a target runtime only if updating one runtime or expanding audit scope requires it.
+- `replicate` / `sync`: defer source and target runtime questions to Phase 1.5, and ask targets only for the requested expansion/sync.
+
+All later phases loop over the selected or detected runtime scope using [platforms.md](./references/platforms.md) as the source of truth for paths and frontmatter.
 
 Gemini CLI emits local subagents at `.gemini/agents/*.md`. See [platforms](./references/platforms.md) and [agent format](./references/agent-format.md) for its non-recursive subagent and `mcp_servers:` rules.
 
-### Phase 1 — Detect & Choose Mode
+### Phase 1 — Footprint Details & Interview Continuation
 
 1. **Inspect cwd** and detect runtime footprint:
    - Project files: `package.json`, `*.csproj`, `Package.swift`, `build.gradle`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `mkdocs.yml`, `.git/`.
@@ -66,7 +76,10 @@ Gemini CLI emits local subagents at `.gemini/agents/*.md`. See [platforms](./ref
      - OpenCode: `opencode.json`, `.opencode/agents/`, `.opencode/skills/`
      - OpenAI Codex: `AGENTS.md` (orchestrator + project rules), `.codex/agents/*.toml` (specialized subagents), `.codex/config.toml`, `~/.codex/AGENTS.md`, `~/.codex/agents/`; CLI-only plugin/command UX stays documented separately
      - Gemini CLI: `GEMINI.md`, `.gemini/agents/*.md`, `.gemini/settings.json`, `~/.gemini/GEMINI.md`, `~/.gemini/agents/`
-2. **Decide mode** with `ask_user` — show what was detected:
+2. **Confirm the Phase 0 mode** — do not re-ask target runtimes before the mode
+   choice. Use this table only to pick the recommended mode/default choices shown
+   in the Phase 0 profile card, or to re-prompt if the initial detection was
+   ambiguous:
 
    | Detected footprint | Default offer | Choices |
    |---|---|---|
@@ -75,7 +88,7 @@ Gemini CLI emits local subagents at `.gemini/agents/*.md`. See [platforms](./ref
    | One runtime, gaps | `update` | `["Update (Recommended)", "Improve (audit + targeted fixes)", "Replicate to another runtime"]` |
    | Two+ runtimes | `improve` | `["Improve current setup (Recommended)", "Replicate / sync between runtimes", "Update one runtime"]` |
 
-3. Run the interview — see [interview script](./references/interview.md). One question per `ask_user` call. Skip questions already answered by detection (project type, framework). For `improve`/`replicate`, jump straight to Phase 1.5.
+3. Continue the interview — see [interview script](./references/interview.md). One question per `ask_user` call. Skip questions already answered by detection (project type, framework). After the Phase 0 mode choice, offer to use detected/safe defaults for non-gated setup questions. Never skip artifact tracking, MCP approval, plan approval, or security-sensitive write gates. For `init`/`update`, ask target runtimes only after mode if needed. For `improve`/`replicate`, jump straight to Phase 1.5; runtime expansion questions happen there only if required.
 
 ### Phase 1.5 — Improve / Replicate branch
 
@@ -135,7 +148,10 @@ Record the choice in the plan so Phase 4 orchestrator output can reference the `
 
 Run after domain detection and before Phase 2. Use [security-audit-architecture](./references/security-audit-architecture.md) as the source of truth.
 
-Ask only questions not already answered by detection:
+Ask only questions not already answered by detection. Data sensitivity, auth
+boundary, and external tools/MCP usage are mandatory. Infer audit evidence,
+architecture style, critical qualities, and anti-pattern defaults into the plan
+for low-risk projects unless the user asks to configure them explicitly.
 
 1. Data sensitivity.
 2. Auth boundary.
@@ -148,11 +164,29 @@ Ask only questions not already answered by detection:
 
 Record the answers in the plan. If the user is unsure, choose safe defaults: least privilege, no silent MCP writes, no secrets in code, architecture decisions documented in `AGENTS.md`, and dedicated security/architecture ownership when the project handles sensitive data or external tools.
 
-### Phase 1.9 — Output Profile & Context Budget
+### Phase 1.9 — Output Profile & Context Budget + Advanced Agent Behavior
 
-Run after Phase 1.8 and before Phase 2. Use [context optimization](./references/context-optimization.md).
+Run after Phase 1.8 and before Phase 2. Run the grouped
+[interview Q9b Advanced agent behavior](./references/interview.md#9b-advanced-agent-behavior)
+block explicitly; do not leave model or tool choices as prose-only plan notes.
+Group agent-behavior choices together so the user compares tradeoffs once:
+optional model overrides, Copilot CLI tool profile when Copilot is selected,
+output profile, and Memory & Learning profile. This phase owns those prompts:
+ask each advanced behavior choice exactly once and do not re-ask output profile
+or memory profile in Phase 1.10. Use [context optimization](./references/context-optimization.md).
 
-Ask once:
+Ask and record the Q9b choices before Phase 2:
+
+1. **Per-agent model override policy** — keep runtime defaults unless the user opts in. Ask for override policy by scope (`all agents | by role | exceptions only`) and avoid looping over every agent by default.
+2. **Copilot CLI Tool Profile** — only when Copilot CLI is selected; persist `copilot_tools_profile`.
+3. **Output profile / context budget** — `Balanced | Compact | Full`.
+4. **Memory & Learning profile** — persist `learning_memory_profile`, `learning_gate_strength`, and overwrite policy.
+
+For Copilot CLI tools, keep prompt choices concise: Standard least-privilege by
+role (recommended), Read-only everywhere, Inherit parent tools, or Custom after
+generation. Render the full mapping in the plan/reference, not in the question.
+
+For the output profile choice, ask once:
 
 > "How much detail should generated agent files include?"
 > Choices: `["Balanced (Recommended)", "Compact", "Full"]`
@@ -168,12 +202,9 @@ If the user is unsure, choose `Balanced`. This keeps all routing, ownership, gov
 
 ### Phase 1.10 — Memory & Learning Profile
 
-Run after Phase 1.9 and before Phase 2. Use [learning memory](./references/learning-memory.md).
-
-Ask once:
-
-> "How should generated agents store durable learnings from past work?"
-> Choices: `["Project-tracked curated memory (Recommended for teams)", "Project-local / untracked memory (Recommended for personal setup)", "Personal/global memory outside this repo", "Disabled"]`
+Do not call `ask_user` here. Use the Memory & Learning answer already collected
+in the Phase 1.9/Q9b advanced-agent-behavior group. This phase normalizes the
+recorded choice for planning and rendering. Use [learning memory](./references/learning-memory.md).
 
 Record:
 - `learning_memory_profile`: `project-tracked | project-local | personal-global | disabled`
@@ -182,7 +213,9 @@ Record:
 - `learning_gate_strength`: `recommended` by default; do not make it blocking unless the user explicitly asks
 - `learning_update_policy`: `overwrite requires orchestrator approval`
 
-Ask optional hook/script support only when the runtime has a supported hook surface. Render the exact hook/config proposal and ask before writing it.
+Do not ask a separate blocking Learning Check question by default. Ask optional
+hook/script support only when the runtime has a supported hook surface. Render
+the exact hook/config proposal and ask before writing it.
 
 ### Phase 2 — Plan (Directory Architecture, Roster, Matrix, Waves)
 
@@ -233,12 +266,19 @@ If any user-selected candidate from Phase 3 includes an MCP server:
    - OpenAI Codex → `.mcp.json` plus any approved per-agent TOML `[mcp_servers.<id>]`
    - Gemini CLI → approved per-agent `mcp_servers:` blocks in `.gemini/agents/*.md`
 2. Render each proposed file/config block verbatim (full JSON/YAML/TOML as applicable).
-3. `ask_user`:
+3. For central MCP config files (`.mcp.json` and `opencode.json` with MCP
+   blocks), include concrete approval evidence with server names:
+   - Prefer a top-level `x-agents-system-setup` object when the runtime schema
+     safely tolerates extension keys. Include `mcp_approval.decision`,
+     `mcp_approval.servers`, `approved_by` or `approval_ref`, and `evidence`.
+   - If extension keys are not schema-safe, write a sibling sidecar named
+     `<config>.agents-system-setup.approval.json` with the same metadata.
+4. `ask_user`:
    > "I'm about to write the MCP configuration above to `<paths>`. Approve?"
    > Choices: `["Approve all (Recommended)", "Approve selectively (per-server)", "Skip MCP entirely"]`
-4. If **selective**, loop per server: `["Include", "Skip"]`.
-5. If **skip**, strip every `mcp-servers:` / `mcpServers` / `mcp_servers:` / TOML `[mcp_servers.*]` surface from generated agents and do not write `.mcp.json` / `opencode.json` `mcp` / extension MCP config.
-6. **No MCP write may occur before this gate returns approval.**
+5. If **selective**, loop per server: `["Include", "Skip"]`.
+6. If **skip**, strip every `mcp-servers:` / `mcpServers` / `mcp_servers:` / TOML `[mcp_servers.*]` surface from generated agents and do not write `.mcp.json` / `opencode.json` `mcp` / extension MCP config.
+7. **No MCP write may occur before this gate returns approval.**
 
 ### Phase 4 — Generate Artifacts (per platform, post-approval)
 
@@ -259,12 +299,19 @@ For each selected platform, look up paths and frontmatter in [platforms.md](./re
   - **Gemini CLI** → [subagent.gemini.md.template](./assets/subagent.gemini.md.template) at `.gemini/agents/<kebab-name>.md`. Required fields: `name`, `description`; emit `kind: local`; optional `display_name`, `tools`, `mcp_servers`, `model`, `temperature`, `max_turns`, `timeout_mins`. Use snake_case `mcp_servers:` only after Phase 3.5 approval. Gemini subagents cannot call other subagents, so cross-agent work returns to the orchestrator/root session.
 - Each skill → [template](./assets/skill.template.md) at the platform's skills path.
 - MCP config (only if Phase 3.5 approved) at the platform's MCP path.
+- Central MCP config files include the Phase 3.5 approval evidence either in
+  top-level `x-agents-system-setup` metadata or in
+  `<config>.agents-system-setup.approval.json`; generated configs with server
+  names and no evidence are invalid.
+- Per-agent MCP blocks include an `agents-system-setup:mcp-approved` marker from the Phase 3.5 decision; generated or improved agents with MCP blocks but no marker must be treated as unapproved until Phase 3.5 runs again.
+- Resolve optional placeholders (`{{OPTIONAL_MCP_APPROVAL_MARKER}}`, `{{OPTIONAL_MCP_APPROVAL_COMMENT}}`, `{{OPTIONAL_PERMISSION_TASK_BLOCK}}`) using the [optional placeholder substitution table](./references/agent-format.md#optional-placeholder-substitution-table) before writing runtime agent directories. Generated runtime agents must contain no literal `{{OPTIONAL_...}}`; templates may keep placeholders.
 - Drop the [directory-architecture snippet](./assets/directory-architecture.snippet.md) into any agent missing the boundary block.
 - **Orchestrator parallelism clause** — render the wave-aware fan-out instructions per [parallelism](./references/parallelism.md). The orchestrator must invoke all parallel-safe subagents of a wave in a single response (multiple Task-tool calls), await all results, then start the next wave.
 - **Plan handoff contract** — render the HandoffIR fields and platform format targets per [handoff](./references/handoff.md). Agent files receive a concise handoff input/output section; Codex subagents receive it inside `developer_instructions`.
 - **Governance baseline** — render the security, audit, architecture, design-pattern, ADR, and quality-gate sections from Phase 1.8 / Phase 2. Subagents that touch sensitive paths, MCP/tool config, CI/release config, dependency manifests, or architecture boundaries must include explicit security boundaries and audit evidence expectations.
 - **Context optimization** — apply [context optimization](./references/context-optimization.md): compact inline summaries, links for overflow details, concise delegation packets, no duplicated long policy prose across subagents, and **profile-aware compact-mode trimming** for Compact subagents (Security/Architecture/Output sections collapse to one line + link; section anchors stay so validators can find them). Codex TOML always follows the [summary + pointer rule](./references/agent-format.md#codex-toml-summary--pointer-rule). Set `Context freshness: recent` in delegation packets when `AGENTS.md` was loaded this turn.
-- **Memory & Learning System** — render the chosen profile from [learning memory](./references/learning-memory.md): `AGENTS.md` gets the Memory & Learning System section, orchestrators get Reflect & Learn, subagents get Learning Check, and optional `assets/learnings.md.template` is emitted only when the memory profile needs a curated Markdown file. Do not write hooks/scripts unless separately approved.
+- **Memory & Learning System** — render the chosen profile from [learning memory](./references/learning-memory.md): `AGENTS.md` gets the Memory & Learning System section, orchestrators get Reflect & Learn, subagents get Learning Check, and optional `assets/learnings.md.template` is emitted only when the memory profile needs a curated Markdown file. Sensitive new learnings require orchestrator and security-owner approval when tagged `risk` or when they mention MCP, CI/release, dependencies, secrets, or generated scripts. Do not write hooks/scripts unless separately approved.
+- **OpenCode primary task gate** — when emitting an OpenCode orchestrator, render `permission.task` so it can call only generated roster subagents by default (`"*": deny`, explicit roster entries allow). Broaden only when the plan says why.
 - **Artifact tracking** — apply [local tracking](./references/local-tracking.md). In `project-local` mode, update `.git/info/exclude` after writes and verify at least `AGENTS.md` with `git check-ignore -v`.
 - **Spec-Kit block** — if Phase 1.7 recorded `spec_kit_installed = true`, render `assets/spec-kit-block.snippet.md` into the `{{SPEC_KIT_BLOCK}}` placeholder of `AGENTS.md` (substituting `{{RUNTIME}}` per platform: `copilot|claude|codex|opencode|gemini`). If `false`, replace the placeholder with an empty string. See [spec-kit](./references/spec-kit.md).
 - **Claude Code AGENT-TEAMS.md** — when Claude Code is among the selected platforms AND the Agent Roster has 3+ subagents marked `team-suitable` (independent + benefits from peer challenge), emit `AGENT-TEAMS.md` documenting: opt-in env var (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), settings.json snippet, suggested teammate roster, token-cost warning, and when to fall back to parallel subagents.
@@ -277,7 +324,7 @@ For each selected platform, look up paths and frontmatter in [platforms.md](./re
 - Gemini CLI uses `GEMINI.md` as its native context file; when Gemini is selected, keep `GEMINI.md` a compact pointer/sync copy of canonical `AGENTS.md` (same OS-specific symlink/copy caution as Claude).
 
 **Frontmatter rules** (silent-failure traps):
-- `name` MUST match filename basename (kebab-case).
+- Formats with a `name` field (Copilot CLI, Claude Code, Gemini CLI, Codex TOML) MUST match filename basename (kebab-case); OpenCode Markdown agents MUST omit `name:` because the filename is the agent name.
 - Quote any `description` containing colons.
 - Subagent `description` MUST start with `"Use when..."`.
 - Use the **right frontmatter schema per platform** (see [platforms.md](./references/platforms.md) — Copilot uses `mcp-servers:` and public tool aliases (`vscode`, `execute`, `read`, `edit`, `search`, `agent`, `web`, `todo`), Claude uses comma-string `tools:`, OpenCode uses `mode:` plus `permission:`, Codex subagents use `.toml`, and Gemini uses `kind: local` plus `mcp_servers:`).
@@ -300,7 +347,7 @@ Only if user confirmed in Phase 1 AND no `.git/` exists. Pick the script that ma
 ### Phase 7 — Verify & Summarize
 
 1. List every file created/modified with absolute paths, grouped by platform.
-2. Re-read each generated agent/skill: confirm `name` matches filename (Copilot, Claude Code, Gemini CLI), no `name:` key in OpenCode files (filename is the name), `description` present and starts with `"Use when..."`, no unquoted colons, frontmatter parses for the *target platform's* schema. Confirm Claude Code `tools:` is a comma-separated string — not a YAML list. Confirm OpenCode files have no `mcp-servers:` key. Confirm Gemini files use `mcp_servers:` (not `mcpServers`) and do not instruct subagents to call subagents. Confirm no `agent: Plan` frontmatter was copied into any generated file.
+2. Re-read each generated agent/skill: confirm `name` matches filename for formats with a name field (Copilot, Claude Code, Gemini CLI, Codex TOML), no `name:` key in OpenCode files (filename is the name), `description` present and starts with `"Use when..."`, no unquoted colons, frontmatter parses for the *target platform's* schema. Confirm Claude Code `tools:` is a comma-separated string — not a YAML list. Confirm OpenCode files have no `mcp-servers:` key. Confirm Gemini files use `mcp_servers:` (not `mcpServers`) and do not instruct subagents to call subagents. Confirm no `agent: Plan` frontmatter was copied into any generated file.
 3. Verify `AGENTS.md` contains non-empty **Directory Architecture**, **Agent Roster**, **Capability Matrix**.
 4. Verify `AGENTS.md` contains non-empty **Security & Audit Matrix**, **Threat Model**, **Architecture / Design Pattern Decisions**, **ADR Index**, and **Quality Gates**. If a concern is not applicable, it must still have an explicit `n/a` rationale.
 5. Verify security-sensitive files (`.mcp.json`, `opencode.json`, `.env*`, CI/release config, lockfiles, generated scripts) have an owner and evidence requirement in the governance sections.

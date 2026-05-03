@@ -10,11 +10,14 @@ All notable changes to this plugin are documented here. Format: [Keep a Changelo
 - New `references/learning-memory.md` and `assets/learnings.md.template` define storage profiles, a compact learning record schema, privacy/security rules, optional hook support, and the rule that overwrite requires orchestrator approval.
 - Orchestrator templates gain **Reflect & Learn**; subagent templates and Codex TOML gain **Learning Check** reporting.
 - Output contract now reports learning memory profile, proposal counts, and accepted/deferred learning updates.
+- Critic-driven hardening adds validator guardrails for MCP approval gates, MCP secret-shaped values, generated-template links, Copilot read-only tool profiles, supported runtimes, and release changelog/markdownlint gates.
 
 ### Changed
 
 - Context loading now treats memory as indexed context: agents load relevant learnings instead of the full operational ledger.
 - Replication guidance preserves the Memory & Learning System across target runtimes.
+- The interview flow now detects first, offers safe defaults for non-gated questions, groups advanced agent behavior choices, avoids per-agent model prompt loops by default, and keeps final summaries filtered to the selected platforms.
+- Generated templates now point subagents to `AGENTS.md` for runtime-available handoff/memory guidance instead of dev-repo-only relative reference links.
 
 ## [0.9.0] - 2026-05-02
 

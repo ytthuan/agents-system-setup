@@ -29,19 +29,20 @@ $status = $LASTEXITCODE
 
 # Line-ending checks
 $fail = 0
-foreach ($f in Get-ChildItem -Recurse -File -Filter '*.sh' -Exclude '.git') {
+foreach ($f in Get-ChildItem -Recurse -File -Filter '*.sh' | Where-Object { $_.FullName -notmatch '[\\/]\.git[\\/]' }) {
     $bytes = [IO.File]::ReadAllBytes($f.FullName)
     if ($bytes -contains 0x0D) {
         Write-Host "[FAIL] $($f.FullName) contains CRLF (must be LF)"
         $fail = 1
     }
 }
-foreach ($f in Get-ChildItem -Recurse -File -Filter '*.ps1' -Exclude '.git') {
+foreach ($f in Get-ChildItem -Recurse -File -Filter '*.ps1' | Where-Object { $_.FullName -notmatch '[\\/]\.git[\\/]' }) {
     $bytes = [IO.File]::ReadAllBytes($f.FullName)
     if (-not ($bytes -contains 0x0D)) {
         Write-Host "[WARN] $($f.FullName) is LF (will be CRLF on Windows checkout via .gitattributes)"
     }
 }
 
+if ($status -ne 0) { exit $status }
 if ($fail -ne 0) { exit 1 }
-exit $status
+exit 0

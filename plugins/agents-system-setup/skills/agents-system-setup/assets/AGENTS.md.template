@@ -53,7 +53,7 @@ This repo uses an **orchestrator + subagent** model. The orchestrator (`@orchest
 - **Curated memory path:** {{LEARNING_MEMORY_PATH}}
 - **Operational ledger:** {{LEARNING_LEDGER_PATH}}  <!-- append-only JSONL/DB when enabled; never Markdown inside runtime agents/ dirs -->
 - **Update policy:** overwrite requires orchestrator approval; supersede old lessons instead of silently deleting them.
-- **Safety:** no secrets or raw credentials in learnings; summarize and link evidence instead of storing raw logs.
+- **Safety:** no secrets or raw credentials in learnings; summarize and link evidence instead of storing raw logs. Sensitive new learnings require orchestrator and security-owner approval when tagged `risk` or when they mention MCP, CI/release, dependencies, secrets, or generated scripts.
 - **Load rule:** read the Learning Index first, then only entries matching the task category, path, runtime, or tool.
 - **Learning Check:** before final response, report `Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>`.
 
@@ -61,7 +61,7 @@ See `{{LEARNING_MEMORY_REFERENCE}}` for the full memory schema, storage profiles
 
 ### Task-Type Routing Map
 
-Use this table to decide which references each agent loads beyond `AGENTS.md` Read First. The orchestrator picks the task tag and surfaces it in the Task Assignment so subagents can short-circuit. See [`references/handoff.md`](plugins/agents-system-setup/skills/agents-system-setup/references/handoff.md#recommended-packet-form) for the per-tag Recommended Packet Form (short-form vs full-form).
+Use this table to decide which references each agent loads beyond `AGENTS.md` Read First. The orchestrator picks the task tag and surfaces it in the Task Assignment so subagents can short-circuit. Use the [Plan Handoff Contract](#plan-handoff-contract) below for the per-tag Recommended Packet Form (short-form vs full-form).
 
 | Task tag | Always load | Load when applicable | Safe to skip | Recommended packet form |
 |---|---|---|---|---|
@@ -114,7 +114,8 @@ Legend: ✅ primary owner · 🟡 assists · *(blank)* not involved.
 ## Plan Handoff Contract
 
 - **Accepted planning sources:** {{HANDOFF_SOURCES}}.
-- **Canonical fields:** task, source plan, owning agent, owned paths, read-only paths, relevant gates, dependencies/wave, required approvals, runtime format target, expected output, evidence.
+- **Canonical required fields (12):** Task; Source plan; Owned paths; Read-only paths; Relevant gates; Constraints; Dependencies / wave; Required approvals; Runtime format target; Expected output; Context freshness; Lossiness.
+- **Expansion fields:** Owning agent, Evidence, and task-specific expansion blocks are included only when useful; they are not part of the required minimum.
 - **Format rule:** generated artifacts must use the selected runtime's native schema; never copy prompt frontmatter or another runtime's frontmatter into this project.
 - **Platform format targets:** {{PLATFORM_FORMAT_NOTES}}
 - **Handoff evidence:** {{HANDOFF_EVIDENCE}}

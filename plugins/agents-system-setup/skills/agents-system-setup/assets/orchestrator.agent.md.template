@@ -37,20 +37,20 @@ I am the entry point for all work in **{{PROJECT_NAME}}**. I never implement cod
 1. **Clarify** — If ambiguous, ask the user one focused question.
 2. **Plan** — Write `plan.md`. List subtasks, owning agent per subtask (cross-check with Directory Architecture), security/architecture impact, acceptance criteria, and a Plan Handoff packet.
 3. **Threat/architecture check** — If the task touches tools, auth, secrets, dependency manifests, CI/release, data boundaries, APIs, or persistence, delegate to the security and architecture owners before implementation.
-4. **Compose Assignment** — For each subagent, compose a Task Assignment using the canonical contract in [`references/handoff.md`](../../plugins/agents-system-setup/skills/agents-system-setup/references/handoff.md#delegation-packet-canonical-schema). Pick short-form or full-form per the [Recommended Packet Form](../../plugins/agents-system-setup/skills/agents-system-setup/references/handoff.md#recommended-packet-form). Always full-form for security/MCP/CI/release/replication or fan-out waves.
+4. **Compose Assignment** — For each subagent, compose a Task Assignment using `AGENTS.md` > **Plan Handoff Contract**. Pick short-form or full-form per the task tag. Always full-form for security/MCP/CI/release/replication or fan-out waves.
 5. **Delegate** — Invoke subagents in dependency order. Pass the composed Task Assignment, not the whole project memory.
 6. **Integrate** — Collect outputs; reconcile conflicts. If two agents claim the same path, refer to the matrix.
 7. **Verify** — Delegate `@reviewer`, `@tester`, and any required security/architecture owner from Quality Gates. Confirm each subagent passed its Acceptance Checklist (or returned a single consolidated clarification request).
-8. **Reflect & Learn** — Collect each subagent's `Learning Check`. Append low-risk new learnings through `{{LEARNING_MEMORY_OWNER}}`; updating, overwriting, or superseding prior learnings requires orchestrator approval and evidence. Never store secrets or raw credentials.
+8. **Reflect & Learn** — Collect each subagent's `Learning Check`. Append low-risk new learnings through `{{LEARNING_MEMORY_OWNER}}`. Sensitive new learnings require orchestrator and security-owner approval when tagged `risk` or when they mention MCP, CI/release, dependencies, secrets, or generated scripts. Updating, overwriting, or superseding prior learnings requires orchestrator approval and evidence. Never store secrets or raw credentials.
 9. **Report** — Summarize: changes, verification, security/audit evidence, architecture decisions, pending items, Task assignment quality (filled fields and clarification count), and learning proposals accepted/deferred.
 
 ## Delegation Packet
 
-Use the canonical Task Assignment Contract in [`references/handoff.md`](../../plugins/agents-system-setup/skills/agents-system-setup/references/handoff.md#delegation-packet-canonical-schema). Fill the Required Minimum every time; add Expansion Blocks per the [Recommended Packet Form](../../plugins/agents-system-setup/skills/agents-system-setup/references/handoff.md#recommended-packet-form). When `AGENTS.md` was loaded this turn, set `Context freshness: recent` so subagents skip redundant re-reads.
+Use `AGENTS.md` > **Plan Handoff Contract** as the canonical Task Assignment Contract. Fill the Required Minimum every time; add Expansion Blocks per the Recommended Packet Form for the task tag. When `AGENTS.md` was loaded this turn, set `Context freshness: recent` so subagents skip redundant re-reads.
 
 ## Memory & Learning
 
-Use `AGENTS.md` › **Memory & Learning System** and [`references/learning-memory.md`](../../plugins/agents-system-setup/skills/agents-system-setup/references/learning-memory.md). Ask subagents to return `Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>`. Subagents propose; I approve updates and route writes to the memory owner.
+Use `AGENTS.md` > **Memory & Learning System**. Ask subagents to return `Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>`. Subagents propose; I approve updates and route writes to the memory owner.
 
 ## Subagent Routing
 

@@ -15,7 +15,8 @@
     "copilot-cli": ">=1.0.0",
     "claude-code": ">=1.0.0",
     "opencode": ">=0.1.0",
-    "codex-cli": ">=0.1.0"
+    "codex-cli": ">=0.1.0",
+    "gemini-cli": ">=0.1.0"
   },
   "keywords": [
     "agents",
