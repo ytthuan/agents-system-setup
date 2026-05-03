@@ -292,7 +292,7 @@ placeholder in generated runtime agent directories.
 | `{{OPTIONAL_PERMISSION_BLOCK}}` | OpenCode subagent `permission:` block with least-privilege `deny`/`ask` defaults and any approved scoped `allow` rules. | Empty string to inherit default permissions only when the plan permits it. |
 | `{{OPTIONAL_DISALLOWED_TOOLS_BLOCK}}` | Claude `disallowedTools: <comma-separated tool list>`. | Empty string. |
 | `{{OPTIONAL_PERMISSION_MODE_LINE}}` | Claude `permissionMode: <mode>` when explicitly selected. | Empty string. |
-| `{{OPTIONAL_EFFORT_LINE}}` | Claude `effort: <low|medium|high|xhigh|max>` when explicitly selected. | Empty string. |
+| `{{OPTIONAL_EFFORT_LINE}}` | Claude `effort: <effort>` when explicitly selected (`low`, `medium`, `high`, `xhigh`, or `max`). | Empty string. |
 | `{{OPTIONAL_ISOLATION_LINE}}` | Claude `isolation: worktree` when the plan requests isolated worktrees. | Empty string. |
 | `{{OPTIONAL_SKILLS_BLOCK}}` | Claude `skills: [...]` block when skills are explicitly attached to that subagent. | Empty string. |
 
@@ -300,7 +300,7 @@ placeholder in generated runtime agent directories.
 
 `{{OPTIONAL_MCP_APPROVAL_MARKER}}` is Markdown-safe and belongs in the agent
 body, not frontmatter. `{{OPTIONAL_MCP_APPROVAL_COMMENT}}` is Codex TOML-safe:
-the template prefixes it with `# `, so the renderer substitutes the comment body
+the template prefixes it with `#`, so the renderer substitutes the comment body
 without a leading `#`.
 
 For Codex TOML, place the resulting approval comment as a **top-level TOML

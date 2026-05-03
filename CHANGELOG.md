@@ -6,18 +6,32 @@ All notable changes to this plugin are documented here. Format: [Keep a Changelo
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [1.0.0] - 2026-05-03
+
+### Added
+
 - **Memory & Learning System.** Generated agent setups can include a project-specific learning loop: agents load a Learning Index, run a before-finish `Learning Check`, and propose durable learnings for conventions, mistakes, tool insights, workflows, preferences, and risks.
 - New `references/learning-memory.md` and `assets/learnings.md.template` define storage profiles, a compact learning record schema, privacy/security rules, optional hook support, and the rule that overwrite requires orchestrator approval.
 - Orchestrator templates gain **Reflect & Learn**; subagent templates and Codex TOML gain **Learning Check** reporting.
 - Output contract now reports learning memory profile, proposal counts, and accepted/deferred learning updates.
-- Critic-driven hardening adds validator guardrails for MCP approval gates, MCP secret-shaped values, generated-template links, Copilot read-only tool profiles, supported runtimes, and release changelog/markdownlint gates.
+- Critic-driven hardening adds validator guardrails for MCP approval gates, MCP secret-shaped values, generated-template links, Copilot read-only tool profiles, supported runtimes, optional placeholder leaks, central MCP approval evidence, OpenCode task gates, and release changelog/markdownlint gates.
 
 ### Changed
 
 - Context loading now treats memory as indexed context: agents load relevant learnings instead of the full operational ledger.
 - Replication guidance preserves the Memory & Learning System across target runtimes.
-- The interview flow now detects first, offers safe defaults for non-gated questions, groups advanced agent behavior choices, avoids per-agent model prompt loops by default, and keeps final summaries filtered to the selected platforms.
+- The interview flow now detects first, chooses mode before runtime expansion, offers safe defaults for non-gated questions, groups advanced agent behavior choices, avoids per-agent model prompt loops by default, and keeps final summaries filtered to the selected platforms.
 - Generated templates now point subagents to `AGENTS.md` for runtime-available handoff/memory guidance instead of dev-repo-only relative reference links.
+- OpenCode primary agents now default to explicit `permission.task` gating, and Codex guidance keeps CLI + App shared artifacts separate from CLI-only usage notes.
+
+### Fixed
+
+- Release workflow checks now include markdownlint, changelog finalization, nested manifest version checks, and broader manifest JSON smoke parsing before publishing.
+- Validator hardening now detects structural MCP blocks instead of prose collisions, expands secret-surface scanning, preserves no-PyYAML fallback behavior, and keeps the canonical handoff contract field list synchronized.
 
 ## [0.9.0] - 2026-05-02
 
