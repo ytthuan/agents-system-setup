@@ -64,12 +64,20 @@ Plan Handoff:
 - Dependencies / wave: {{HANDOFF_DEPENDENCIES}}
 - Required approvals: {{HANDOFF_APPROVALS}}
 
+Learning Check:
+- Before final response, report: Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>.
+- Propose durable project conventions, recurring mistakes, tool insights, workflows, preferences, or risks.
+- Updating, overwriting, or superseding prior learning requires orchestrator approval and evidence.
+- Never store secrets or raw credentials; summarize and point to evidence instead of pasting raw logs.
+- Do not write memory unless Owned paths explicitly include the memory path.
+
 Output Contract:
 - Outcome first.
 - Files changed: list with relative paths.
 - Evidence: only for gates touched, per Reporting Protocol.
 - Risks/escalations: only when present.
 - Handoff status: accepted | completed | blocked | returned-to-orchestrator.
+- Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>.
 """
 
 # Optional per-agent MCP server allowlist (also reads repo-root .mcp.json).

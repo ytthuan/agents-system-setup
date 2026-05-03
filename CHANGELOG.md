@@ -2,6 +2,20 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [Unreleased]
+
+### Added
+
+- **Memory & Learning System.** Generated agent setups can include a project-specific learning loop: agents load a Learning Index, run a before-finish `Learning Check`, and propose durable learnings for conventions, mistakes, tool insights, workflows, preferences, and risks.
+- New `references/learning-memory.md` and `assets/learnings.md.template` define storage profiles, a compact learning record schema, privacy/security rules, optional hook support, and the rule that overwrite requires orchestrator approval.
+- Orchestrator templates gain **Reflect & Learn**; subagent templates and Codex TOML gain **Learning Check** reporting.
+- Output contract now reports learning memory profile, proposal counts, and accepted/deferred learning updates.
+
+### Changed
+
+- Context loading now treats memory as indexed context: agents load relevant learnings instead of the full operational ledger.
+- Replication guidance preserves the Memory & Learning System across target runtimes.
+
 ## [0.9.0] - 2026-05-02
 
 ### Added

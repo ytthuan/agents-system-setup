@@ -117,6 +117,8 @@ enabled: true
 > Replication preserves explicit `model:` overrides only. When the source agent left `model:` blank, emit `model: inherit` (or omit it where the target runtime treats absence as inherit). Never invent ids — see [models](./models.md) for accepted formats per target.
 >
 > **Task Assignment preservation:** replication preserves the full Task Assignment Contract structure ([handoff.md](./handoff.md#delegation-packet-canonical-schema)). Required-minimum fields are 1:1 across runtimes; expansion blocks (Goal & Definition of Done, Scope, File Inventory, Verification Protocol, Reporting Protocol, etc.) must be carried into the target agent body. Codex TOML keeps the structure inside `developer_instructions`; never silently drop expansion blocks during replication. Surface any drop in the lossiness report.
+>
+> **Memory & Learning preservation:** replication preserves the runtime-neutral Memory & Learning System ([learning-memory.md](./learning-memory.md)). Target runtimes may render the Learning Check in Markdown body or TOML `developer_instructions`, but they must keep the same storage profile, memory owner, no-secrets rule, and update policy: overwrite requires orchestrator approval.
 
 ### Tool-name canonicalization
 

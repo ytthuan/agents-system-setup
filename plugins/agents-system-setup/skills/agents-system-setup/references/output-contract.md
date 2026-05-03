@@ -28,6 +28,9 @@ Use this contract at the end of `init`, `update`, `improve`, and `replicate` flo
 ✅ Architecture decisions: <count + ADR refs, or n/a with rationale>
 ✅ Quality gates: <build/test/lint/security/supply-chain/architecture evidence>
 ✅ Project memory link: <symlink | copy | n/a>
+✅ Learning memory: <disabled | project-tracked | project-local | personal-global> (owner: <@orchestrator | @memory-steward | n/a>, path: <path | n/a>)
+✅ Learning check: <checked agents>/<total agents>, proposals=<n>, accepted=<n>, deferred=<n>
+✅ Learning updates: <new ids | updated ids | superseded ids | none>
 ✅ Git: <initialized | left untouched | already present>
 ✅ Wrap-up add-ons selected: <list with source URL, or "none">
 ✅ Wrap-up add-ons skipped: <list, or "none">

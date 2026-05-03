@@ -100,6 +100,15 @@ Use [security-audit-architecture](./security-audit-architecture.md). Ask only qu
 - Choices: `["Balanced (Recommended)", "Compact", "Full"]`
 - Record as `output_profile`. If the user is unsure, choose `Balanced`.
 
+### 11i. Memory & Learning profile
+- Q: "How should generated agents store durable learnings from past work?"
+- Choices: `["Project-tracked curated memory (Recommended for teams)", "Project-local / untracked memory (Recommended for personal setup)", "Personal/global memory outside this repo", "Disabled"]`
+- Record as `learning_memory_profile`.
+- Follow-up Q: "Should the Learning Check be blocking before agents finish?"
+- Choices: `["Recommended / non-blocking (Default)", "Mandatory before done", "Disabled"]`
+- Record as `learning_gate_strength`. Default: `recommended`. Always record `learning_update_policy = overwrite requires orchestrator approval`.
+- If hooks/scripts are requested, show the exact runtime-specific hook/config proposal and ask before writing.
+
 ## 12. Git
 - Only if no `.git/` present.
 - Q: "No git repo detected. Run `git init` + `.gitignore` + initial commit?"

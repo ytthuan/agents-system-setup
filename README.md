@@ -21,6 +21,7 @@ A multi-runtime plugin/skill package that **bootstraps**, **updates**, **improve
 - **Source-backed governance baseline** — OWASP GenAI, NIST SSDF, MCP Security Best Practices, GitHub Code Security, SLSA, OPA, Azure Well-Architected, C4, and TOGAF (enterprise only).
 - **Context-optimized output profiles** — `Balanced` by default, with `Compact` and `Full` options for generated files and summaries.
 - **Artifact tracking choice** — generated systems can be team-shared in git, local-only via `.git/info/exclude`, or written to personal/global runtime paths.
+- **Memory & Learning System** — generated agents can load curated learnings, run a before-finish Learning Check, and propose durable project lessons without silently overwriting past memory.
 - **Runtime update audit** — latest upstream drift is tracked in `plugins/agents-system-setup/skills/agents-system-setup/references/runtime-updates.md` for all supported runtimes and future candidates.
 - **Optional model overrides with rate-limit guidance** — model selection stays optional during the interview; per-runtime accepted formats, defaults, and source-linked rate-limit pointers live in `plugins/agents-system-setup/skills/agents-system-setup/references/models.md`.
 - **Sharper context engine** — generated `AGENTS.md` includes a Task-Type Routing Map, a context-freshness rule, and a single canonical Delegation Packet schema in `references/handoff.md` so subagents skip duplicated reads and load only what each task tag needs.

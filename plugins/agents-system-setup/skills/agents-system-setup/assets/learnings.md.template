@@ -1,0 +1,54 @@
+# {{PROJECT_NAME}} Agent Learnings
+
+> Curated agent memory for this project. This file records durable lessons that
+> help future agents avoid rediscovery. It is not an operational log.
+
+<!-- agents-system-setup:learning-memory:start -->
+
+## Learning Index
+
+| ID | Category | Applies to | Summary | Status |
+|---|---|---|---|---|
+{{LEARNING_INDEX_ROWS}}
+
+## Active Learnings
+
+### {{LEARNING_ID}}
+
+```text
+id: {{LEARNING_ID}}
+scope: project
+category: {{LEARNING_CATEGORY}}
+applies_to: {{LEARNING_APPLIES_TO}}
+summary: {{LEARNING_SUMMARY}}
+evidence: {{LEARNING_EVIDENCE}}
+source_agent: {{SOURCE_AGENT}}
+created_or_updated: {{CREATED_OR_UPDATED}}
+status: active
+supersedes: {{SUPERSEDES}}
+```
+
+## Proposed Learnings
+
+> Agents may propose learnings here only when the project chose tracked Markdown
+> memory and the orchestrator approved the write. Otherwise proposals stay in the
+> final report or operational JSONL ledger until reviewed.
+
+{{PROPOSED_LEARNINGS}}
+
+## Superseded Learnings
+
+> Do not silently delete old lessons. Move them here with `status: superseded`
+> and an evidence pointer after orchestrator approval.
+
+{{SUPERSEDED_LEARNINGS}}
+
+## Safety Rules
+
+- No secrets or raw credentials.
+- No raw operational logs; summarize and link evidence instead.
+- Updates or overwrites require orchestrator approval.
+- Operational append-only ledgers belong in `.agents-system-setup/*.jsonl`, not
+  Markdown files inside runtime `agents/` directories.
+
+<!-- agents-system-setup:learning-memory:end -->

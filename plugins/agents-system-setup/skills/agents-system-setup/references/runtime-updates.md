@@ -30,6 +30,7 @@ Current supported runtimes are **Copilot CLI**, **Claude Code**, **OpenCode**, *
 4. **Keep app/web compatibility separate from CLI-only UX.** Codex shared artifacts must be useful without CLI-only commands; plugin installation and slash commands stay in CLI usage notes.
 5. **Emit loader-valid Gemini frontmatter.** Use `mcp_servers:` for Gemini agent-local MCP config even when upstream prose shows `mcpServers`; importers may accept and normalize the docs spelling but must warn on emission.
 6. **Never bypass MCP approval gates.** Copilot `mcp-servers:`, Claude `.mcp.json`/`mcpServers`, OpenCode `opencode.json` › `mcp`, Codex `.mcp.json`/TOML `[mcp_servers.*]`, Gemini `mcp_servers:`, and extension/plugin MCP manifests all require the Phase 3.5 gate.
+7. **Generated memory is artifact policy, not runtime-native memory.** The Memory & Learning System is rendered into `AGENTS.md`, runtime agent bodies, and approved memory artifacts. Do not claim a runtime has native long-term learning unless source docs confirm it.
 
 ## Gemini CLI support notes
 

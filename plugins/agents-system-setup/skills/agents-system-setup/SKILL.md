@@ -41,6 +41,7 @@ Scaffold or update a complete agent system for the current project across **Copi
 21. **Runtime drift is source-backed and gated.** Use [runtime updates](./references/runtime-updates.md) before changing platform support. Gemini CLI is supported for local project subagents; remote A2A/extension packaging surfaces remain explicit import/package work.
 22. **Model overrides are optional and source-backed.** Keep `model:` blank by default. Only when the user opts in during interview Q9b, load [models](./references/models.md) for the runtime's accepted format, defaults, and rate-limit sources. Never pin live RPM/TPM numbers in generated files.
 23. **Task assignments use the canonical contract.** Compose every orchestrator → subagent handoff with the [Task Assignment Contract](./references/handoff.md#delegation-packet-canonical-schema). Always fill the Required Minimum; add Expansion Blocks per the [Recommended Packet Form](./references/handoff.md#recommended-packet-form). Subagents run the Acceptance Checklist before doing work and emit results via the Reporting Template; missing required fields trigger one consolidated `clarification_request:` to the orchestrator.
+24. **Learning memory is approval-safe.** When enabled, generated agents run the [Learning Check](./references/learning-memory.md#learning-check-contract) before final response. `none` is valid. Subagents propose learnings; only the orchestrator or memory owner writes memory, and overwrite requires orchestrator approval. Never store secrets or raw credentials in learnings.
 
 ## Procedure
 
@@ -165,6 +166,24 @@ Record:
 
 If the user is unsure, choose `Balanced`. This keeps all routing, ownership, governance, and quality gates inline while moving long rationale and overflow candidate lists to references.
 
+### Phase 1.10 — Memory & Learning Profile
+
+Run after Phase 1.9 and before Phase 2. Use [learning memory](./references/learning-memory.md).
+
+Ask once:
+
+> "How should generated agents store durable learnings from past work?"
+> Choices: `["Project-tracked curated memory (Recommended for teams)", "Project-local / untracked memory (Recommended for personal setup)", "Personal/global memory outside this repo", "Disabled"]`
+
+Record:
+- `learning_memory_profile`: `project-tracked | project-local | personal-global | disabled`
+- `learning_memory_owner`: `@memory-steward` when the roster includes one, otherwise `@orchestrator`
+- `learning_memory_path`: path chosen from [learning memory](./references/learning-memory.md#storage-profiles)
+- `learning_gate_strength`: `recommended` by default; do not make it blocking unless the user explicitly asks
+- `learning_update_policy`: `overwrite requires orchestrator approval`
+
+Ask optional hook/script support only when the runtime has a supported hook surface. Render the exact hook/config proposal and ask before writing it.
+
 ### Phase 2 — Plan (Directory Architecture, Roster, Matrix, Waves)
 
 Build the plan and show it before writing anything. The plan must include:
@@ -178,6 +197,7 @@ Build the plan and show it before writing anything. The plan must include:
 - Plugin/MCP candidates **per capability** (Phase 3 fills this).
 - Per-platform file plan (Copilot/Claude/OpenCode/Codex/Gemini paths the user will actually get).
 - **Artifact tracking** — `project-tracked | project-local | personal-global`, plus exclude plan for local-only mode.
+- **Memory & Learning plan** — storage profile, memory owner, curated memory path, operational ledger path (if any), Learning Check strength, overwrite approval policy, and Directory Architecture rows for memory paths.
 - Git actions (if any).
 - **Output profile & context budget** — `balanced|compact|full`, sections kept inline, overflow targets, and biggest expected agent-memory file.
 - **Security & Audit Matrix** — controls, owner agents, affected paths, evidence required, and source reference.
@@ -244,6 +264,7 @@ For each selected platform, look up paths and frontmatter in [platforms.md](./re
 - **Plan handoff contract** — render the HandoffIR fields and platform format targets per [handoff](./references/handoff.md). Agent files receive a concise handoff input/output section; Codex subagents receive it inside `developer_instructions`.
 - **Governance baseline** — render the security, audit, architecture, design-pattern, ADR, and quality-gate sections from Phase 1.8 / Phase 2. Subagents that touch sensitive paths, MCP/tool config, CI/release config, dependency manifests, or architecture boundaries must include explicit security boundaries and audit evidence expectations.
 - **Context optimization** — apply [context optimization](./references/context-optimization.md): compact inline summaries, links for overflow details, concise delegation packets, no duplicated long policy prose across subagents, and **profile-aware compact-mode trimming** for Compact subagents (Security/Architecture/Output sections collapse to one line + link; section anchors stay so validators can find them). Codex TOML always follows the [summary + pointer rule](./references/agent-format.md#codex-toml-summary--pointer-rule). Set `Context freshness: recent` in delegation packets when `AGENTS.md` was loaded this turn.
+- **Memory & Learning System** — render the chosen profile from [learning memory](./references/learning-memory.md): `AGENTS.md` gets the Memory & Learning System section, orchestrators get Reflect & Learn, subagents get Learning Check, and optional `assets/learnings.md.template` is emitted only when the memory profile needs a curated Markdown file. Do not write hooks/scripts unless separately approved.
 - **Artifact tracking** — apply [local tracking](./references/local-tracking.md). In `project-local` mode, update `.git/info/exclude` after writes and verify at least `AGENTS.md` with `git check-ignore -v`.
 - **Spec-Kit block** — if Phase 1.7 recorded `spec_kit_installed = true`, render `assets/spec-kit-block.snippet.md` into the `{{SPEC_KIT_BLOCK}}` placeholder of `AGENTS.md` (substituting `{{RUNTIME}}` per platform: `copilot|claude|codex|opencode|gemini`). If `false`, replace the placeholder with an empty string. See [spec-kit](./references/spec-kit.md).
 - **Claude Code AGENT-TEAMS.md** — when Claude Code is among the selected platforms AND the Agent Roster has 3+ subagents marked `team-suitable` (independent + benefits from peer challenge), emit `AGENT-TEAMS.md` documenting: opt-in env var (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), settings.json snippet, suggested teammate roster, token-cost warning, and when to fall back to parallel subagents.
@@ -284,10 +305,11 @@ Only if user confirmed in Phase 1 AND no `.git/` exists. Pick the script that ma
 4. Verify `AGENTS.md` contains non-empty **Security & Audit Matrix**, **Threat Model**, **Architecture / Design Pattern Decisions**, **ADR Index**, and **Quality Gates**. If a concern is not applicable, it must still have an explicit `n/a` rationale.
 5. Verify security-sensitive files (`.mcp.json`, `opencode.json`, `.env*`, CI/release config, lockfiles, generated scripts) have an owner and evidence requirement in the governance sections.
 6. Verify `AGENTS.md` contains **Plan Handoff Contract**, **Context Loading Policy** (including the **Task-Type Routing Map** rows), and records the selected output profile.
-7. Verify every generated agent/subagent uses its target runtime's native handoff surface: Markdown body for Copilot/Claude/OpenCode/Gemini, TOML `developer_instructions` for Codex. Confirm each subagent template includes the **Acceptance Checklist** and **Reporting Template** sections; Codex TOML mirrors them inside `developer_instructions`. For Copilot CLI agents, confirm the `tools:` line matches the role's profile from [Copilot CLI Standard Tool Profiles](./references/platforms.md#copilot-cli-standard-tool-profiles): orchestrator + edit-capable subagents emit `[vscode, execute, read, agent, edit, search, todo]`; reviewers/auditors emit `[read, search]`; the marker `<!-- agents-system-setup:tools-profile: <profile> -->` records the chosen profile.
-8. Verify artifact tracking: project-tracked files are visible to git; project-local files are ignored via `.git/info/exclude`; personal-global mode wrote no repo artifacts unless approved.
-9. Print "Try it" examples per selected platform (`copilot`, `claude`, `opencode`, `codex`, `gemini`).
-10. Suggest 2–3 next customizations.
+7. Verify `AGENTS.md` contains **Memory & Learning System**, the chosen memory profile, and the rule that overwrite requires orchestrator approval. Confirm every orchestrator includes **Reflect & Learn** and every subagent/Codex TOML includes **Learning Check** with the no-secrets rule.
+8. Verify every generated agent/subagent uses its target runtime's native handoff surface: Markdown body for Copilot/Claude/OpenCode/Gemini, TOML `developer_instructions` for Codex. Confirm each subagent template includes the **Acceptance Checklist** and **Reporting Template** sections; Codex TOML mirrors them inside `developer_instructions`. For Copilot CLI agents, confirm the `tools:` line matches the role's profile from [Copilot CLI Standard Tool Profiles](./references/platforms.md#copilot-cli-standard-tool-profiles): orchestrator + edit-capable subagents emit `[vscode, execute, read, agent, edit, search, todo]`; reviewers/auditors emit `[read, search]`; the marker `<!-- agents-system-setup:tools-profile: <profile> -->` records the chosen profile.
+9. Verify artifact tracking: project-tracked files are visible to git; project-local files are ignored via `.git/info/exclude`; personal-global mode wrote no repo artifacts unless approved.
+10. Print "Try it" examples per selected platform (`copilot`, `claude`, `opencode`, `codex`, `gemini`).
+11. Suggest 2–3 next customizations.
 
 ### Phase 8 — Final Wrap-Up (single consolidated ask)
 

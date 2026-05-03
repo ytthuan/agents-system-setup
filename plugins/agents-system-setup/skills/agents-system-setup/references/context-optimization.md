@@ -20,6 +20,7 @@ If the user is unsure, choose `Balanced`.
 |---|---|---|
 | `AGENTS.md` | Canonical routing and policy index | One-screen "Read First"; compact matrices; link overflow details. |
 | Runtime agent files | Role-specific execution instructions | Include role, owned/read-only paths, triggers, security boundary, output contract. Avoid repeating full project policy. |
+| Memory & learning files | Durable lessons and Learning Index | Load the index first; load detailed entries only when category/path/runtime matches the task. |
 | Reference files | Deep detail | Load only when task needs that domain or when the user asks for full detail. |
 | Plans / summaries | Temporary task state | Lead with outcome, keep evidence concise, link or name files for detail. |
 
@@ -51,6 +52,7 @@ Keep inline:
 - Quality gates.
 - Runtime "try it" commands.
 - Plan Handoff Contract summary.
+- Memory & Learning System summary, including Learning Check and memory owner.
 
 Move or link when large:
 - Full marketplace candidate research.
@@ -112,6 +114,7 @@ Map common task tags to the references each agent should load (or skip), and to 
 | `release` | Quality Gates, manifests, version sync rules | `runtime-updates.md` for upstream drift | Long architecture rationale | full-form |
 | `docs-only` | `AGENTS.md` Read First | Quality Gates only if doc CI exists | Security/MCP gates unless docs touch credentials | short-form |
 | `bug-fix` | `AGENTS.md` Read First, Directory Architecture, owning agent boundary | Quality Gates row, repro logs, related ADRs | Long marketplace research | full-form (Reproduction block required) |
+| `learning-check` | `AGENTS.md` Memory & Learning System, Learning Index | `learning-memory.md` for update/supersede policy | Full operational ledger, unrelated learnings | short-form |
 
 The map is guidance, not a hard schema. Agents may load more references when the task warrants it; they must not skip load rows that include a hard gate, and they must not downgrade the recommended form for security/MCP/release tasks.
 
@@ -125,6 +128,7 @@ Output profile (Phase 1.9) controls subagent body verbosity. The frontmatter and
 | Security & Audit Boundaries | One line + link to the matching `AGENTS.md` row | Current expanded list | Expanded list plus evidence template |
 | Architecture & Design Expectations | One line + link to the matching ADR row | Current expanded list | Expanded list plus rejected alternatives |
 | Outputs | One sentence | Current bullet list | Bullet list plus example output |
+| Memory & Learning System | Profile + owner + link | Current compact section | Section plus schema example |
 
 Renderers must keep section headings (so validators and humans can find them) and keep the link target valid. Codex TOML `developer_instructions` follows the "summary + pointer" rule from [agent-format](./agent-format.md#codex-toml-summary--pointer-rule) regardless of profile because TOML cannot link inline.
 
@@ -135,3 +139,4 @@ Renderers must keep section headings (so validators and humans can find them) an
 - Repeating the same policy paragraph in every subagent.
 - Generating full marketplace research inline when only one candidate was selected.
 - Hiding lossy replication drops to save space.
+- Loading the full learning ledger for every task instead of the Learning Index and matching entries.

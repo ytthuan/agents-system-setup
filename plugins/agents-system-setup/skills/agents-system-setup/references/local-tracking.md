@@ -6,9 +6,9 @@ Always ask how generated agent artifacts should be stored before writing project
 
 | Mode | Use when | Write location | Git behavior |
 |---|---|---|---|
-| `project-tracked` | Team should share the agent system | Standard project paths (`AGENTS.md`, `GEMINI.md`, `.github/agents/**`, `.claude/**`, `.opencode/**`, `.codex/**`, `.gemini/**`) | Files are normal repo files; do not commit unless user approves git actions. |
-| `project-local` | User wants project-specific agents for this checkout only | Standard project paths in the working tree | Add generated paths to `.git/info/exclude`; never modify `.gitignore` just to hide local-only artifacts. |
-| `personal-global` | User wants reusable personal agents outside this repo | Runtime user paths (`~/.copilot`, `~/.claude`, `~/.config/opencode`, `~/.codex`) | Nothing written to repo unless explicitly approved. |
+| `project-tracked` | Team should share the agent system | Standard project paths (`AGENTS.md`, `GEMINI.md`, `docs/agents/learnings.md`, `.github/agents/**`, `.claude/**`, `.opencode/**`, `.codex/**`, `.gemini/**`) | Files are normal repo files; do not commit unless user approves git actions. |
+| `project-local` | User wants project-specific agents and memory for this checkout only | Standard project paths plus `.agents-system-setup/memory/` when learning is enabled | Add generated paths to `.git/info/exclude`; never modify `.gitignore` just to hide local-only artifacts. |
+| `personal-global` | User wants reusable personal agents and memory outside this repo | Runtime user paths (`~/.copilot`, `~/.claude`, `~/.config/opencode`, `~/.codex`, `~/.gemini`) or `~/.agents-system-setup/` | Nothing written to repo unless explicitly approved. |
 
 ## Required question
 
@@ -37,6 +37,10 @@ CLAUDE.md
 GEMINI.md
 AGENT-TEAMS.md
 .agents-system-setup/
+.agents-system-setup/memory/
+.agents-system-setup/learnings.jsonl
+.copilot-memory/
+docs/agents/learnings.md
 .github/agents/
 .github/skills/
 .claude/agents/
@@ -60,3 +64,4 @@ Only include paths the skill actually created or modified. If a file already exi
 - Adding local-only artifacts to `.gitignore` in a team repo without approval.
 - Excluding all of `.github/` and accidentally hiding workflows or issue templates.
 - Treating personal/global installs as project documentation.
+- Hiding tracked curated memory after a team chose `project-tracked`.

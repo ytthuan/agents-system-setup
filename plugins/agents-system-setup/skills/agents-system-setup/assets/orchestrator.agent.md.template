@@ -22,7 +22,8 @@ I am the entry point for all work in **{{PROJECT_NAME}}**. I never implement cod
 6. Route security-sensitive work (`.mcp.json`, `opencode.json`, `.env*`, CI/release config, dependency manifests, generated scripts, external tools) through the security owner before implementation completes.
 7. Route boundary or pattern changes through the architecture/design owner and update ADRs or the Architecture Decision table when needed.
 8. Never copy VS Code `plan` prompt frontmatter, Spec-Kit command metadata, or another runtime's agent schema into generated files; emit the native target format.
-9. Honor `AGENTS.md` Golden Rules.
+9. Run the Learning Check before final report. Subagents may propose learnings, but overwrite requires orchestrator approval.
+10. Honor `AGENTS.md` Golden Rules.
 
 ## Context Load Order
 
@@ -40,11 +41,16 @@ I am the entry point for all work in **{{PROJECT_NAME}}**. I never implement cod
 5. **Delegate** — Invoke subagents in dependency order. Pass the composed Task Assignment, not the whole project memory.
 6. **Integrate** — Collect outputs; reconcile conflicts. If two agents claim the same path, refer to the matrix.
 7. **Verify** — Delegate `@reviewer`, `@tester`, and any required security/architecture owner from Quality Gates. Confirm each subagent passed its Acceptance Checklist (or returned a single consolidated clarification request).
-8. **Report** — Summarize: changes, verification, security/audit evidence, architecture decisions, pending items, and Task assignment quality (filled fields and clarification count).
+8. **Reflect & Learn** — Collect each subagent's `Learning Check`. Append low-risk new learnings through `{{LEARNING_MEMORY_OWNER}}`; updating, overwriting, or superseding prior learnings requires orchestrator approval and evidence. Never store secrets or raw credentials.
+9. **Report** — Summarize: changes, verification, security/audit evidence, architecture decisions, pending items, Task assignment quality (filled fields and clarification count), and learning proposals accepted/deferred.
 
 ## Delegation Packet
 
 Use the canonical Task Assignment Contract in [`references/handoff.md`](../../plugins/agents-system-setup/skills/agents-system-setup/references/handoff.md#delegation-packet-canonical-schema). Fill the Required Minimum every time; add Expansion Blocks per the [Recommended Packet Form](../../plugins/agents-system-setup/skills/agents-system-setup/references/handoff.md#recommended-packet-form). When `AGENTS.md` was loaded this turn, set `Context freshness: recent` so subagents skip redundant re-reads.
+
+## Memory & Learning
+
+Use `AGENTS.md` › **Memory & Learning System** and [`references/learning-memory.md`](../../plugins/agents-system-setup/skills/agents-system-setup/references/learning-memory.md). Ask subagents to return `Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>`. Subagents propose; I approve updates and route writes to the memory owner.
 
 ## Subagent Routing
 

@@ -1548,6 +1548,8 @@ def check_runtime_update_policy() -> None:
         "Task assignment quality",
         "check_copilot_tool_profile",
         "Copilot CLI Standard Tool Profiles",
+        "check_learning_memory_policy",
+        "Memory & Learning System",
     ):
         if marker not in validator_text:
             err(f"scripts/_validate.py: missing runtime validator marker `{marker}`")
@@ -1661,6 +1663,178 @@ def check_copilot_tool_profile() -> None:
         err("orchestrator.agent.md.template: orchestrator needs `agent` in its tools to delegate")
 
 
+def check_learning_memory_policy() -> None:
+    """Keep the generated memory and reinforcement-learning loop intact."""
+    require_contains(
+        SKILL_ROOT / "references" / "learning-memory.md",
+        (
+            "Memory and Learning System",
+            "Learning Check contract",
+            "overwrite requires orchestrator approval",
+            "no secrets or raw credentials",
+            "Operational ledger",
+            "Optional hook/script support",
+            "Learning Index",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "learnings.md.template",
+        (
+            "Curated agent memory",
+            "not an operational log",
+            "agents-system-setup:learning-memory:start",
+            "No secrets or raw credentials",
+            "Updates or overwrites require orchestrator approval",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "Memory & Learning System",
+            "{{LEARNING_MEMORY_PROFILE}}",
+            "{{LEARNING_MEMORY_OWNER}}",
+            "{{LEARNING_MEMORY_PATH}}",
+            "Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>",
+            "overwrite requires orchestrator approval",
+            "no secrets or raw credentials",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "GEMINI.md.template",
+        (
+            "Memory & Learning",
+            "Learning Check before done",
+            "Do not store secrets or raw credentials",
+        ),
+    )
+    for rel in (
+        "orchestrator.agent.md.template",
+        "orchestrator.claude.md.template",
+        "orchestrator.opencode.md.template",
+    ):
+        require_contains(
+            SKILL_ROOT / "assets" / rel,
+            (
+                "Reflect & Learn",
+                "Learning Check",
+                "overwrite",
+                "Never store secrets or raw credentials",
+            ),
+        )
+    for rel in (
+        "subagent.agent.md.template",
+        "subagent.claude.md.template",
+        "subagent.opencode.md.template",
+        "subagent.gemini.md.template",
+    ):
+        require_contains(
+            SKILL_ROOT / "assets" / rel,
+            (
+                "## Learning Check",
+                "Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>",
+                "orchestrator approval",
+                "Never store secrets or raw credentials",
+            ),
+        )
+    require_contains(
+        SKILL_ROOT / "assets" / "subagent.codex.toml.template",
+        (
+            "Learning Check:",
+            "Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>",
+            "orchestrator approval",
+            "Never store secrets or raw credentials",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "Learning memory is approval-safe",
+            "Phase 1.10 — Memory & Learning Profile",
+            "Memory & Learning plan",
+            "Memory & Learning System",
+            "overwrite requires orchestrator approval",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "interview.md",
+        (
+            "11i. Memory & Learning profile",
+            "learning_memory_profile",
+            "learning_gate_strength",
+            "overwrite requires orchestrator approval",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "context-optimization.md",
+        (
+            "Memory & learning files",
+            "Learning Index",
+            "learning-check",
+            "Memory & Learning System",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "local-tracking.md",
+        (
+            ".agents-system-setup/memory/",
+            ".agents-system-setup/learnings.jsonl",
+            "docs/agents/learnings.md",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "output-contract.md",
+        (
+            "Learning memory",
+            "Learning check",
+            "Learning updates",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "replication.md",
+        (
+            "Memory & Learning preservation",
+            "learning-memory.md",
+            "overwrite requires orchestrator approval",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "runtime-updates.md",
+        (
+            "Generated memory is artifact policy",
+            "Memory & Learning System",
+        ),
+    )
+    require_contains(
+        REPO / "README.md",
+        (
+            "Memory & Learning System",
+            "Learning Check",
+        ),
+    )
+    require_contains(
+        REPO / "CHANGELOG.md",
+        (
+            "Memory & Learning System",
+            "Learning Check",
+            "overwrite requires orchestrator approval",
+        ),
+    )
+
+    for agent_dir in (
+        REPO / ".github" / "agents",
+        REPO / ".claude" / "agents",
+        REPO / ".opencode" / "agents",
+        REPO / ".codex" / "agents",
+        REPO / ".gemini" / "agents",
+    ):
+        if not agent_dir.exists():
+            continue
+        for md in agent_dir.rglob("*.md"):
+            name = md.name.lower()
+            if "learning" in name or "log" in name or "ledger" in name:
+                warn(f"{md.relative_to(REPO).as_posix()}: memory/log Markdown inside runtime agents directory may be parsed as an agent")
+
+
 # ---------- main ----------
 
 def main() -> int:
@@ -1682,6 +1856,7 @@ def main() -> int:
     check_codex_cli_app_compatibility()
     check_runtime_update_policy()
     check_copilot_tool_profile()
+    check_learning_memory_policy()
 
     if WARNINGS:
         print("\nWARNINGS:")

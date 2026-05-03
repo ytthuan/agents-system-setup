@@ -89,6 +89,16 @@ If any check fails I return one consolidated `clarification_request:` to `@orche
 2. {{STEP_2}}
 3. {{STEP_3}}
 
+## Learning Check
+
+Before final response I check whether this task produced a durable learning:
+
+- Return `Learning Check: none` when there is nothing worth storing.
+- Return `Learning Check: proposed_new:<id>` for a new project convention, recurring mistake, tool insight, workflow, preference, or risk.
+- Return `Learning Check: proposed_update:<id>` only with evidence. Updating, overwriting, or superseding prior learning requires orchestrator approval.
+- Never store secrets or raw credentials. Summarize and point to evidence instead of pasting raw logs.
+- I propose learnings; I do not write memory unless my Owned paths explicitly include the memory path.
+
 ## Reporting Template
 
 I emit results in this stable shape so the orchestrator can integrate without re-deriving:
@@ -103,6 +113,7 @@ Evidence:
 Gates touched: <list with status>
 Risks / escalations: <list or "none">
 Handoff status: accepted | completed | blocked | returned-to-orchestrator
+Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>
 ```
 
 ## Outputs

@@ -11,6 +11,7 @@
 2. Use `.gemini/agents/*.md` local subagents when a task matches their `description`.
 3. Keep fan-out in this root Gemini session. Gemini subagents cannot recursively call other subagents; cross-agent work returns here.
 4. Do not write `mcp_servers:` or extension MCP config unless the MCP approval gate has shown and approved the exact YAML or JSON block.
+5. Follow `AGENTS.md` › **Memory & Learning System**. Gemini subagents propose Learning Check entries; this root session or the orchestrator owns memory writes.
 
 ## Local Subagents
 
@@ -23,5 +24,12 @@
 ## Canonical Context
 
 Load `AGENTS.md` for the full project memory and treat this file as a Gemini-native pointer. If this file is a copy rather than a symlink, regenerate it whenever the managed `AGENTS.md` block changes.
+
+## Memory & Learning
+
+- Canonical policy: `AGENTS.md` › **Memory & Learning System**.
+- Learning Check before done: `none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>`.
+- Do not store secrets or raw credentials in learnings.
+- Do not write memory directly from Gemini subagents unless they explicitly own the memory path.
 
 <!-- agents-system-setup:managed:end -->
