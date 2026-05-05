@@ -2,6 +2,24 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [1.0.1] - 2026-05-05
+
+### Added
+
+- Validator guardrails for runtime invocation drift now catch stale Codex `@...` skill examples, nonexistent OpenCode plugin-install commands, provider-specific invocation markers, Gemini native skill coverage, and Copilot `.github/agents/*.md` import/drift signals.
+
+### Changed
+
+- Runtime invocation guidance now distinguishes provider-specific skill, command, agent, plugin, and MCP surfaces across Copilot CLI, Claude Code, OpenCode, OpenAI Codex CLI/App, and Gemini CLI.
+- Codex usage examples now use `/skills` and `$agents-system-setup` for bundled skill invocation while keeping `/plugins` and marketplace install guidance explicitly CLI-only.
+- OpenCode guidance now separates JS/TS plugins, Markdown agents, `skill` tool activation with `permission.skill`, and `.opencode/commands/<name>.md` slash commands.
+- Gemini guidance now documents native `.gemini/skills/<name>/SKILL.md` skills and native `settings.json` hooks in addition to extension-packaged surfaces.
+
+### Fixed
+
+- Claude Code plugin `commands/` are no longer described as legacy-only; the docs now keep commands for slash-command prompts and recommend skills for reusable workflows.
+- Copilot plugin install examples now separate terminal `copilot plugin install ...` usage from in-session `/plugin install PLUGIN@MARKETPLACE` usage.
+
 ## [Unreleased]
 
 ### Added
