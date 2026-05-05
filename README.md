@@ -68,12 +68,15 @@ Reads `.claude-plugin/plugin.json`. Skills are namespaced as `/<plugin>:<skill>`
 codex plugin marketplace add ytthuan/agents-system-setup
 codex
 > /plugins        # browse and install agents-system-setup
-> @agents-system-setup
+> /skills         # list available skills from installed plugins
+> $agents-system-setup   # invoke the bundled skill
 ```
 
 Reads `.codex-plugin/plugin.json` and the marketplace descriptor at `.agents/plugins/marketplace.json`. Source: <https://developers.openai.com/codex/plugins/build>.
 
-Generated Codex project artifacts are compatible with **OpenAI Codex CLI + App** surfaces that load repo artifacts: `AGENTS.md` contains project/orchestrator memory, `.codex/agents/*.toml` contains specialized subagents, and `.codex/config.toml` contains `[agents]` defaults. Plugin marketplace install and slash-command examples above are CLI-only.
+After installing via `/plugins`, invoke the bundled skill with `$agents-system-setup` in the Codex CLI prompt, or use `/skills` to list and select skills interactively.
+
+Generated Codex project artifacts are compatible with **OpenAI Codex CLI + App** surfaces that load repo artifacts: `AGENTS.md` contains project/orchestrator memory, `.codex/agents/*.toml` contains specialized subagents, and `.codex/config.toml` contains `[agents]` defaults. Plugin marketplace install and slash-command examples above are CLI-only; generated repo artifacts remain compatible with both CLI and App.
 
 ### OpenCode
 

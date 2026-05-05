@@ -11,13 +11,30 @@ Skills use the **same SKILL.md format across platforms** — only the *location*
 | `.github/skills/<name>/SKILL.md` | Copilot CLI | Project |
 | `.claude/skills/<name>/SKILL.md` | Claude Code | Project |
 | `.opencode/skills/<name>/SKILL.md` | OpenCode | Project |
+| `.gemini/skills/<name>/SKILL.md` | Gemini CLI | Project |
+| `.agents/skills/<name>/SKILL.md` | Gemini CLI / Universal | Project |
 | `~/.copilot/skills/<name>/SKILL.md` | Copilot CLI | Personal |
 | `~/.claude/skills/<name>/SKILL.md` | Claude Code | Personal |
+| `~/.gemini/skills/<name>/SKILL.md` | Gemini CLI | Personal |
 | `~/.agents/skills/<name>/SKILL.md` | Universal fallback | Personal |
 
 Folder name MUST equal `name` in frontmatter.
 
 > When emitting to multiple platforms, write the **same** `SKILL.md` to each platform's path. Skills are portable.
+
+## Activation & Invocation
+
+| Platform | How model loads skill | How user invokes | Notes |
+|---|---|---|---|
+| Copilot CLI | Auto-loads when relevant (`disable-model-invocation: false`) | `/<name>` slash command when `user-invocable: true` | Default behavior |
+| Claude Code | Auto-loads when relevant | `/<name>` slash command | Same frontmatter |
+| OpenCode | Loaded on demand through the `skill` tool | No direct `/<name>` shortcut; use commands for slash UX | Gated by `permission.skill` |
+| Gemini CLI | Model activates via skill loading/tooling | `/skills` to list/manage; no `/<name>` slash command | No direct per-skill slash command |
+| Codex CLI | Model activates via skill loading | `$skill-name` selects a skill | `$` prefix is Codex-specific — not universal syntax |
+
+> **Gemini note:** Gemini does not expose a `/<skill-name>` shortcut. Users browse available skills with `/skills` and the model applies them automatically. Do not document `/<name>` invocation for Gemini.
+
+> **Codex note:** `$skill-name` is Codex's selection syntax. Do not use `$` as a cross-platform skill invocation pattern.
 
 ## Structure
 

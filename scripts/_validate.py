@@ -20,7 +20,9 @@ Checks (per the CONTRIBUTING.md contract):
  15. Plan handoff policy is present and platform-specific
  16. Codex shared artifacts are documented as CLI + App compatible without
       overclaiming Codex App plugin installation
- 17. Runtime update audit tracks supported-runtime drift for five runtimes
+  17. Runtime update audit tracks supported-runtime drift for five runtimes
+  18. Runtime invocation guidance distinguishes skills, commands, plugins,
+      and provider-specific `/`, `$`, and `@` syntax
 
 Exits non-zero on any failure. Designed to be invoked from CI on
 Linux / macOS / Windows runners with only Python 3.10+ available
@@ -428,6 +430,15 @@ def check_frontmatter_files() -> None:
         if ".git" in p.parts:
             continue
         targets.append((p, "agent"))
+    for p in (REPO / ".github" / "agents").glob("*.md"):
+        if p.name.endswith(".agent.md"):
+            continue
+        warn(
+            f"{p.relative_to(REPO).as_posix()}: `.github/agents/*.md` detected; "
+            "the emitter writes `.agent.md`, so verify this is an intentional "
+            "Copilot import/upstream-drift signal"
+        )
+        targets.append((p, "copilot-agent-import"))
 
     for path, kind in targets:
         rel = path.relative_to(REPO)
@@ -450,8 +461,10 @@ def check_frontmatter_files() -> None:
         # Filename-vs-name check
         if kind == "skill":
             expected = path.parent.name
-        else:  # agent: <name>.agent.md
+        elif kind == "agent":  # agent: <name>.agent.md
             expected = path.name.removesuffix(".agent.md")
+        else:  # Copilot import/drift signal: <name>.md
+            expected = path.name.removesuffix(".md")
         if name and name != expected:
             err(f"{rel}: frontmatter name `{name}` does not match basename `{expected}`")
         if not name:
@@ -2059,6 +2072,8 @@ def check_runtime_update_policy() -> None:
         "Copilot CLI Standard Tool Profiles",
         "check_learning_memory_policy",
         "Memory & Learning System",
+        "check_runtime_invocation_policy",
+        "$skill-name",
         "SUPPORTED_RUNTIMES",
         "check_mcp_approval_gate",
         "check_mcp_secret_shape",
@@ -2075,6 +2090,132 @@ def check_runtime_update_policy() -> None:
         compat = data.get("compatibility", {})
         if isinstance(compat, dict) and "gemini-cli" in compat and not isinstance(compat["gemini-cli"], str):
             err(f"{manifest.relative_to(REPO).as_posix()}: compatibility.gemini-cli must be a version string when present")
+
+
+def check_runtime_invocation_policy() -> None:
+    """Guard provider-specific skill/command/plugin invocation syntax.
+
+    The supported runtimes intentionally differ: Codex uses `$skill-name`,
+    slash commands are runtime command surfaces, and `@` selects agents/plugins
+    only where the provider documents that composer behavior.
+    """
+    references = SKILL_ROOT / "references"
+    platforms = references / "platforms.md"
+    skill_format = references / "skill-format.md"
+    marketplaces = references / "marketplaces.md"
+    plugin_discovery = references / "plugin-discovery.md"
+    runtime_updates = references / "runtime-updates.md"
+
+    require_contains(
+        runtime_updates,
+        (
+            "Invocation and packaging audit",
+            "2026-05-05",
+            "$skill-name",
+            "PLUGIN@MARKETPLACE",
+            "permission.skill",
+            ".opencode/commands/<name>.md",
+            ".gemini/skills/<name>/SKILL.md",
+            "native `settings.json` hooks",
+            "Do not generalize `/`,",
+        ),
+    )
+    require_contains(
+        platforms,
+        (
+            ".opencode/commands/<name>.md",
+            "$ARGUMENTS",
+            "permission.skill",
+            ".gemini/skills/<name>/SKILL.md",
+            "~/.gemini/skills/<name>/SKILL.md",
+            "native `settings.json` hooks",
+            "not legacy",
+            "no `$skill` or `/<skill>` invocation",
+        ),
+    )
+    require_contains(
+        skill_format,
+        (
+            ".gemini/skills/<name>/SKILL.md",
+            ".agents/skills/<name>/SKILL.md",
+            "~/.gemini/skills/<name>/SKILL.md",
+            "`skill` tool",
+            "permission.skill",
+            "`/skills` to list/manage",
+            "$skill-name",
+            "Codex-specific",
+        ),
+    )
+    require_contains(
+        marketplaces,
+        (
+            "PLUGIN@MARKETPLACE",
+            "/skills         # browse and select installed skills",
+            "type @ to choose an installed plugin",
+            "$skill-name",
+            "permission.skill",
+            ".opencode/commands/<name>.md",
+            ".gemini/skills/<name>/SKILL.md",
+            "settings hooks or extension hooks",
+            "`commands/` (slash commands); `skills/` preferred",
+        ),
+    )
+    require_contains(
+        plugin_discovery,
+        (
+            ".opencode/plugins/",
+            "opencode.json › plugins",
+        ),
+    )
+    require_contains(
+        REPO / "README.md",
+        (
+            "$agents-system-setup",
+            "/skills         # list available skills",
+            "generated repo artifacts remain compatible with both CLI and App",
+        ),
+    )
+
+    scan_paths = [REPO / "README.md", *sorted(references.glob("*.md"))]
+    for path in scan_paths:
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except (FileNotFoundError, UnicodeDecodeError):
+            continue
+        rel = path.relative_to(REPO).as_posix()
+        for line_no, line in enumerate(lines, 1):
+            if "@agents-system-setup" in line:
+                err(
+                    f"{rel}:{line_no}: stale Codex invocation example "
+                    "`@agents-system-setup`; use `$agents-system-setup` "
+                    "or `/skills` for bundled skills"
+                )
+            if "@<plugin-name>" in line:
+                err(
+                    f"{rel}:{line_no}: stale Codex plugin invocation example "
+                    "`@<plugin-name>`; describe typing `@` to choose a plugin "
+                    "and `$skill-name` or `/skills` for skills"
+                )
+            if "opencode plugin install" in line:
+                negative_context = re.search(
+                    r"\b(no|not|without|nonexistent|does not exist|there is no)\b",
+                    line,
+                    re.IGNORECASE,
+                )
+                if not negative_context:
+                    err(
+                        f"{rel}:{line_no}: stale OpenCode install command "
+                        "`opencode plugin install`; use JS/TS plugin paths or "
+                        "opencode.json plugin config guidance"
+                    )
+            if re.search(r"commands/.*legacy", line, re.IGNORECASE):
+                not_legacy = re.search(r"\bnot\s+legacy\b|\bnot\b.*\blegacy\b", line, re.IGNORECASE)
+                if not not_legacy:
+                    warn(
+                        f"{rel}:{line_no}: Claude/OpenCode command guidance "
+                        "mentions `commands/` as legacy; plugin slash commands "
+                        "remain supported"
+                    )
 
 
 def check_copilot_tool_profile() -> None:
@@ -2395,6 +2536,7 @@ def main() -> int:
     check_plan_handoff_policy()
     check_codex_cli_app_compatibility()
     check_runtime_update_policy()
+    check_runtime_invocation_policy()
     check_copilot_tool_profile()
     check_learning_memory_policy()
 

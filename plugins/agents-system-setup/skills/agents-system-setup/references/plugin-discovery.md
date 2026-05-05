@@ -23,7 +23,7 @@ bundles:                # any of: agents | skills | hooks | mcp | lsp
 install_command_per_platform:
   copilot-cli:          # e.g., /plugin install microsoft/playwright-mcp
   claude-code:          # e.g., claude plugins install ...
-  opencode:             # e.g., opencode plugin install ... (if applicable)
+  opencode:             # e.g., copy JS/TS file to .opencode/plugins/ or add npm pkg to opencode.json › plugins
 why_recommended:        # one sentence, project-specific
 tradeoffs:              # one sentence — what to consider before picking
 ```

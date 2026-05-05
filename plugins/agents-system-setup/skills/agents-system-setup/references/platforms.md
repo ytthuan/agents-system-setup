@@ -17,9 +17,10 @@ This skill targets five agent runtimes. The user picks one or more in **Phase 0*
 | Artifact | Copilot CLI | Claude Code | OpenCode | OpenAI Codex (CLI + App) | Gemini CLI |
 |---|---|---|---|---|---|
 | Agents | Emit `.github/agents/<name>.agent.md`; also recognize `.github/agents/<name>.md` as an upstream docs drift/import signal | `.claude/agents/<name>.md` | Markdown default: `.opencode/agents/<name>.md`; JSON import/update surface: `opencode.json` top-level `agent` | orchestrator + project rules in `AGENTS.md`; **specialized subagents in `.codex/agents/<name>.toml`** (project) or `~/.codex/agents/` (user) | `.gemini/agents/<name>.md` (project local subagent) or `~/.gemini/agents/<name>.md` (user); extension `agents/*.md` is import/package surface |
-| Skills | `.github/skills/<name>/SKILL.md` | `.claude/skills/<name>/SKILL.md` | `.opencode/skills/<name>/SKILL.md` | not supported natively — describe in `AGENTS.md` | Gemini extensions can bundle `skills/<name>/SKILL.md`; project generation documents skills unless packaging an extension |
+| Skills | `.github/skills/<name>/SKILL.md` | `.claude/skills/<name>/SKILL.md` | `.opencode/skills/<name>/SKILL.md`; keep separate from commands; gated by `permission.skill` | not supported natively — describe in `AGENTS.md` | `.gemini/skills/<name>/SKILL.md` (project) or `~/.gemini/skills/<name>/SKILL.md` (user); `.agents/skills/<name>/SKILL.md` also recognized; extension-packaged skills also supported; activation is model-side via skill loading; managed with `/skills`; no `$skill` or `/<skill>` invocation |
 | MCP servers | `.mcp.json` (root) | `.mcp.json` (root, shared with Copilot) | `opencode.json` › `"mcp": { ... }` | `.mcp.json` (root, shared) | per-agent `mcp_servers:` in `.gemini/agents/*.md`; extension manifests use `mcpServers`; all MCP writes are approval-gated |
-| Hooks | `.github/hooks/*.json` | `.claude/settings.json` › `"hooks"` | `.opencode/hooks/` | not supported | Gemini extension hooks / settings only when packaging an extension |
+| Hooks | `.github/hooks/*.json` | `.claude/settings.json` › `"hooks"` | `.opencode/hooks/` | not supported | native `settings.json` hooks at project / user / system scope; extension `hooks/hooks.json` when packaging; not extension-only |
+| Commands | plugin `commands/<cmd>.md` under plugin root | plugin `commands/<cmd>.md` supported for slash commands (not legacy); project commands at `.claude/commands/<cmd>.md` | `.opencode/commands/<name>.md` or `command` config key; invoked as `/<name>`; `$ARGUMENTS`/`$1` are body placeholders, not invocation syntax; keep separate from skills | not a standard surface | Gemini extensions can bundle `commands/*.md`; no native project command surface |
 | Project memory | `AGENTS.md` (root) | `CLAUDE.md` (symlink → `AGENTS.md` on macOS/Linux; copy on Windows) | `AGENTS.md` (native) | `AGENTS.md` (native — primary consumer in Codex CLI + App artifact flows) | `GEMINI.md` is Gemini's native context file; keep it a compact pointer/sync copy of canonical `AGENTS.md` when Gemini is selected |
 | Personal memory | `~/.copilot/AGENTS.md` | `~/.claude/CLAUDE.md` | `~/.config/opencode/AGENTS.md` | `~/.codex/AGENTS.md` | `~/.gemini/GEMINI.md` plus `~/.gemini/agents/` |
 
@@ -96,6 +97,8 @@ color: blue                      # optional UI color
 >
 > Project/user/session agents and plugin-shipped agents are not the same schema surface. Project/user/session agents may use richer fields such as `mcpServers`, `hooks`, and `permissionMode`; plugin-shipped agents must not rely on unsupported fields such as `hooks`, `mcpServers`, or `permissionMode`.
 >
+> **Commands vs skills:** Plugin `commands/` (under the plugin root) remain fully supported for slash commands and are not legacy. Use `commands/` for prompt-template slash commands; prefer skills for reusable multi-step workflows. Project-level slash commands live at `.claude/commands/<cmd>.md`.
+>
 > Distinguish three Claude primitives:
 > 1. **Subagent definition** — a Markdown file or `--agents` JSON object describing a specialist.
 > 2. **Tool-based subagent invocation** — Claude delegates through its `Agent` tool inside the current session; the worker reports back only to the caller and cannot recursively spawn subagents.
@@ -147,6 +150,10 @@ Use `permission.task: { "*": ask }` only when the user explicitly approves
 broad runtime-selected delegation. See the
 [optional placeholder substitution table](./agent-format.md#optional-placeholder-substitution-table)
 for the generated `{{OPTIONAL_PERMISSION_TASK_BLOCK}}` forms.
+
+#### OpenCode commands
+
+OpenCode slash commands live at `.opencode/commands/<name>.md` or are declared via the `command` key in config. They are invoked as `/<name>` at runtime. Inside the command body, `$ARGUMENTS` (or `$1`) are placeholder substitution variables — they are not part of the invocation syntax. Keep commands separate from skills: skills are loaded via the skill tool and gated by `permission.skill`; commands are prompt templates exposed as slash commands.
 
 ### OpenAI Codex CLI + App — split layout
 
@@ -239,6 +246,7 @@ Gemini source-backed runtime notes:
 - `tools:` supports wildcards such as `*`, `mcp_*`, and `mcp_<server>_*`. Prefer narrow allowlists for reviewers and docs agents.
 - The docs prose shows `mcpServers`, but the loader schema validates `mcp_servers`. Emit snake_case `mcp_servers:` and normalize imported camelCase examples with a warning.
 - Remote A2A subagents (`kind: remote`, `agent_card_url`, `agent_card_json`, `auth`) are advanced/import-only; do not emit them by default.
+- Gemini CLI supports native skills loaded from `.gemini/skills/<name>/SKILL.md` (project) or `~/.gemini/skills/<name>/SKILL.md` (user); `.agents/skills/<name>/SKILL.md` is also recognized. Activation is model-side via skill loading; use `/skills` to manage loaded skills. There is no `$skill` or `/<skill>` invocation syntax — skills are not slash commands.
 - Gemini extensions can bundle subagents, skills, MCP servers, commands, hooks, and context files. Treat extension packaging as marketplace/plugin work, not the default project-agent path.
 
 ## MCP Configuration — per platform

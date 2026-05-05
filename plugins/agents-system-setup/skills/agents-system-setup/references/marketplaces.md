@@ -147,10 +147,19 @@ This prevents the user from accepting an unmaintained fork and makes the recomme
 
 ### Copilot CLI
 
+Terminal (outside the session):
+
+```sh
+copilot plugin install <owner>/<repo>
+copilot plugin install <owner>/<repo>/<plugin-subpath>
+copilot plugin install <path/to/local/plugin>
 ```
+
+Interactive slash-command (inside a running session):
+
+```text
 copilot
-> /plugin install <owner>/<repo>
-> /plugin install <owner>/<repo>/<plugin-subpath>
+> /plugin install PLUGIN@MARKETPLACE
 ```
 
 ### Claude Code
@@ -168,15 +177,16 @@ codex plugin marketplace add <owner>/<repo>
 codex plugin marketplace add <owner>/<repo> --ref main
 codex plugin marketplace add <owner>/<repo> --sparse .agents/plugins
 codex
-> /plugins        # browse and install
-> @<plugin-name>  # invoke a plugin or its bundled skill
+> /plugins        # open plugin browser / marketplace
+> /skills         # browse and select installed skills
+# In the composer: type @ to choose an installed plugin; use $skill-name to invoke a skill
 ```
 
-Codex marketplace sources accept GitHub shorthand, HTTPS/SSH Git URLs, or a local path. Refresh with `codex plugin marketplace upgrade [name]`; remove with `codex plugin marketplace remove <name>`. These are CLI plugin commands; do not present them as Codex App plugin installation.
+Codex marketplace sources accept GitHub shorthand, HTTPS/SSH Git URLs, or a local path. Refresh with `codex plugin marketplace upgrade [name]`; remove with `codex plugin marketplace remove <name>`. These are CLI plugin commands; do not present them as Codex App plugin installation. The Codex App provides a separate Plugins UI; `/plugins` and `/skills` are in-session commands only.
 
 ### OpenCode
 
-OpenCode "plugins" are JS/TS hooks (different shape from the other runtimes). Skill-style content is installed by clone-and-copy under `~/.config/opencode/skills/` (user) or `.opencode/skills/` (project). Agent Markdown belongs under `~/.config/opencode/agents/` or `.opencode/agents/`. MCP servers go in `opencode.json` › `mcp`.
+OpenCode "plugins" are JS/TS or npm/config-based (there is no `opencode plugin install` CLI command). Skill-style content is installed by clone-and-copy under `~/.config/opencode/skills/` (user) or `.opencode/skills/` (project); skills are activated via the skill tool and a `permission.skill` config entry. Agent Markdown belongs under `~/.config/opencode/agents/` or `.opencode/agents/`. MCP servers go in `opencode.json` › `mcp`. Slash commands are defined as Markdown files under `.opencode/commands/<name>.md` (or inline in `opencode.json`) and invoked with `/name` inside the session.
 
 ### Gemini CLI
 
@@ -197,10 +207,10 @@ Gemini extension recommendations must identify what the extension actually ships
 | Component                | Copilot | Claude Code | Codex | OpenCode | Gemini CLI |
 |--------------------------|:---:|:---:|:---:|:---:|:---:|
 | Agents (per-file)        | `.github/agents/*.agent.md` | `agents/*.md` | `.codex/agents/*.toml` | `.opencode/agents/*.md` | `.gemini/agents/*.md` or extension `agents/*.md` |
-| Skills                   | `skills/<name>/SKILL.md` | `skills/<name>/SKILL.md` | `skills/<name>/SKILL.md` | `.opencode/skills/<name>/SKILL.md` | extension `skills/<name>/SKILL.md` |
-| Hooks                    | `hooks.json` | `hooks/hooks.json` | (planned) | JS/TS hooks | extension hooks |
+| Skills                   | `skills/<name>/SKILL.md` | `skills/<name>/SKILL.md` | `skills/<name>/SKILL.md` | `.opencode/skills/<name>/SKILL.md` | `.gemini/skills/<name>/SKILL.md` or extension `skills/<name>/SKILL.md` |
+| Hooks                    | `hooks.json` | `hooks/hooks.json` | (planned) | JS/TS hooks | settings hooks or extension hooks |
 | MCP servers              | `.mcp.json` (or `.github/mcp.json`) | `.mcp.json` (also inline in agent `mcpServers`) | `.mcp.json` (also inline `[mcp_servers.*]` per agent) | `opencode.json` › `mcp` | agent `mcp_servers:` or extension `mcpServers` |
 | LSP servers              | `lsp.json` | `.lsp.json` | n/a | n/a | n/a |
-| Slash commands           | n/a | `commands/` (legacy) → `skills/` (new) | `skills/` | n/a | extension `commands/` |
+| Slash commands           | n/a | `commands/` (slash commands); `skills/` preferred for reusable workflows | `skills/` | `.opencode/commands/<name>.md` | extension `commands/` |
 
 Always inspect a plugin's README before recommending — surface what it actually brings to the user.
