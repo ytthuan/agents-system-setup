@@ -33,7 +33,6 @@ Folder name MUST equal `name` in frontmatter.
 | Codex CLI | Model activates via skill loading | `$skill-name` selects a skill | `$` prefix is Codex-specific — not universal syntax |
 
 > **Gemini note:** Gemini does not expose a `/<skill-name>` shortcut. Users browse available skills with `/skills` and the model applies them automatically. Do not document `/<name>` invocation for Gemini.
-
 > **Codex note:** `$skill-name` is Codex's selection syntax. Do not use `$` as a cross-platform skill invocation pattern.
 
 ## Structure
