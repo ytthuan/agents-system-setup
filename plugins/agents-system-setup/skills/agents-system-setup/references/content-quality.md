@@ -26,7 +26,7 @@ Use `agent-quality-curator` as the primary generated role name. Use
 | Owned paths | None by default. The curator is read-only unless an explicit plan grants a narrow docs-only remediation path. |
 | Tool profile | `read-only` or `research`; never edit-capable by default. |
 | Runs before | Final setup/update/improve/replicate output when generated agent-system prose changed. |
-| Reports | `Content quality: ok|warn|fail|n/a; signals=<list|none>` plus concrete fixes or escalation. |
+| Reports | Content-quality status `ok`, `warn`, `fail`, or `n/a`; signal list; concrete fixes or escalation. |
 
 The curator does not replace `reviewer`, `tester`, `security-auditor`,
 `architecture-reviewer`, `design-pattern-reviewer`, or static validators. It
