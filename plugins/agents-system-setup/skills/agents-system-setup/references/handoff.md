@@ -18,6 +18,10 @@ Plan my task.
 
 Treat this as an upstream planning surface only. The `agent: Plan` field routes the prompt to a planner; it is not valid Copilot CLI, Claude Code, OpenCode, OpenAI Codex, or Gemini CLI subagent frontmatter. Spec-Kit `/plan` and user-written plans follow the same rule: parse the planning output into HandoffIR, then render the selected runtime's native format.
 
+`requirements-triage` output is also upstream planning input. Treat its intake
+brief as a plan seed: useful for scope, risks, questions, and routing, but not a
+final approval or runtime schema.
+
 ## HandoffIR
 
 Normalize every plan handoff into these fields before delegation or file generation:
@@ -25,6 +29,11 @@ Normalize every plan handoff into these fields before delegation or file generat
 ```yaml
 task: "<one sentence>"
 source_plan: "vs-code-plan-prompt | spec-kit-plan | user-plan | other"
+triage_source: "requirements-triage | planner-merged | skipped | n/a"
+triage_status: "separate | merged | skipped | n/a"
+content_quality_status: "ok | warn | fail | n/a"
+content_quality_curator: "separate | merged | skipped | n/a"
+content_quality_signals: ["generic-description | empty-rationale | padding-repetition | slop-completeness | invented-attribution | context-bloat | vague-ownership | unsupported-assertion | silent-gate-gap | prompt-hygiene-risk | none"]
 selected_platforms: ["copilot-cli", "claude-code", "opencode", "codex-cli", "gemini-cli"]
 owning_agent: "<kebab-case agent name>"
 owned_paths: ["<glob>", "..."]
@@ -40,6 +49,39 @@ evidence_required: ["diff summary", "tests", "security finding", "adr", "..."]
 lossiness: ["<field dropped or mapped>", "..."]
 surface_lossiness: ["<CLI-only instruction not available in app/web UI>", "..."]
 ```
+
+## Requirements triage handoff
+
+When `requirements-triage` runs, it returns this compact intake brief before the
+orchestrator writes the plan:
+
+```text
+Intent summary: <one sentence>
+Task type: init | update | improve | replicate | release | docs | research | unknown
+Scope:
+  in: <items>
+  out: <items>
+Ambiguities:
+  - <missing detail or "none">
+Question requests:
+  - <question_request id or "none">
+Risk classification:
+  security: low | medium | high
+  mcp_or_external_tools: yes | no
+  release_or_ci: yes | no
+Recommended routing:
+  wave_0: <agents to consult before plan>
+  wave_1: <parallel-safe implementation agents>
+Plan seed:
+  acceptance_criteria: <bullets>
+  suggested_quality_gates: <bullets>
+Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>
+```
+
+The orchestrator validates this brief, resolves any `question_request` through
+the Human Input / Question Protocol, then converts accepted fields into the
+normal HandoffIR. Triage cannot approve MCP writes, artifact tracking, release
+actions, learning overwrites, or security-sensitive changes.
 
 ## Per-runtime handoff surfaces
 
@@ -74,7 +116,17 @@ Context freshness: <AGENTS.md@<sha or "recent"> | reload>
 Lossiness: <fields dropped or mapped, or "none">
 ```
 
-These twelve fields are mandatory in every assignment. They preserve backward compatibility with the legacy Delegation Packet name.
+These twelve fields are mandatory in every assignment. Add
+`Triage: <separate | merged | skipped | n/a, question_request count>` immediately
+after `Source plan` when the setup includes `requirements-triage`; it is strongly
+recommended but not counted in the required minimum so older generated systems
+remain compatible. The twelve required fields preserve backward compatibility
+with the legacy Delegation Packet name.
+
+Add `Content quality: <ok | warn | fail | n/a, curator=<separate|merged|skipped>, signals=<list|none>>`
+after `Triage` when the task creates or changes generated agent, skill, memory,
+recommendation, or output-contract prose. It is strongly recommended but not
+part of the required minimum for backward compatibility.
 
 ### Expansion blocks
 
@@ -153,6 +205,7 @@ Clarification Protocol:
 | Task tag | Recommended form | Required expansion blocks (in addition to required minimum) |
 |---|---|---|
 | `read-only-research` | short-form | none |
+| `content-quality-review` | short-form | Reporting Protocol |
 | `code-edit` (≤2 files, no gates) | short-form | none |
 | `code-edit` (>2 files or touching shared boundary) | full-form | Goal & Definition of Done · Scope · File Inventory · Verification Protocol · Reporting Protocol |
 | `security-write` | full-form | Goal & Definition of Done · Scope · File Inventory · Known Risks · Verification Protocol · Reporting Protocol · Clarification Protocol |
@@ -168,7 +221,7 @@ Do not include unrelated roster rows, marketplace research, or full platform sch
 
 ### Acceptance Checklist
 
-Subagents run this before doing work and return one consolidated clarification question if any required field is missing.
+Subagents run this before doing work and return one consolidated `question_request` if any required field is missing.
 
 1. All twelve required-minimum fields are present and non-empty: Task, Source plan, Owned paths, Read-only paths, Relevant gates, Constraints, Dependencies / wave, Required approvals, Runtime format target, Expected output, Context freshness, and Lossiness.
 2. `File Inventory.to_modify` (when used) intersects only `Owned paths`.
@@ -179,7 +232,7 @@ Subagents run this before doing work and return one consolidated clarification q
 7. `Constraints` and `Known Risks` mention every gate the agent will touch.
 8. `Coordination` lists wave siblings when `Dependencies / wave` is greater than 1.
 
-If any check fails, return: `clarification_request: <single consolidated question>` and stop. Do not loop.
+If any check fails, return: `question_request: <single consolidated question>` and stop. Do not loop.
 
 ### Reporting Template
 
@@ -193,6 +246,7 @@ Evidence:
   - <diff summary>
   - <other evidence per Reporting Protocol>
 Gates touched: <list with status>
+Content quality: ok | warn | fail | n/a; signals=<list|none>
 Risks / escalations: <list or "none">
 Handoff status: accepted | completed | blocked | returned-to-orchestrator
 Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>
@@ -209,6 +263,7 @@ Before declaring done:
 5. Confirm MCP, secrets, CI/release, and user-scope writes still went through their approval gates.
 6. For Codex, confirm shared artifacts (`AGENTS.md`, `.codex/agents/*.toml`, `.codex/config.toml`) do not require CLI-only commands to work in the App.
 7. For Gemini, confirm `GEMINI.md` points to canonical `AGENTS.md` and `.gemini/agents/*.md` subagents use loader-valid frontmatter.
+8. Confirm generated agent-system prose reports `Content quality` status/signals or `n/a`.
 
 ## Anti-patterns
 
@@ -219,3 +274,4 @@ Before declaring done:
 - Rendering Codex specialized subagents as Markdown headings in `AGENTS.md`.
 - Treating Codex CLI commands as requirements for Codex App compatibility.
 - Copying Gemini extension `mcpServers` examples into local `.gemini/agents/*.md` instead of normalizing to `mcp_servers`.
+- Treating content-quality review as a replacement for tests, security review, architecture review, or provider schema validation.

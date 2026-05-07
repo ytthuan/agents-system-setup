@@ -15,14 +15,19 @@
 - **Target platforms:** {{TARGET_PLATFORMS}}  <!-- e.g., copilot-cli, claude-code, opencode, codex-cli, gemini-cli -->
 - **Output profile:** {{CONTEXT_PROFILE}}  <!-- balanced | compact | full -->
 - **Agent artifact tracking:** {{ARTIFACT_TRACKING}}  <!-- project-tracked | project-local | personal-global -->
+- **Content quality:** {{CONTENT_QUALITY_STATUS}}  <!-- ok | warn | fail | n/a -->
 
 ## Read First
 
 1. Route by [Directory Architecture](#directory-architecture) and [Agent Roster](#agent-roster).
 2. Check [Security & Audit Matrix](#security--audit-matrix) and [Quality Gates](#quality-gates) before risky writes.
-3. Load [Memory & Learning System](#memory--learning-system) entries relevant to the task; do not load the full ledger by default.
-4. Load overflow details only when the task needs them: {{DETAIL_REFERENCES}}.
-5. Respect artifact tracking: {{ARTIFACT_TRACKING_NOTES}}.
+3. Run or explicitly skip [Requirements Triage](#requirements-triage) before planning non-trivial work.
+4. Run or merge [Content Quality / Anti-Slop Review](#content-quality--anti-slop-review) before final output when generated agent-system prose changes.
+5. Use [Human Input / Question Protocol](#human-input--question-protocol); subagents return `question_request` instead of stopping for feedback.
+6. Check [Self-Update Preflight](#self-update-preflight) before setup or generated-artifact refresh.
+7. Load [Memory & Learning System](#memory--learning-system) entries relevant to the task; do not load the full ledger by default.
+8. Load overflow details only when the task needs them: {{DETAIL_REFERENCES}}.
+9. Respect artifact tracking: {{ARTIFACT_TRACKING_NOTES}}.
 
 ## How Agents Should Work Here
 
@@ -30,13 +35,15 @@ This repo uses an **orchestrator + subagent** model. The orchestrator (`@orchest
 
 ### Golden Rules
 1. **Plan first.** For any non-trivial task, the orchestrator writes a plan and confirms scope before editing.
-2. **One concern per subagent.** Implementer never reviews its own work — delegate to `@reviewer`.
-3. **Respect Directory Architecture.** Each subagent owns specific paths; do not touch paths owned by another agent without delegation.
-4. **Run the project's own checks** before declaring done: `{{BUILD_CMD}}`, `{{TEST_CMD}}`, `{{LINT_CMD}}`.
-5. **Non-destructive edits** to managed files. Touch only what the task requires.
-6. **No secrets in code.** Use the configured secret store / env vars only.
-7. **Security and architecture are first-class.** Before risky writes, check the Security & Audit Matrix, Threat Model, Architecture Decisions, and Quality Gates below.
-8. **Reflect before done.** Run the Learning Check from [Memory & Learning System](#memory--learning-system); `none` is valid, but useful learnings should be proposed.
+2. **Triage when useful.** For ambiguous, risky, cross-runtime, release, MCP, replication, or multi-wave work, route through `@requirements-triage` before planning.
+3. **Reject AI slop.** Route generated agent, skill, memory, recommendation, or output-contract prose through `@agent-quality-curator` or merged reviewer quality checks.
+4. **One concern per subagent.** Implementer never reviews its own work — delegate to `@reviewer`.
+5. **Respect Directory Architecture.** Each subagent owns specific paths; do not touch paths owned by another agent without delegation.
+6. **Run the project's own checks** before declaring done: `{{BUILD_CMD}}`, `{{TEST_CMD}}`, `{{LINT_CMD}}`.
+7. **Non-destructive edits** to managed files. Touch only what the task requires.
+8. **No secrets in code.** Use the configured secret store / env vars only.
+9. **Security and architecture are first-class.** Before risky writes, check the Security & Audit Matrix, Threat Model, Architecture Decisions, and Quality Gates below.
+10. **Reflect before done.** Run the Learning Check from [Memory & Learning System](#memory--learning-system); `none` is valid, but useful learnings should be proposed.
 
 ## Context Loading Policy
 
@@ -46,14 +53,37 @@ This repo uses an **orchestrator + subagent** model. The orchestrator (`@orchest
 - **Overflow details:** {{DETAIL_REFERENCES}}
 - **Rule:** if a detail is moved out of this file, link it here so agents can find it.
 
+## Self-Update Preflight
+
+- **Source checkout:** `${AGENTS_SYSTEM_SETUP_HOME:-$HOME/github/agents-system-setup}`.
+- **Status:** {{SELF_UPDATE_PREFLIGHT_STATUS}}  <!-- checked | already-current | ff-updated | requires-human | skipped -->
+- **Evidence / question:** {{SELF_UPDATE_PREFLIGHT_EVIDENCE}}.
+- **Policy:** fast-forward only when the checkout exists, is a Git worktree, is clean, has an upstream, `git fetch` succeeds, the branch is only behind upstream, and `git merge --ff-only` succeeds.
+- **Human-needed cases:** missing checkout, dirty worktree, missing upstream, local-only commits, divergence, fetch failure, plugin-manager ambiguity, or any update that would edit runtime settings.
+- **No side effects:** preflight never edits MCP config, plugin/runtime settings, generated agents, memory files, or release/version metadata.
+
+## Human Input / Question Protocol
+
+| Runtime | Native question surface | Allowlist / config rule | Non-interactive or child-agent fallback |
+|---|---|---|---|
+{{HUMAN_INPUT_PROVIDER_ROWS}}
+
+- **Fallback schema:** subagents and restricted child agents return one `question_request` to `@orchestrator` when they cannot ask directly.
+- **Required fields:** `id`, `asked_by`, `reason`, `question`, optional `choices`, `default`, `urgency`, `if_unanswered`, and concise `context`.
+- **Non-terminating flow:** the orchestrator asks once through the provider-native mechanism when available, records the answer/default in the plan and todos, then re-delegates or stops before sensitive writes per `if_unanswered`.
+- **Separate gates:** approvals, MCP config writes, artifact-tracking choices, provider memory/hooks, and learning overwrites remain separate approval gates. A question answer is evidence, not blanket approval.
+- **Provider safety:** do not invent question-tool names. Copilot custom-agent `tools:` profiles must not include `ask_user`; Codex agent TOML must not include question or memory fields.
+
 ## Memory & Learning System
 
 - **Memory profile:** {{LEARNING_MEMORY_PROFILE}}  <!-- project-tracked | project-local | personal-global | disabled -->
+- **Native learning surface:** {{NATIVE_LEARNING_SURFACE}}  <!-- documented-only | approved-native-config | none -->
 - **Memory owner:** {{LEARNING_MEMORY_OWNER}}  <!-- @orchestrator or @memory-steward -->
 - **Curated memory path:** {{LEARNING_MEMORY_PATH}}
 - **Operational ledger:** {{LEARNING_LEDGER_PATH}}  <!-- append-only JSONL/DB when enabled; never Markdown inside runtime agents/ dirs -->
 - **Update policy:** overwrite requires orchestrator approval; supersede old lessons instead of silently deleting them.
 - **Safety:** no secrets or raw credentials in learnings; summarize and link evidence instead of storing raw logs. Sensitive new learnings require orchestrator and security-owner approval when tagged `risk` or when they mention MCP, CI/release, dependencies, secrets, or generated scripts.
+- **Native vs plugin-managed:** provider-native memory is complementary and must be enabled only by its own approval path. The plugin-managed Learning Check stays active and cannot silently change MCP, hooks, plugin settings, artifact tracking, or learning-overwrite gates.
 - **Load rule:** read the Learning Index first, then only entries matching the task category, path, runtime, or tool.
 - **Learning Check:** before final response, report `Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>`.
 
@@ -66,6 +96,8 @@ Use this table to decide which references each agent loads beyond `AGENTS.md` Re
 | Task tag | Always load | Load when applicable | Safe to skip | Recommended packet form |
 |---|---|---|---|---|
 | `read-only-research` | Read First, Directory Architecture | Topology if topology questions | Security & Audit detail, Threat Model long rationale | short-form |
+| `requirements-triage` | Read First, Directory Architecture, Human Input / Question Protocol | Security/Audit rows, runtime/platform refs, topology, prior plan only when relevant | Source files outside requested scope, full marketplace research | short-form intake brief |
+| `content-quality-review` | Read First, Content Quality, Directory Architecture | Output Contract, Handoff, runtime/platform refs for generated artifacts | Source implementation files unrelated to generated prose | short-form quality signals |
 | `code-edit` | Read First, Directory Architecture, owning agent boundary | Quality Gates row for this path | Marketplace research, full platform schemas | short-form (≤2 files) · full-form when >2 files or shared boundary |
 | `security-write` | Security & Audit Matrix, Threat Model, owning agent boundary | Security/Audit reference rows for the change | Long marketplace candidate research | full-form |
 | `mcp-write` | MCP approval gate, Security & Audit Matrix | Plugin/MCP rendering reference | Architecture Decisions detail | full-form |
@@ -78,6 +110,28 @@ Use this table to decide which references each agent loads beyond `AGENTS.md` Re
 ### Context Freshness
 
 If `AGENTS.md` was already loaded this turn, prefer `Context freshness: recent` in delegated packets so subagents skip the row-by-row reload and read only the rows for the current task tag.
+
+## Requirements Triage
+
+- **Status:** {{REQUIREMENTS_TRIAGE_STATUS}}  <!-- separate | merged | skipped -->
+- **Owner:** {{REQUIREMENTS_TRIAGE_OWNER}}  <!-- @requirements-triage | @planner | @orchestrator -->
+- **Use when:** ambiguous, risky, cross-runtime, release, MCP, replication, audit, improve, or multi-wave work.
+- **Output:** intent summary, task type, in/out scope, ambiguities, `question_request` items, risk flags, recommended routing/waves, acceptance criteria, quality gates, and Learning Check.
+- **Boundaries:** read-only by default; no source edits, MCP/runtime config writes, release metadata writes, or final approval decisions.
+- **Skip rule:** for tiny direct tasks, record `triage: skipped` or `triage: merged` with rationale in the plan.
+- **Latest evidence:** {{REQUIREMENTS_TRIAGE_EVIDENCE}}
+
+## Content Quality / Anti-Slop Review
+
+- **Status:** {{CONTENT_QUALITY_STATUS}}  <!-- ok | warn | fail | n/a -->
+- **Curator:** {{CONTENT_QUALITY_CURATOR}}  <!-- separate | merged | skipped -->
+- **Owner:** {{CONTENT_QUALITY_OWNER}}  <!-- @agent-quality-curator | @reviewer | @orchestrator -->
+- **Reference:** {{CONTENT_QUALITY_REFERENCE}}
+- **Use when:** generated agents, skills, memory, marketplace/MCP recommendations, or output-contract prose changes.
+- **Signals:** {{CONTENT_QUALITY_SIGNALS}}  <!-- generic-description, empty-rationale, padding-repetition, slop-completeness, invented-attribution, context-bloat, vague-ownership, unsupported-assertion, silent-gate-gap, prompt-hygiene-risk, or none -->
+- **Output marker:** `Content quality: ok|warn|fail|n/a; curator=<separate|merged|skipped>; signals=<list|none>`.
+- **Boundaries:** read-only by default; no broad write, MCP config, runtime config, release metadata, or final approval ownership.
+- **Skip rule:** use `n/a` only when no generated agent-system prose changed; otherwise record merged/skipped rationale.
 
 ## Directory Architecture
 
@@ -116,6 +170,7 @@ Legend: ✅ primary owner · 🟡 assists · *(blank)* not involved.
 - **Accepted planning sources:** {{HANDOFF_SOURCES}}.
 - **Canonical required fields (12):** Task; Source plan; Owned paths; Read-only paths; Relevant gates; Constraints; Dependencies / wave; Required approvals; Runtime format target; Expected output; Context freshness; Lossiness.
 - **Expansion fields:** Owning agent, Evidence, and task-specific expansion blocks are included only when useful; they are not part of the required minimum.
+- **Triage seed:** requirements-triage may prefill intent, scope, risks, questions, and routing, but the orchestrator must validate it before delegation.
 - **Format rule:** generated artifacts must use the selected runtime's native schema; never copy prompt frontmatter or another runtime's frontmatter into this project.
 - **Platform format targets:** {{PLATFORM_FORMAT_NOTES}}
 - **Handoff evidence:** {{HANDOFF_EVIDENCE}}
@@ -155,6 +210,7 @@ Legend: ✅ primary owner · 🟡 assists · *(blank)* not involved.
 | Gate | Command or evidence | Owner | Required before done |
 |---|---|---|---|
 {{QUALITY_GATE_ROWS}}
+| Content quality | `agent-quality-curator` review or reviewer-merged check; report `Content quality` status/signals | {{CONTENT_QUALITY_OWNER}} | Before final output when generated agent-system prose changes |
 
 ## Skills
 

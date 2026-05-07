@@ -38,6 +38,8 @@ mcp-servers:                      # OPTIONAL — hyphenated key
 > Use Copilot's documented tool aliases for new output: `vscode`, `execute`, `read`, `edit`, `search`, `agent`, `web`, `todo`. Product-specific aliases (`Bash`, `Read`, `Grep`, `Glob`, `Task`) are accepted by Copilot as compatible aliases, but emitting the public aliases keeps profiles portable. `/fleet` can use these custom agents for parallel subtasks; it is an optional CLI workflow, not a file schema.
 >
 > Apply the [Copilot CLI Standard Tool Profiles](./platforms.md#copilot-cli-standard-tool-profiles) at emit time: `standard` (`[vscode, execute, read, agent, edit, search, todo]`) for orchestrators and edit-capable subagents, `read-only` (`[read, search]`) for reviewers/auditors, `runner` for testers/release helpers, `research` for documentation gatherers, or `inherit` to omit `tools:` entirely. The role → profile mapping is the source of truth for Phase 4 generation.
+>
+> Human input is a session tool (`ask_user`) and is disabled by `--no-ask-user`. Do **not** add `ask_user` to custom-agent `tools:` profiles because it is not a documented custom-agent tool alias. Copilot subagents return `question_request` to the orchestrator/session.
 
 ## Claude Code (`.claude/agents/<name>.md`)
 
@@ -49,7 +51,7 @@ Only `name` and `description` are required. The body becomes the system prompt. 
 ---
 name: <kebab-case-name>           # REQUIRED — lowercase letters and hyphens; unique
 description: Use when ... <triggers>.   # REQUIRED — when Claude should delegate
-tools: Read, Grep, Glob, Bash     # OPTIONAL — comma-separated allowlist; omit = inherit all
+tools: Read, Grep, Glob, Bash, AskUserQuestion # OPTIONAL comma-separated allowlist; omit = inherit all
 disallowedTools: Write, Edit      # OPTIONAL — denylist; applied before `tools`
 model: sonnet                     # OPTIONAL — sonnet | opus | haiku | <full-id> | inherit (default)
 permissionMode: default           # OPTIONAL — default | acceptEdits | auto | dontAsk | bypassPermissions | plan
@@ -75,6 +77,9 @@ You are a <role>...
 > **Scopes & precedence** (highest→lowest): managed settings → `--agents` CLI JSON → `.claude/agents/` (project) → `~/.claude/agents/` (user) → plugin `agents/`. Higher-priority same-name subagents override lower ones. Project subagents are discovered by walking up from CWD; `--add-dir` paths are NOT scanned.
 >
 > **Schema split:** project/user/session subagents can use the richer field set above. Plugin-shipped agents are narrower: do not rely on `hooks`, `mcpServers`, or `permissionMode` in plugin-bundled agent files.
+> Plugin-shipped agents do support `memory`; keep that separate from unsupported hook/MCP/permission fields.
+>
+> Add `AskUserQuestion` to restrictive `tools:` allowlists only when the agent is expected to ask the user. Otherwise subagents report `question_request` to the orchestrator.
 >
 > **Primitive split:** a Claude subagent file is a reusable definition. Tool-based subagent invocation via `Agent` launches that definition inside the current session and returns a summary to the caller. Agent teams are a separate experimental feature: independent Claude Code instances, peer-to-peer messages, and a shared task list; only use them when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is enabled and the work benefits from teammate discussion.
 
@@ -97,6 +102,7 @@ disable: false                      # OPTIONAL — set true to disable
 hidden: false                       # OPTIONAL — hide from @ autocomplete (still callable via Task)
 color: accent                       # OPTIONAL — hex (#FF5733) or theme (primary|secondary|accent|success|warning|error|info)
 permission:                         # OPTIONAL — preferred over deprecated `tools:`
+  question: allow                    # OPTIONAL — official human-input tool
   edit: deny                        # allow | ask | deny
   webfetch: deny
   bash:
@@ -118,6 +124,8 @@ You are a <role>...
 > Markdown agents remain the default emitter. `opencode.json` can also define agents under top-level `agent`; treat JSON agent config as an import/update target only when the user explicitly asks for JSON emission.
 >
 > Permission keys: `read`, `edit`, `glob`, `grep`, `list`, `bash`, `task`, `external_directory`, `todowrite`, `webfetch`, `websearch`, `codesearch`, `lsp`, `skill`, `question`, `doom_loop`.
+>
+> Human input uses the `question` tool. Grant it with nested YAML (`permission: { question: allow }` or the block above), not a literal dotted key. OpenCode does not provide durable auto-learning beyond AGENTS.md, skills, compaction, and plugin patterns.
 >
 > `mode: primary` agents are directly selectable; `mode: subagent` agents are invoked by primary agents or manually with `@<agent-name>`. Use `permission.task` to constrain which subagents a primary or broad worker may spawn. Child sessions are navigated with OpenCode's `session_child_first`, `session_child_cycle`, `session_child_cycle_reverse`, and `session_parent` keybinds; keep those in usage notes, not frontmatter.
 
@@ -168,6 +176,8 @@ Codex shared artifact rules:
 - **Required fields**: `name`, `description`, `developer_instructions`. Missing any → silent skip.
 - **`name` is the source of truth and generated files keep it equal to the filename stem**. Imported custom files may differ, but replication should report that as drift; built-ins (`default`, `worker`, `explorer`) may still be overridden by reusing the name.
 - **Global config** in `.codex/config.toml`: `[agents] max_threads = 6`, `max_depth = 1`, and optional `job_max_runtime_seconds` defaults.
+- Human input: `request_user_input` is Plan-mode only. It is not a TOML field; Codex child/default/exec flows return `question_request`.
+- Native memories: `[features] memories = true` and `~/.codex/memories/` exist but are off by default and may be region-limited. Do not emit `memory` in agent TOML.
 - MCP servers can be shared via `.mcp.json` at repo root *or* declared per-agent inside the TOML.
 - Read-only identity rule: Codex agents whose `name` or filename stem identifies
   them as reviewer, auditor, security, architect, or governance roles set
@@ -200,6 +210,7 @@ tools:
   - read_file
   - grep_search
   - run_shell_command
+  - ask_user
 mcp_servers: {}
 model: gemini-3-flash-preview
 temperature: 0.1
@@ -215,10 +226,25 @@ Gemini local-subagent rules:
 - Optional fields: `display_name`, `tools`, `mcp_servers`, `model`, `temperature`, `max_turns`, `timeout_mins`.
 - Names are slug-like (`[a-z0-9-_]+`) and should match the filename basename.
 - `tools:` is an allowlist. Omit it to inherit parent tools; use wildcards (`*`, `mcp_*`, `mcp_<server>_*`) only with rationale.
+- Human input uses `ask_user`; include it only for interactive agents expected to ask. Headless or restricted agents return `question_request`.
+- Native memory includes `save_memory`, `GEMINI.md`, `/memory`, and experimental `autoMemory`. Gemini skills use `activate_skill`.
 - Emit snake_case `mcp_servers:`. Upstream prose examples may show `mcpServers`, but the loader schema validates `mcp_servers`; normalize imported camelCase with a warning.
 - Subagents cannot invoke other subagents, even with wildcard tools; in validator wording, **subagents must not recursively call subagents**. Cross-agent work returns to the orchestrator/root session.
 - Files whose basename starts with `_` are ignored by Gemini's agent loader.
 - Remote A2A import fields are `kind: remote`, `agent_card_url`, `agent_card_json`, and `auth`; do not emit them for local project agents unless explicitly requested and approved.
+
+## Human Input Surface
+
+Use [human-input](./human-input.md) for the canonical matrix and
+`question_request` schema.
+
+| Runtime | Valid emitted syntax | Pitfall |
+|---|---|---|
+| Copilot CLI | Session/orchestrator calls `ask_user`; subagents return `question_request`. | Do not add `ask_user` to custom-agent `tools:`. |
+| Claude Code | `tools: Read, AskUserQuestion` when a restrictive allowlist must permit questions. | Plugin agents support `memory`, but not `hooks`, `mcpServers`, or `permissionMode`. |
+| OpenCode | `permission: { question: allow }` or a nested YAML block. | Do not write a literal `permission.question` key. |
+| OpenAI Codex CLI + App | `request_user_input` in Plan mode; `question_request` elsewhere. | Do not emit human-input or memory fields in `.codex/agents/*.toml`. |
+| Gemini CLI | `tools: [ask_user]` for interactive ask-capable agents. | Subagents cannot call subagents; headless flows return `question_request`. |
 
 ## Discovery Surface (all platforms)
 
@@ -243,6 +269,9 @@ The VS Code `plan` prompt (`agent: Plan`) and Spec-Kit `/plan` output are planni
 - Using Copilot's `tools:` *list* in a Claude file (Claude expects a comma-separated *string*).
 - Using Claude's `model: sonnet` in an OpenCode file (OpenCode expects `provider/model`).
 - Embedding `mcp-servers:` in an OpenCode agent (use `opencode.json` instead).
+- Writing OpenCode `permission.question: allow` as a literal key instead of nested `permission`.
+- Adding `ask_user` to Copilot custom-agent tools.
+- Emitting Codex `request_user_input` or `memory` in agent TOML.
 - Embedding `mcpServers` in a Gemini local subagent (emit `mcp_servers:`).
 - Asking a Gemini subagent to call another subagent (the runtime prevents recursive subagent calls).
 - Overlapping responsibilities between two subagents → orchestrator picks wrong one. Make boundaries explicit in `## Out of scope` and in the **Directory Architecture** in `AGENTS.md`.
@@ -268,6 +297,14 @@ The VS Code `plan` prompt (`agent: Plan`) and Spec-Kit `/plan` output are planni
 Renderers must replace these placeholders before writing generated runtime
 agent directories. Literal `{{OPTIONAL_...}}` placeholders are allowed only in
 this repository's templates under `assets/`.
+
+Content-quality placeholders such as `{{CONTENT_QUALITY_STATUS}}`,
+`{{CONTENT_QUALITY_CURATOR}}`, `{{CONTENT_QUALITY_OWNER}}`,
+`{{CONTENT_QUALITY_SIGNALS}}`, and `{{CONTENT_QUALITY_REFERENCE}}` are normal
+managed-content placeholders in `AGENTS.md` and related templates. They are not
+runtime frontmatter fields. For Codex TOML, keep content-quality guidance inside
+`developer_instructions`; do not emit unsupported fields such as
+`content_quality`, `ask_user`, `question`, `request_user_input`, or `memory`.
 
 General default: when a feature is off, unsupported, or not applicable, replace
 the placeholder with an empty string and remove the surrounding blank line or
@@ -314,6 +351,7 @@ Default approved roster gate:
 
 ```yaml
 permission:
+  question: allow
   task:
     "*": deny
     "<subagent-name>": allow
@@ -323,6 +361,7 @@ MCP skipped or no delegated subagents:
 
 ```yaml
 permission:
+  question: allow
   task:
     "*": deny
 ```
@@ -331,6 +370,7 @@ Human-approved broad delegation must stay non-permissive by default:
 
 ```yaml
 permission:
+  question: allow
   task:
     "*": ask
 ```

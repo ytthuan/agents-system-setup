@@ -1,6 +1,6 @@
 # Memory and Learning System
 
-Generated agent systems can include a lightweight learning loop:
+Generated agent systems can include a lightweight, plugin-managed learning loop:
 
 ```text
 Experience -> Capture -> Reflect -> Persist -> Apply
@@ -24,7 +24,33 @@ Ask per project before writing memory artifacts.
 
 Default guidance: recommend `project-tracked` for teams and `project-local` for
 personal setups. Respect the artifact tracking decision from
-[local tracking](./local-tracking.md).
+[local tracking](./local-tracking.md). Native provider memory, when present, is
+complementary; it does not replace the explicit Learning Check, approval, and
+no-secrets policy.
+
+## Native vs plugin-managed learning
+
+| Runtime | Native memory / learning surface | Setup behavior |
+|---|---|---|
+| Copilot CLI | Copilot Memory is public-preview, transparent, server-side durable repo memory. | Document it as complementary. Do not create local files for native memory; keep plugin-managed project learning for explicit policy and audit evidence. |
+| Claude Code | Subagent `memory` field supports `user`, `project`, and `local`. Plugin agents support memory but not `hooks`, `mcpServers`, or `permissionMode`. | Enable `memory` only when the user picks a scope. Keep hook/MCP/permission setup separate and approval-gated. |
+| OpenCode | No durable auto-learning beyond AGENTS.md, skills, compaction summaries, and plugin patterns. | Use the plugin-managed storage profile for durable learning. Do not claim native long-term memory. |
+| OpenAI Codex CLI + App | Memories feature exists via `[features] memories = true` and `~/.codex/memories/`; it is off by default and may be region-limited. | Mention optional native memories only when relevant. Do not emit `memory` in `.codex/agents/*.toml`. |
+| Gemini CLI | Native memory includes `save_memory`, `GEMINI.md`, `/memory`, and experimental `autoMemory`; skills use `activate_skill`. | Use `GEMINI.md` for project context. Enable `save_memory`/`autoMemory` only after user approval; subagents cannot call subagents. |
+
+## Setup behavior
+
+1. Ask the Memory & Learning profile once during advanced agent behavior intake.
+2. Record `learning_memory_profile`, `native_learning_surface`, owner, path,
+   gate strength, and overwrite policy in the plan.
+3. If native memory is only documented, render a short "native memory available"
+   note and keep plugin-managed Learning Check active.
+4. If native memory is explicitly enabled, render the exact provider-native
+   config or command and ask before writing or changing settings.
+5. Never write provider memory, hooks, MCP config, or plugin settings as a side
+   effect of choosing plugin-managed learning.
+6. Do not re-ask learning or hook setup in wrap-up when Phase 1.9/1.10 already
+   handled it.
 
 ## Learning record schema
 
@@ -132,6 +158,9 @@ approval-gated:
 - OpenCode: `.opencode/hooks/` only when selected and approved.
 - Codex/Gemini: document agent-native reflection unless a supported hook surface
   is confirmed.
+- Native memory is not a hook. Copilot Memory, Claude `memory`, Codex memories,
+  and Gemini `save_memory`/`autoMemory` still follow the approval and no-secrets
+  rules above.
 
 No hook may bypass the MCP approval gate, artifact tracking choice, or
 orchestrator approval for overwrites.
@@ -145,3 +174,6 @@ orchestrator approval for overwrites.
 - Updating old learnings without orchestrator approval.
 - Storing secrets, raw credentials, or full private logs.
 - Loading the entire memory ledger for every task.
+- Emitting unsupported native memory fields, especially `memory` in Codex agent TOML.
+- Treating OpenCode compaction summaries as durable project learning.
+- Re-asking optional learning/hook setup during wrap-up after setup already handled it.

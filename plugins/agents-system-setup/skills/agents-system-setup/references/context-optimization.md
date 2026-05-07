@@ -20,6 +20,8 @@ If the user is unsure, choose `Balanced`.
 |---|---|---|
 | `AGENTS.md` | Canonical routing and policy index | One-screen "Read First"; compact matrices; link overflow details. |
 | Runtime agent files | Role-specific execution instructions | Include role, owned/read-only paths, triggers, security boundary, output contract. Avoid repeating full project policy. |
+| Requirements triage output | Intake brief before planning | Keep inline in the plan as a compact scope/risk/routing seed; do not duplicate full repo memory. |
+| Content quality review | Anti-slop signal check before final output | Keep only status/signals inline; link `content-quality.md` for taxonomy and fixes. |
 | Memory & learning files | Durable lessons and Learning Index | Load the index first; load detailed entries only when category/path/runtime matches the task. |
 | Reference files | Deep detail | Load only when task needs that domain or when the user asks for full detail. |
 | Plans / summaries | Temporary task state | Lead with outcome, keep evidence concise, link or name files for detail. |
@@ -52,6 +54,8 @@ Keep inline:
 - Quality gates.
 - Runtime "try it" commands.
 - Plan Handoff Contract summary.
+- Requirements triage status and latest intake evidence.
+- Content-quality status, curator mode, and signals.
 - Memory & Learning System summary, including Learning Check and memory owner.
 
 Move or link when large:
@@ -107,6 +111,8 @@ Map common task tags to the references each agent should load (or skip), and to 
 | Task tag | Always load | Load when applicable | Safe to skip | Recommended packet form |
 |---|---|---|---|---|
 | `read-only-research` | `AGENTS.md` Read First, Directory Architecture | `topology.md` if topology questions | Security & Audit Matrix detail, Threat Model long rationale, MCP gate | short-form |
+| `requirements-triage` | `AGENTS.md` Read First, Directory Architecture, Human Input / Question Protocol | `topology.md`, platform/runtime refs, Security & Audit rows, prior plan only when relevant | Source files outside requested scope, full marketplace research | short-form intake brief |
+| `content-quality-review` | `AGENTS.md` Read First, Content Quality / Anti-Slop Review, Directory Architecture | `content-quality.md`, `output-contract.md`, `handoff.md`, runtime refs for generated artifacts | Source implementation files unrelated to generated prose | short-form quality signals |
 | `code-edit` | `AGENTS.md` Read First, Directory Architecture, owning agent boundary | Quality Gates row for this path | Marketplace research, full platform schemas | short-form (≤2 files) · full-form when >2 files or shared boundary |
 | `security-write` | Security & Audit Matrix, Threat Model, owning agent boundary | `security-audit-architecture.md` rows for the change | Long marketplace candidate research | full-form |
 | `mcp-write` | MCP approval gate (Phase 3.5), Security & Audit Matrix | `plugin-discovery.md` MCP rendering | Architecture Decisions detail | full-form |
@@ -137,6 +143,7 @@ Renderers must keep section headings (so validators and humans can find them) an
 - Treating `<details>` blocks as context optimization; models still read the text.
 - Moving security/audit/architecture gates into a file that `AGENTS.md` does not link.
 - Repeating the same policy paragraph in every subagent.
+- Adding anti-slop bloat instead of a compact `Content quality` status and linked signal taxonomy.
 - Generating full marketplace research inline when only one candidate was selected.
 - Hiding lossy replication drops to save space.
 - Loading the full learning ledger for every task instead of the Learning Index and matching entries.

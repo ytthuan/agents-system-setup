@@ -18,7 +18,7 @@ Scaffold or update a complete agent system for the current project across **Copi
 
 ## Hard Rules
 
-1. **Always interview first** with `ask_user`. Never assume project type, language, scope, or target platform.
+1. **Always interview first** with the provider-native human-input tool. Use [human input](./references/human-input.md); in Copilot CLI this is the session `ask_user` tool and `--no-ask-user` disables it. Never assume project type, language, scope, or target platform.
 2. **Detect existing agent footprint on entry.** If any of `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `opencode.json`, `.github/agents/`, `.claude/agents/`, `.opencode/agents/`, `.codex/agents/`, `.gemini/agents/`, `~/.codex/AGENTS.md` exists, present mode choice with `improve` and `replicate` as first-class options — never silently jump to `update`.
 3. **Orchestrator + subagent topology is mandatory.** Subagent count (3 to ~50) is decided dynamically from scope.
 4. **Directory Architecture is generated and enforced.** Every subagent file references it; the orchestrator routes by ownership.
@@ -40,10 +40,32 @@ Scaffold or update a complete agent system for the current project across **Copi
 20. **Plan handoff is normalized before emission.** Treat VS Code `plan` prompt output, Spec-Kit `/plan`, and user-written plans as upstream planning input only. Convert them to the [handoff contract](./references/handoff.md) / HandoffIR, then emit each selected runtime's native format. Never copy prompt frontmatter or another runtime's agent schema into generated artifacts.
 21. **Runtime drift is source-backed and gated.** Use [runtime updates](./references/runtime-updates.md) before changing platform support. Gemini CLI is supported for local project subagents; remote A2A/extension packaging surfaces remain explicit import/package work.
 22. **Model overrides are optional and source-backed.** Keep `model:` blank by default. Only when the user opts in during interview Q9b, load [models](./references/models.md) for the runtime's accepted format, defaults, and rate-limit sources. Never pin live RPM/TPM numbers in generated files.
-23. **Task assignments use the canonical contract.** Compose every orchestrator → subagent handoff with the [Task Assignment Contract](./references/handoff.md#delegation-packet-canonical-schema). Always fill the Required Minimum; add Expansion Blocks per the [Recommended Packet Form](./references/handoff.md#recommended-packet-form). Subagents run the Acceptance Checklist before doing work and emit results via the Reporting Template; missing required fields trigger one consolidated `clarification_request:` to the orchestrator.
-24. **Learning memory is approval-safe.** When enabled, generated agents run the [Learning Check](./references/learning-memory.md#learning-check-contract) before final response. `none` is valid. Subagents propose learnings; only the orchestrator or memory owner writes memory, and overwrite requires orchestrator approval. Never store secrets or raw credentials in learnings.
+23. **Task assignments use the canonical contract.** Compose every orchestrator → subagent handoff with the [Task Assignment Contract](./references/handoff.md#delegation-packet-canonical-schema). Always fill the Required Minimum; add Expansion Blocks per the [Recommended Packet Form](./references/handoff.md#recommended-packet-form). Subagents run the Acceptance Checklist before doing work and emit results via the Reporting Template; missing required fields trigger one consolidated `question_request:` to the orchestrator.
+24. **Learning memory is approval-safe and native-aware.** When enabled, generated agents run the [Learning Check](./references/learning-memory.md#learning-check-contract) before final response. `none` is valid. Subagents propose learnings; only the orchestrator or memory owner writes plugin-managed memory, and overwrite requires orchestrator approval. Native provider memory is complementary and used only where documented; never emit unsupported memory fields such as Codex agent TOML `memory`.
+25. **Human-input schemas are provider-specific.** Never add `ask_user` to Copilot custom-agent `tools:` profiles. Claude agents that need to ask include `AskUserQuestion`; OpenCode uses nested `permission: { question: allow }`; Codex uses `request_user_input` only in Plan mode and falls back to `question_request`; Gemini may allow `ask_user`. Subagents return `question_request` when they cannot ask directly.
+26. **Run self-update preflight before setup.** Phase -1 uses [self-update preflight](./references/self-update-preflight.md) at `${AGENTS_SYSTEM_SETUP_HOME:-$HOME/github/agents-system-setup}`. Fast-forward only clean Git checkouts; ask or emit `question_request` on dirty, missing, divergent, or install-manager ambiguity. Never update MCP/plugin config silently.
+27. **Requirements triage is default-on recommended.** Add `requirements-triage` before `planner` for normal, ambiguous, cross-runtime, security-sensitive, release, MCP, replication, or multi-wave setups. For tiny direct setups, merge the role into `planner` and record why. Triage is read-mostly, uses `question_request`, and never owns final decisions or approval gates.
+28. **Content quality is universal.** Apply [content quality](./references/content-quality.md) to all generated agents, skills, memory files, recommendations, and output contracts. Generate `agent-quality-curator` as a separate read-only role for normal/complex setups, merge into `reviewer` for tiny setups, and report `Content quality: ok|warn|fail|n/a`.
 
 ## Procedure
+
+### Phase -1 — Self-Update Preflight
+
+Before footprint detection, run the safe preflight from
+[self-update-preflight](./references/self-update-preflight.md):
+
+1. Locate `${AGENTS_SYSTEM_SETUP_HOME:-$HOME/github/agents-system-setup}`.
+2. If it is a clean Git checkout with an upstream, `git fetch` and
+   `git merge --ff-only` when only behind.
+3. If the checkout is missing, dirty, ahead, divergent, lacks upstream, or the
+   install owner is ambiguous, ask with the provider-native human-input tool
+   from [human input](./references/human-input.md). If interaction is disabled,
+   emit `question_request` and continue with the installed version.
+4. Do not edit MCP config, plugin config, runtime settings, generated agents, or
+   version/release files during this phase.
+
+Record `update_preflight_status`, source path/manager, and evidence for Phase 2
+and the final output contract.
 
 ### Phase 0 — Detect Footprint & Choose Mode
 
@@ -180,7 +202,7 @@ Ask and record the Q9b choices before Phase 2:
 1. **Per-agent model override policy** — keep runtime defaults unless the user opts in. Ask for override policy by scope (`all agents | by role | exceptions only`) and avoid looping over every agent by default.
 2. **Copilot CLI Tool Profile** — only when Copilot CLI is selected; persist `copilot_tools_profile`.
 3. **Output profile / context budget** — `Balanced | Compact | Full`.
-4. **Memory & Learning profile** — persist `learning_memory_profile`, `learning_gate_strength`, and overwrite policy.
+4. **Memory & Learning profile** — persist `learning_memory_profile`, `learning_gate_strength`, overwrite policy, and whether native provider memory is only documented or explicitly enabled.
 
 For Copilot CLI tools, keep prompt choices concise: Standard least-privilege by
 role (recommended), Read-only everywhere, Inherit parent tools, or Custom after
@@ -208,14 +230,53 @@ recorded choice for planning and rendering. Use [learning memory](./references/l
 
 Record:
 - `learning_memory_profile`: `project-tracked | project-local | personal-global | disabled`
+- `native_learning_surface`: runtime-native memory selected or `document-only | disabled`
 - `learning_memory_owner`: `@memory-steward` when the roster includes one, otherwise `@orchestrator`
 - `learning_memory_path`: path chosen from [learning memory](./references/learning-memory.md#storage-profiles)
 - `learning_gate_strength`: `recommended` by default; do not make it blocking unless the user explicitly asks
 - `learning_update_policy`: `overwrite requires orchestrator approval`
 
-Do not ask a separate blocking Learning Check question by default. Ask optional
-hook/script support only when the runtime has a supported hook surface. Render
-the exact hook/config proposal and ask before writing it.
+Do not ask a separate blocking Learning Check question by default. Native memory
+setup follows [learning memory](./references/learning-memory.md): Copilot Memory
+is public-preview, transparent server-side durable repo memory, Claude has
+`memory: user|project|local`, OpenCode relies on AGENTS/skills/compaction/plugin
+patterns, Codex memories require `[features] memories = true`, and Gemini has
+`save_memory`, `GEMINI.md`, `/memory`, and experimental `autoMemory`. Ask
+optional hook/script support only when the runtime has a supported hook surface
+and this setup has not already handled learning. Render the exact hook/config
+proposal and ask before writing it.
+
+### Phase 1.11 — Requirements Triage
+
+Before Phase 2 planning, decide `requirements_triage_status`:
+
+- `separate` — generate `requirements-triage` as its own read-mostly subagent.
+- `merged` — merge triage into `planner` for tiny direct setups.
+- `skipped` — only when the task is direct, low-risk, single-runtime, and already
+  has clear scope.
+
+Default to `separate` for ambiguous, multi-step, cross-runtime, security-sensitive,
+release, MCP, replication, audit, improve, or multi-wave setups. The triage role
+returns an intake brief with intent summary, task type, in/out scope, ambiguities,
+`question_request` items, risk classification, recommended routing/waves,
+acceptance criteria, quality gates, and Learning Check. The orchestrator owns the
+final plan, all user-facing questions, and every approval gate.
+
+### Phase 1.12 — Content Quality Review
+
+Before Phase 2 planning, decide `content_quality_curator`:
+
+- `separate` — generate `agent-quality-curator` as its own read-only subagent.
+- `merged` — merge content-quality review into `reviewer` for tiny direct setups.
+- `skipped` — only when no generated agent, skill, memory, recommendation, or
+  output-contract prose is changed.
+
+Default to `separate` for normal, complex, cross-runtime, audit, improve,
+replication, MCP, release, skill-heavy, or multi-wave setups. Use
+[content quality](./references/content-quality.md) for signals, status levels,
+and boundaries. The curator reports
+`Content quality: ok|warn|fail|n/a; signals=<list|none>` and never owns broad
+write, MCP config, runtime config, release metadata, or final approval gates.
 
 ### Phase 2 — Plan (Directory Architecture, Roster, Matrix, Waves)
 
@@ -225,12 +286,16 @@ Build the plan and show it before writing anything. The plan must include:
 - **Agent Roster** — table of `name | role | owns | triggers | model (optional) | parallel-safe | wave`. Use [topology guide](./references/topology.md). Compute parallel-safety per [parallelism](./references/parallelism.md): a subagent is parallel-safe iff its `owns` glob doesn't overlap any other's, it doesn't write outside `owns`, and it doesn't depend on another subagent's output in the same wave.
 - **Capability Matrix** — capabilities × agents grid (✅ / 🟡).
 - **Wave plan** — grouped list `Wave N → [parallel-safe subagents]`; the orchestrator fans out per wave and awaits each before the next.
+- **Requirements triage** — status (`separate | merged | skipped`), intake brief, ambiguities, `question_request` count, risk flags, and recommended first-wave routing.
+- **Content quality** — curator status (`separate | merged | skipped`), review scope, expected signals, and output marker from [content quality](./references/content-quality.md).
 - **Plan Handoff Contract** — accepted planning sources, HandoffIR fields, per-platform format targets, approval boundaries, and verification evidence. Use [handoff](./references/handoff.md).
+- **Self-update preflight** — status, source path or provider manager, fast-forward evidence, and any `question_request` from [self-update preflight](./references/self-update-preflight.md).
+- **Human Input protocol** — selected runtime matrix, native question tool or fallback, allowlist/config syntax, and unresolved `question_request` records from [human input](./references/human-input.md).
 - Skills to create.
 - Plugin/MCP candidates **per capability** (Phase 3 fills this).
 - Per-platform file plan (Copilot/Claude/OpenCode/Codex/Gemini paths the user will actually get).
 - **Artifact tracking** — `project-tracked | project-local | personal-global`, plus exclude plan for local-only mode.
-- **Memory & Learning plan** — storage profile, memory owner, curated memory path, operational ledger path (if any), Learning Check strength, overwrite approval policy, and Directory Architecture rows for memory paths.
+- **Memory & Learning plan** — native-vs-plugin-managed memory choice, storage profile, memory owner, curated memory path, operational ledger path (if any), Learning Check strength, overwrite approval policy, and Directory Architecture rows for memory paths.
 - Git actions (if any).
 - **Output profile & context budget** — `balanced|compact|full`, sections kept inline, overflow targets, and biggest expected agent-memory file.
 - **Security & Audit Matrix** — controls, owner agents, affected paths, evidence required, and source reference.
@@ -308,9 +373,13 @@ For each selected platform, look up paths and frontmatter in [platforms.md](./re
 - Drop the [directory-architecture snippet](./assets/directory-architecture.snippet.md) into any agent missing the boundary block.
 - **Orchestrator parallelism clause** — render the wave-aware fan-out instructions per [parallelism](./references/parallelism.md). The orchestrator must invoke all parallel-safe subagents of a wave in a single response (multiple Task-tool calls), await all results, then start the next wave.
 - **Plan handoff contract** — render the HandoffIR fields and platform format targets per [handoff](./references/handoff.md). Agent files receive a concise handoff input/output section; Codex subagents receive it inside `developer_instructions`.
+- **Self-update preflight notes** — render the Phase -1 status and approved provider update command, if any. Do not imply that MCP/plugin config changed unless the normal gated write path changed it.
+- **Human input protocol** — render the provider-specific question behavior from [human input](./references/human-input.md). Copilot agents never include `ask_user` in `tools:`; Claude restrictive allowlists include `AskUserQuestion` only for agents expected to ask; OpenCode uses nested `permission: { question: allow }`; Codex TOML has no human-input field and uses `question_request`; Gemini may allow `ask_user` for interactive agents.
+- **Requirements triage role** — render `requirements-triage` as a read-mostly subagent when Phase 1.11 is `separate`; otherwise render the merged/skipped rationale in `AGENTS.md`. Triage owns no source paths, returns `question_request` for missing input, and cannot write MCP/runtime config or release metadata.
+- **Content quality role** — render `agent-quality-curator` as a read-only subagent when Phase 1.12 is `separate`; otherwise render the merged/skipped rationale in `AGENTS.md`. The curator reviews generated agent, skill, memory, recommendation, and output-contract prose, reports content-quality signals, and must not write MCP/runtime config or release metadata.
 - **Governance baseline** — render the security, audit, architecture, design-pattern, ADR, and quality-gate sections from Phase 1.8 / Phase 2. Subagents that touch sensitive paths, MCP/tool config, CI/release config, dependency manifests, or architecture boundaries must include explicit security boundaries and audit evidence expectations.
 - **Context optimization** — apply [context optimization](./references/context-optimization.md): compact inline summaries, links for overflow details, concise delegation packets, no duplicated long policy prose across subagents, and **profile-aware compact-mode trimming** for Compact subagents (Security/Architecture/Output sections collapse to one line + link; section anchors stay so validators can find them). Codex TOML always follows the [summary + pointer rule](./references/agent-format.md#codex-toml-summary--pointer-rule). Set `Context freshness: recent` in delegation packets when `AGENTS.md` was loaded this turn.
-- **Memory & Learning System** — render the chosen profile from [learning memory](./references/learning-memory.md): `AGENTS.md` gets the Memory & Learning System section, orchestrators get Reflect & Learn, subagents get Learning Check, and optional `assets/learnings.md.template` is emitted only when the memory profile needs a curated Markdown file. Sensitive new learnings require orchestrator and security-owner approval when tagged `risk` or when they mention MCP, CI/release, dependencies, secrets, or generated scripts. Do not write hooks/scripts unless separately approved.
+- **Memory & Learning System** — render the chosen profile from [learning memory](./references/learning-memory.md): `AGENTS.md` gets the native-vs-plugin-managed memory note, orchestrators get Reflect & Learn, subagents get Learning Check, and optional `assets/learnings.md.template` is emitted only when the memory profile needs a curated Markdown file. Sensitive new learnings require orchestrator and security-owner approval when tagged `risk` or when they mention MCP, CI/release, dependencies, secrets, or generated scripts. Do not write native memory config, hooks, or scripts unless separately approved.
 - **OpenCode primary task gate** — when emitting an OpenCode orchestrator, render `permission.task` so it can call only generated roster subagents by default (`"*": deny`, explicit roster entries allow). Broaden only when the plan says why.
 - **Artifact tracking** — apply [local tracking](./references/local-tracking.md). In `project-local` mode, update `.git/info/exclude` after writes and verify at least `AGENTS.md` with `git check-ignore -v`.
 - **Spec-Kit block** — if Phase 1.7 recorded `spec_kit_installed = true`, render `assets/spec-kit-block.snippet.md` into the `{{SPEC_KIT_BLOCK}}` placeholder of `AGENTS.md` (substituting `{{RUNTIME}}` per platform: `copilot|claude|codex|opencode|gemini`). If `false`, replace the placeholder with an empty string. See [spec-kit](./references/spec-kit.md).
@@ -354,9 +423,12 @@ Only if user confirmed in Phase 1 AND no `.git/` exists. Pick the script that ma
 6. Verify `AGENTS.md` contains **Plan Handoff Contract**, **Context Loading Policy** (including the **Task-Type Routing Map** rows), and records the selected output profile.
 7. Verify `AGENTS.md` contains **Memory & Learning System**, the chosen memory profile, and the rule that overwrite requires orchestrator approval. Confirm every orchestrator includes **Reflect & Learn** and every subagent/Codex TOML includes **Learning Check** with the no-secrets rule.
 8. Verify every generated agent/subagent uses its target runtime's native handoff surface: Markdown body for Copilot/Claude/OpenCode/Gemini, TOML `developer_instructions` for Codex. Confirm each subagent template includes the **Acceptance Checklist** and **Reporting Template** sections; Codex TOML mirrors them inside `developer_instructions`. For Copilot CLI agents, confirm the `tools:` line matches the role's profile from [Copilot CLI Standard Tool Profiles](./references/platforms.md#copilot-cli-standard-tool-profiles): orchestrator + edit-capable subagents emit `[vscode, execute, read, agent, edit, search, todo]`; reviewers/auditors emit `[read, search]`; the marker `<!-- agents-system-setup:tools-profile: <profile> -->` records the chosen profile.
-9. Verify artifact tracking: project-tracked files are visible to git; project-local files are ignored via `.git/info/exclude`; personal-global mode wrote no repo artifacts unless approved.
-10. Print "Try it" examples per selected platform (`copilot`, `claude`, `opencode`, `codex`, `gemini`).
-11. Suggest 2–3 next customizations.
+9. Verify self-update preflight: the output records checked/current/fast-forwarded/requires-human/skipped status, and no MCP/plugin/runtime config changed outside the normal approval gates.
+10. Verify human-input protocol: no Copilot `tools:` profile contains `ask_user`; Claude restrictive ask-capable agents include `AskUserQuestion`; OpenCode uses nested `permission` with `question`; Codex TOML has no `request_user_input` or `memory` field; Gemini interactive ask-capable agents may include `ask_user`; subagents document `question_request` fallback.
+11. Verify content quality: `AGENTS.md` records `agent-quality-curator` status, generated subagents report `Content quality`, and final output includes content-quality status/signals.
+12. Verify artifact tracking: project-tracked files are visible to git; project-local files are ignored via `.git/info/exclude`; personal-global mode wrote no repo artifacts unless approved.
+13. Print "Try it" examples per selected platform (`copilot`, `claude`, `opencode`, `codex`, `gemini`).
+14. Suggest 2–3 next customizations.
 
 ### Phase 8 — Final Wrap-Up (single consolidated ask)
 
@@ -404,13 +476,16 @@ Skip the entire phase only when `mode == update` and no agents/plugins/MCP chang
 - **Generating pattern names without rationale** — every architecture/design-pattern decision needs alternatives, guardrails, and an ADR reference or `n/a` rationale.
 - **Creating a security auditor with broad write access** — security review is read-mostly unless the plan grants tightly scoped remediation paths.
 - **Using verbosity as safety** — long repeated prompts do not make agents safer. Keep gates and ownership inline, link detail, and require evidence.
+- **Adding anti-slop bloat** — content-quality review must remove generic, unsupported, repetitive prose; do not paste long quality rules into every generated subagent.
 - **Hiding overflow details** — any moved detail must be linked from `AGENTS.md` or listed in the output contract.
 - **Assuming agent artifacts should be committed** — always ask tracking mode before writing project files.
 - **Using `.gitignore` for local-only project agents without approval** — local-only mode belongs in `.git/info/exclude`.
 - **Copying plan prompt frontmatter into agent files** — the VS Code `plan` prompt (`agent: Plan`) is an upstream planning surface, not a runtime agent schema. Normalize to HandoffIR, then emit per-platform formats.
 - **Letting Gemini subagents recurse** — Gemini subagents cannot call other subagents; route fan-out through the parent/orchestrator session.
 - **Using Gemini's docs-spelled `mcpServers` in local subagents** — generated local agents must use loader-valid `mcp_servers:` and must pass the MCP approval gate.
+- **Putting human-input tools in the wrong schema** — no Copilot `ask_user` in custom-agent `tools:`, no literal OpenCode `permission.question`, no Codex TOML `request_user_input`, and no unsupported memory fields.
+- **Silent self-updates that change config** — Phase -1 may fast-forward the skill checkout only; plugin/MCP/runtime config changes still need their normal approval gates.
 
 ## Output Contract
 
-Use [output-contract](./references/output-contract.md). Always include `Context profile`, `Context split`, and largest memory file. For `Compact` and `Balanced`, lead with counts, changed paths, security/architecture evidence, and "Try it" commands; expand full lists only for failures, warnings, or explicit user requests.
+Use [output-contract](./references/output-contract.md). Always include `Update preflight`, `Human input`, `Context profile`, `Context split`, and largest memory file. For `Compact` and `Balanced`, lead with counts, changed paths, security/architecture evidence, and "Try it" commands; expand full lists only for failures, warnings, or explicit user requests.

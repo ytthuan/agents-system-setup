@@ -23,6 +23,10 @@ Checks (per the CONTRIBUTING.md contract):
   17. Runtime update audit tracks supported-runtime drift for five runtimes
   18. Runtime invocation guidance distinguishes skills, commands, plugins,
       and provider-specific `/`, `$`, and `@` syntax
+  19. Human-input/question tooling is provider-specific and non-terminating
+  20. Self-update preflight is safe, fast-forward-only, and config-silent
+  21. Generated content-quality / anti-slop review is universal, compact,
+      read-only by default, and provider-schema safe
 
 Exits non-zero on any failure. Designed to be invoked from CI on
 Linux / macOS / Windows runners with only Python 3.10+ available
@@ -942,6 +946,301 @@ def require_matches(path: Path, patterns: tuple[str, ...]) -> None:
             err(f"{rel}: missing required governance pattern `{pattern}`")
 
 
+def _read_text_for_policy(path: Path) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        err(f"{path.relative_to(REPO).as_posix()}: required governance file is missing")
+    except UnicodeDecodeError:
+        err(f"{path.relative_to(REPO).as_posix()}: not valid UTF-8")
+    return None
+
+
+def _skill_policy_paths() -> list[Path]:
+    paths = [SKILL_ROOT / "SKILL.md"]
+    paths.extend(sorted((SKILL_ROOT / "references").glob("*.md")))
+    paths.extend(
+        p
+        for p in sorted((SKILL_ROOT / "assets").rglob("*"))
+        if p.is_file()
+    )
+    return paths
+
+
+def _aggregate_policy_text(paths: list[Path]) -> str:
+    chunks: list[str] = []
+    for path in paths:
+        text = _read_text_for_policy(path)
+        if text is None:
+            continue
+        rel = path.relative_to(REPO).as_posix()
+        chunks.append(f"\n--- {rel} ---\n{text}")
+    return "\n".join(chunks)
+
+
+def _require_aggregate_marker(label: str, text: str, marker: str, *, case_sensitive: bool = True) -> None:
+    haystack = text if case_sensitive else text.casefold()
+    needle = marker if case_sensitive else marker.casefold()
+    if needle not in haystack:
+        err(f"{label}: missing required governance marker `{marker}`")
+
+
+def _require_aggregate_pattern(label: str, text: str, pattern: str) -> None:
+    if not re.search(pattern, text, re.MULTILINE | re.DOTALL):
+        err(f"{label}: missing required governance pattern `{pattern}`")
+
+
+def _iter_policy_lines(paths: list[Path]):
+    for path in paths:
+        text = _read_text_for_policy(path)
+        if text is None:
+            continue
+        rel = path.relative_to(REPO).as_posix()
+        in_fence = False
+        for line_no, line in enumerate(text.splitlines(), start=1):
+            if re.match(r"^\s*```", line):
+                in_fence = not in_fence
+            yield path, rel, line_no, line, in_fence
+
+
+def _frontmatter_tools(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [part.strip().strip("'\"") for part in re.split(r"[, \t]+", value) if part.strip()]
+    if isinstance(value, list):
+        return [str(part).strip().strip("'\"") for part in value]
+    return []
+
+
+def _has_negative_context(line: str) -> bool:
+    return bool(
+        re.search(
+            r"\b(no|not|never|without|avoid|forbid|forbidden|unsupported|"
+            r"anti-pattern|pitfall|does not exist|there is no|do not|don't|must not)\b",
+            line,
+            re.IGNORECASE,
+        )
+    )
+
+
+def _strip_toml_triple_strings(text: str) -> str:
+    return re.sub(r'(?s)""".*?"""|\'\'\'.*?\'\'\'', '""', text)
+
+
+def check_human_input_protocol() -> None:
+    """Guard provider-specific question tools and subagent question_request flow."""
+    policy_paths = _skill_policy_paths()
+    policy_text = _aggregate_policy_text(policy_paths)
+    label = "human-input protocol"
+
+    for marker in (
+        "Human Input / Question Tool Matrix",
+        "question_request",
+        "AskUserQuestion",
+        "request_user_input",
+        "--no-ask-user",
+        "ask_user",
+        "provider-native",
+    ):
+        _require_aggregate_marker(label, policy_text, marker)
+    _require_aggregate_marker(label, policy_text, "non-terminating", case_sensitive=False)
+    _require_aggregate_pattern(
+        label,
+        policy_text,
+        r"permission:\s*(?:\{\s*question\s*:\s*allow\s*\}|\n\s+question:\s*allow\b)",
+    )
+    for path in (
+        SKILL_ROOT / "SKILL.md",
+        SKILL_ROOT / "references" / "handoff.md",
+    ):
+        rel = path.relative_to(REPO).as_posix()
+        for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+            if "clarification_request" in line and "legacy" not in line.casefold() and "superseded" not in line.casefold():
+                err(f"{rel}:{line_no}: use `question_request` for current human-input flow; `clarification_request` is legacy-only")
+
+    # Copilot generated tool profiles/templates must never include ask_user.
+    copilot_paths = [
+        SKILL_ROOT / "SKILL.md",
+        SKILL_ROOT / "references" / "platforms.md",
+        SKILL_ROOT / "references" / "agent-format.md",
+        SKILL_ROOT / "references" / "replication.md",
+        SKILL_ROOT / "references" / "interview.md",
+        SKILL_ROOT / "references" / "runtime-updates.md",
+        SKILL_ROOT / "assets" / "orchestrator.agent.md.template",
+        SKILL_ROOT / "assets" / "subagent.agent.md.template",
+    ]
+    for path, rel, line_no, line, _ in _iter_policy_lines(copilot_paths):
+        gemini_context = "gemini" in line.casefold() or path.name in {"GEMINI.md.template", "subagent.gemini.md.template"}
+        if not gemini_context and re.search(r"\btools\s*:\s*\[[^\]\n]*\bask_user\b", line, re.IGNORECASE):
+            err(f"{rel}:{line_no}: Copilot generated `tools:` profiles must not include `ask_user`")
+        if path.suffix == ".md" and ".github" in path.parts and "agents" in path.parts:
+            split = split_frontmatter(path.read_text(encoding="utf-8", errors="ignore"))
+            if split is not None:
+                try:
+                    fm = parse_yaml_document(split[0])
+                except Exception:
+                    fm = {}
+                if isinstance(fm, dict) and any(tool == "ask_user" for tool in _frontmatter_tools(fm.get("tools"))):
+                    err(f"{rel}: Copilot custom-agent frontmatter `tools:` must not include `ask_user`")
+
+    # Claude question tooling must be AskUserQuestion, never other runtimes' names.
+    claude_paths = [
+        SKILL_ROOT / "references" / "human-input.md",
+        SKILL_ROOT / "references" / "platforms.md",
+        SKILL_ROOT / "references" / "agent-format.md",
+        SKILL_ROOT / "references" / "runtime-updates.md",
+        SKILL_ROOT / "assets" / "orchestrator.claude.md.template",
+        SKILL_ROOT / "assets" / "subagent.claude.md.template",
+    ]
+    _require_aggregate_marker("Claude human-input tooling", _aggregate_policy_text(claude_paths), "AskUserQuestion")
+    for path, rel, line_no, line, _ in _iter_policy_lines(claude_paths):
+        claude_context = "claude" in rel.casefold() or re.search(r"\bClaude\b", line)
+        if not claude_context:
+            continue
+        if _has_negative_context(line):
+            continue
+        if re.search(r"\btools\s*:\s*[^\n]*\b(ask_user|request_user_input)\b", line, re.IGNORECASE):
+            err(f"{rel}:{line_no}: Claude `tools:` entries must use `AskUserQuestion`, not another runtime's question tool")
+        if re.search(r"\btools\s*:\s*[^\n]*\bquestion\b", line, re.IGNORECASE) and "AskUserQuestion" not in line:
+            err(f"{rel}:{line_no}: Claude question tooling must be `AskUserQuestion`, not `question`")
+        split = split_frontmatter(path.read_text(encoding="utf-8", errors="ignore")) if path.suffix == ".md" else None
+        if split is not None:
+            try:
+                fm = parse_yaml_document(split[0])
+            except Exception:
+                fm = {}
+            if isinstance(fm, dict):
+                lowered_tools = {tool.casefold() for tool in _frontmatter_tools(fm.get("tools"))}
+                if lowered_tools & {"ask_user", "question", "request_user_input"}:
+                    err(f"{rel}: Claude frontmatter `tools:` must use `AskUserQuestion` for question tooling")
+
+    # OpenCode must emit nested permission syntax, not a dotted config key.
+    opencode_paths = [
+        SKILL_ROOT / "SKILL.md",
+        SKILL_ROOT / "references" / "human-input.md",
+        SKILL_ROOT / "references" / "platforms.md",
+        SKILL_ROOT / "references" / "agent-format.md",
+        SKILL_ROOT / "references" / "runtime-updates.md",
+        SKILL_ROOT / "assets" / "orchestrator.opencode.md.template",
+        SKILL_ROOT / "assets" / "subagent.opencode.md.template",
+    ]
+    for path, rel, line_no, line, in_fence in _iter_policy_lines(opencode_paths):
+        if "permission.question" not in line:
+            continue
+        if in_fence or not ("literal" in line.casefold() or "shorthand" in line.casefold() or _has_negative_context(line)):
+            err(f"{rel}:{line_no}: OpenCode must not emit literal `permission.question`; use nested `permission: {{ question: allow }}`")
+        if path.suffix == ".md":
+            split = split_frontmatter(path.read_text(encoding="utf-8", errors="ignore"))
+            if split is not None:
+                try:
+                    fm = parse_yaml_document(split[0])
+                except Exception:
+                    fm = {}
+                if isinstance(fm, dict) and "permission.question" in fm:
+                    err(f"{rel}: OpenCode frontmatter must not use literal `permission.question`")
+
+    # Codex TOML supports request_user_input only in Plan mode prose, not agent fields.
+    codex_toml_paths = [SKILL_ROOT / "assets" / "subagent.codex.toml.template"]
+    codex_toml_paths.extend(
+        p for p in REPO.rglob("*.toml") if ".codex" in p.parts and ".git" not in p.parts
+    )
+    for path in codex_toml_paths:
+        text = _read_text_for_policy(path)
+        if text is None:
+            continue
+        rel = path.relative_to(REPO).as_posix()
+        structural = _strip_toml_triple_strings(text)
+        for line_no, line in enumerate(structural.splitlines(), start=1):
+            if line.lstrip().startswith("#"):
+                continue
+            if re.match(r"\s*(ask_user|question|request_user_input)\s*=", line):
+                err(f"{rel}:{line_no}: Codex TOML must not define top-level human-input field `{line.strip().split('=', 1)[0].strip()}`")
+            if re.match(r"\s*\[\[?\s*(ask_user|question|request_user_input)(?:[.\]\s])", line):
+                err(f"{rel}:{line_no}: Codex TOML must not define human-input tables; keep question tooling in developer_instructions prose")
+
+    # Gemini uses ask_user for human input and activate_skill / /skills for skills.
+    gemini_paths = [
+        SKILL_ROOT / "references" / "agent-format.md",
+        SKILL_ROOT / "references" / "platforms.md",
+        SKILL_ROOT / "references" / "runtime-updates.md",
+        SKILL_ROOT / "references" / "skill-format.md",
+        SKILL_ROOT / "references" / "marketplaces.md",
+        SKILL_ROOT / "assets" / "GEMINI.md.template",
+        SKILL_ROOT / "assets" / "subagent.gemini.md.template",
+    ]
+    gemini_text = _aggregate_policy_text(gemini_paths)
+    _require_aggregate_marker("Gemini human-input tooling", gemini_text, "ask_user")
+    _require_aggregate_marker("Gemini skill activation", gemini_text, "activate_skill")
+    _require_aggregate_marker("Gemini skill management", gemini_text, "/skills")
+    for path, rel, line_no, line, _ in _iter_policy_lines(gemini_paths):
+        gemini_context = (
+            path.name in {"GEMINI.md.template", "subagent.gemini.md.template"}
+            or "gemini" in line.casefold()
+            or ".gemini" in line.casefold()
+            or "GEMINI.md" in line
+        )
+        if not gemini_context:
+            continue
+        if re.search(r"\$(?:skill|<skill>)|/<skill>", line) and not _has_negative_context(line):
+            err(f"{rel}:{line_no}: Gemini artifacts must not document `$skill` or `/<skill>` invocation; use `activate_skill` and `/skills` guidance")
+        if "ask_user" in line and not re.search(r"human[- ]input|question|interactive|allow", line, re.IGNORECASE):
+            err(f"{rel}:{line_no}: Gemini `ask_user` mentions must be limited to human-input/question guidance")
+
+
+def check_self_update_preflight_policy() -> None:
+    """Keep self-update safe: clean fast-forward only, no silent config edits."""
+    policy_paths = [
+        SKILL_ROOT / "SKILL.md",
+        SKILL_ROOT / "references" / "self-update-preflight.md",
+        SKILL_ROOT / "references" / "runtime-updates.md",
+        SKILL_ROOT / "references" / "marketplaces.md",
+        SKILL_ROOT / "references" / "wrapup.md",
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+    ]
+    policy_text = _aggregate_policy_text(policy_paths)
+    label = "self-update preflight policy"
+    for marker in (
+        "Phase -1 — Self-Update Preflight",
+        "AGENTS_SYSTEM_SETUP_HOME",
+        "git status --porcelain=v1",
+        "git fetch --prune",
+        "git merge --ff-only",
+        "dirty",
+        "missing",
+        "divergent",
+        "install mode",
+        "ask_user",
+        "copilot plugin update agents-system-setup",
+        "/plugin marketplace update",
+        "/reload-plugins",
+        "opencode plugin <module>",
+        "codex plugin marketplace upgrade",
+        "gemini extensions update --all",
+    ):
+        _require_aggregate_marker(label, policy_text, marker)
+    _require_aggregate_pattern(
+        label,
+        policy_text,
+        r"(?:must not|Never|Do not)\s+update MCP/plugin config silently|no MCP/plugin/runtime config changed outside the normal approval gates",
+    )
+
+    destructive_patterns = (
+        r"\bgit\s+reset\s+--hard\b",
+        r"\bgit\s+clean\b",
+        r"\bgit\s+stash\b",
+        r"\bgit\s+pull\s+--rebase\b",
+        r"\bgit\s+pull\b[^\n]*(?:--force|-f)\b",
+        r"\bgit\s+fetch\b[^\n]*(?:--force|-f)\b",
+    )
+    for _, rel, line_no, line, _ in _iter_policy_lines(policy_paths):
+        if "opencode plugin install" in line and not _has_negative_context(line):
+            err(f"{rel}:{line_no}: self-update docs must not use unqualified `opencode plugin install`; use `opencode plugin <module>` or package/Git update guidance")
+        for pattern in destructive_patterns:
+            if re.search(pattern, line):
+                err(f"{rel}:{line_no}: destructive self-update snippet is forbidden (`{line.strip()}`)")
+
+
 def check_governance_baseline() -> None:
     """The skill must keep security, audit, architecture, and design-pattern
     governance as first-class generated outputs, not optional wrap-up notes.
@@ -1343,6 +1642,264 @@ def check_mcp_secret_shape() -> None:
 
 # ---------- 13: context optimization ----------
 
+def check_requirements_triage_policy() -> None:
+    """Keep the generated requirements-triage role useful and read-mostly."""
+    require_contains(
+        SKILL_ROOT / "references" / "topology.md",
+        (
+            "requirements-triage",
+            "Requirements Triage Sizing Rule",
+            "default-on recommended",
+            "read-only",
+            "question_request",
+            "orchestrator owns user-facing questions",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "Requirements triage is default-on recommended",
+            "Phase 1.11 — Requirements Triage",
+            "requirements_triage_status",
+            "separate",
+            "merged",
+            "skipped",
+            "question_request",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "## Requirements Triage",
+            "{{REQUIREMENTS_TRIAGE_STATUS}}",
+            "{{REQUIREMENTS_TRIAGE_OWNER}}",
+            "{{REQUIREMENTS_TRIAGE_EVIDENCE}}",
+            "requirements-triage",
+            "question_request",
+            "read-only by default",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "handoff.md",
+        (
+            "Requirements triage handoff",
+            "triage_source",
+            "triage_status",
+            "Intent summary",
+            "Task type",
+            "Recommended routing",
+            "Triage:",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "output-contract.md",
+        (
+            "Requirements triage",
+            "triage_question_requests",
+            "intake brief",
+            "Triage status",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "context-optimization.md",
+        (
+            "Requirements triage output",
+            "requirements-triage",
+            "short-form intake brief",
+        ),
+    )
+    for rel in (
+        "orchestrator.agent.md.template",
+        "orchestrator.claude.md.template",
+        "orchestrator.opencode.md.template",
+    ):
+        require_contains(
+            SKILL_ROOT / "assets" / rel,
+            (
+                "Requirements Triage",
+                "@requirements-triage",
+                "triage: skipped",
+                "read-mostly and advisory",
+                "I own final decisions and approval gates",
+            ),
+        )
+
+    topology = (SKILL_ROOT / "references" / "topology.md").read_text(encoding="utf-8")
+    triage_lines = [line for line in topology.splitlines() if "requirements-triage" in line]
+    if not triage_lines or not any("read-only" in line for line in triage_lines):
+        err("references/topology.md: requirements-triage must be read-only by default")
+    forbidden = re.compile(
+        r"requirements-triage[^\n]*(?:mcp\s*(?:write|config)|runtime config|release metadata|full file edit|edit-capable)",
+        re.IGNORECASE,
+    )
+    for path in (
+        SKILL_ROOT / "references" / "topology.md",
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        SKILL_ROOT / "SKILL.md",
+    ):
+        rel = path.relative_to(REPO).as_posix()
+        for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+            if forbidden.search(line) and not (_has_negative_context(line) or "cannot" in line.casefold()):
+                err(f"{rel}:{line_no}: requirements-triage must not receive broad write/config/release ownership")
+
+
+def check_output_quality_policy() -> None:
+    """Keep generated anti-slop review universal, compact, and read-only."""
+    require_contains(
+        SKILL_ROOT / "references" / "content-quality.md",
+        (
+            "Content Quality / Anti-Slop Guardrails",
+            "agent-quality-curator",
+            "anti-slop-reviewer",
+            "Signal taxonomy",
+            "generic-description",
+            "empty-rationale",
+            "padding-repetition",
+            "slop-completeness",
+            "invented-attribution",
+            "context-bloat",
+            "vague-ownership",
+            "unsupported-assertion",
+            "silent-gate-gap",
+            "prompt-hygiene-risk",
+            "Content quality: <ok|warn|fail|n/a>",
+            "Quality ledger policy",
+            "Do not create `.agents-system-setup/quality-baseline.jsonl` by default",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "topology.md",
+        (
+            "agent-quality-curator",
+            "Content Quality Sizing Rule",
+            "universal recommended",
+            "read-only",
+            "Content quality: ok|warn|fail|n/a",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "Content quality is universal",
+            "Phase 1.12 — Content Quality Review",
+            "content_quality_curator",
+            "agent-quality-curator",
+            "Content quality: ok|warn|fail|n/a",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "## Content Quality / Anti-Slop Review",
+            "{{CONTENT_QUALITY_STATUS}}",
+            "{{CONTENT_QUALITY_CURATOR}}",
+            "{{CONTENT_QUALITY_OWNER}}",
+            "{{CONTENT_QUALITY_SIGNALS}}",
+            "{{CONTENT_QUALITY_REFERENCE}}",
+            "agent-quality-curator",
+            "Content quality: ok|warn|fail|n/a",
+            "Before final output when generated agent-system prose changes",
+        ),
+    )
+    for rel in (
+        "orchestrator.agent.md.template",
+        "orchestrator.claude.md.template",
+        "orchestrator.opencode.md.template",
+    ):
+        require_contains(
+            SKILL_ROOT / "assets" / rel,
+            (
+                "Content Quality Review",
+                "@agent-quality-curator",
+                "Content quality: ok|warn|fail|n/a",
+                "read-only and advisory",
+                "I own final decisions and approval gates",
+            ),
+        )
+    for rel in (
+        "subagent.agent.md.template",
+        "subagent.claude.md.template",
+        "subagent.opencode.md.template",
+        "subagent.gemini.md.template",
+    ):
+        require_contains(
+            SKILL_ROOT / "assets" / rel,
+            (
+                "Content quality: ok | warn | fail | n/a; signals=<list|none>",
+            ),
+        )
+    require_contains(
+        SKILL_ROOT / "assets" / "subagent.codex.toml.template",
+        (
+            "Content quality: ok | warn | fail | n/a; signals=<list|none>",
+            "Do not add unsupported TOML question fields or `memory` fields",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "GEMINI.md.template",
+        (
+            "Content Quality / Anti-Slop Review",
+            "Content quality before final output",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "handoff.md",
+        (
+            "content_quality_status",
+            "content_quality_curator",
+            "content_quality_signals",
+            "content-quality-review",
+            "Content quality: ok | warn | fail | n/a; signals=<list|none>",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "context-optimization.md",
+        (
+            "Content quality review",
+            "content-quality-review",
+            "compact `Content quality` status",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "output-contract.md",
+        (
+            "Content quality: <ok|warn|fail|n/a>",
+            "Content-quality findings",
+            "Full content-quality signal list",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "agent-format.md",
+        (
+            "{{CONTENT_QUALITY_STATUS}}",
+            "{{CONTENT_QUALITY_CURATOR}}",
+            "{{CONTENT_QUALITY_OWNER}}",
+            "{{CONTENT_QUALITY_SIGNALS}}",
+            "{{CONTENT_QUALITY_REFERENCE}}",
+            "do not emit unsupported fields",
+        ),
+    )
+
+    forbidden = re.compile(
+        r"agent-quality-curator[^\n]*(?:mcp\s*(?:write|config)|runtime config|release metadata|full file edit|edit-capable|broad write|final approval)",
+        re.IGNORECASE,
+    )
+    for path in (
+        SKILL_ROOT / "references" / "topology.md",
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        SKILL_ROOT / "SKILL.md",
+    ):
+        rel = path.relative_to(REPO).as_posix()
+        for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+            if forbidden.search(line) and not _has_negative_context(line):
+                err(f"{rel}:{line_no}: agent-quality-curator must not receive broad write/config/release/final-approval ownership")
+
+    codex_template = (SKILL_ROOT / "assets" / "subagent.codex.toml.template").read_text(encoding="utf-8")
+    structural_toml = _strip_toml_triple_strings(codex_template)
+    if re.search(r"(?m)^\s*(?:content_quality|ask_user|question|request_user_input|memory)\s*=", structural_toml):
+        err("assets/subagent.codex.toml.template: content-quality/question/memory must stay in developer_instructions, not TOML fields")
+
+
 def check_context_optimization() -> None:
     """The skill must stay compact-by-default and preserve progressive loading
     markers in generated templates.
@@ -1461,7 +2018,7 @@ def check_context_optimization() -> None:
             "Keep the response concise",
             "## Acceptance Checklist",
             "## Reporting Template",
-            "clarification_request",
+            "question_request",
         ),
     )
     require_contains(
@@ -1469,7 +2026,7 @@ def check_context_optimization() -> None:
         (
             "## Acceptance Checklist",
             "## Reporting Template",
-            "clarification_request",
+            "question_request",
         ),
     )
     require_contains(
@@ -1477,7 +2034,7 @@ def check_context_optimization() -> None:
         (
             "## Acceptance Checklist",
             "## Reporting Template",
-            "clarification_request",
+            "question_request",
         ),
     )
     require_contains(
@@ -1485,7 +2042,7 @@ def check_context_optimization() -> None:
         (
             "## Acceptance Checklist",
             "## Reporting Template",
-            "clarification_request",
+            "question_request",
         ),
     )
     require_contains(
@@ -1495,7 +2052,7 @@ def check_context_optimization() -> None:
             "Outcome first",
             "summary + pointer rule",
             "Task Assignment Acceptance Checklist",
-            "clarification_request",
+            "question_request",
         ),
     )
 
@@ -2079,6 +2636,12 @@ def check_runtime_update_policy() -> None:
         "check_mcp_secret_shape",
         "check_optional_placeholder_leaks",
         "agents-system-setup:mcp-approved",
+        "check_human_input_protocol",
+        "Human Input / Question Tool Matrix",
+        "check_self_update_preflight_policy",
+        "Phase -1 — Self-Update Preflight",
+        "check_requirements_triage_policy",
+        "Requirements Triage",
     ):
         if marker not in validator_text:
             err(f"scripts/_validate.py: missing runtime validator marker `{marker}`")
@@ -2342,6 +2905,19 @@ def check_learning_memory_policy() -> None:
         SKILL_ROOT / "references" / "learning-memory.md",
         (
             "Memory and Learning System",
+            "Native vs plugin-managed learning",
+            "| Runtime | Native memory / learning surface | Setup behavior |",
+            "Copilot Memory",
+            "Claude Code",
+            "OpenCode",
+            "OpenAI Codex CLI + App",
+            "Gemini CLI",
+            "plugin-managed project learning",
+            "native_learning_surface",
+            "save_memory",
+            "autoMemory",
+            "activate_skill",
+            "Do not emit `memory` in `.codex/agents/*.toml`",
             "Learning Check contract",
             "overwrite requires orchestrator approval",
             "no secrets or raw credentials",
@@ -2367,8 +2943,12 @@ def check_learning_memory_policy() -> None:
         (
             "Memory & Learning System",
             "{{LEARNING_MEMORY_PROFILE}}",
+            "{{NATIVE_LEARNING_SURFACE}}",
             "{{LEARNING_MEMORY_OWNER}}",
             "{{LEARNING_MEMORY_PATH}}",
+            "Native vs plugin-managed",
+            "provider-native memory is complementary",
+            "plugin-managed Learning Check stays active",
             "Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>",
             "overwrite requires orchestrator approval",
             "no secrets or raw credentials",
@@ -2526,6 +3106,10 @@ def main() -> int:
     check_claude_plugin_agent_fields()
     check_replication_ledger()
     check_governance_baseline()
+    check_human_input_protocol()
+    check_self_update_preflight_policy()
+    check_requirements_triage_policy()
+    check_output_quality_policy()
     check_mcp_approval_gate()
     check_central_mcp_approval_evidence()
     check_optional_placeholder_leaks()

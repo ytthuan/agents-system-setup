@@ -8,6 +8,8 @@ Each row also names the **owned paths** that feed into AGENTS.md › Directory A
 
 | Subagent | Responsibility | Tool restrictions | Owned paths (Directory Architecture) |
 |---|---|---|---|
+| `requirements-triage` | Analyze the user's request, classify task type/risk, find ambiguity, propose first questions, and recommend routing before planning | read-only + `question_request` to orchestrator | *(none — read-only; may draft a plan seed in the orchestrator's plan)* |
+| `agent-quality-curator` | Review generated agent, skill, memory, recommendation, and output-contract prose for specificity, grounding, evidence, prompt hygiene, and context bloat | read-only + content-quality signals; no final approval ownership | *(none — read-only; may propose concise fixes to orchestrator)* |
 | `planner` | Decompose tasks, write plan.md | read-only + write to plan.md | `plan.md`, `**/plan.md` |
 | `implementer` | Make code changes | full file edit + bash | source dirs (project-specific) |
 | `reviewer` | Critique diffs, flag risks | read-only + bash (lint/test) | *(none — read-only)* |
@@ -66,6 +68,34 @@ Security, audit, architecture, and design-pattern ownership is mandatory, but ro
 | PII, payments, health, credentials, or regulated data | Dedicated `security-auditor`; consider `compliance-auditor`. |
 | MCP servers, external APIs, or deploy/write tools | Add `threat-modeler` or merge that role into `security-auditor`; MCP approval gate remains mandatory. |
 | Monorepo, microservices, event-driven, or cloud infrastructure | Dedicated `architecture-reviewer`; add `design-pattern-reviewer` when pattern consistency is a goal. |
+
+## Requirements Triage Sizing Rule
+
+`requirements-triage` is **default-on recommended**. Generate it as a separate
+subagent for normal, ambiguous, cross-runtime, security-sensitive, release, MCP,
+replication, or multi-wave setups. For tiny direct setups, merge the
+responsibility into `planner` and record `requirements_triage_status = merged`.
+
+The triage agent never replaces the orchestrator. It returns an intake brief,
+task classification, ambiguity list, `question_request` items, risk flags, and
+recommended routing. The orchestrator owns user-facing questions, approval gates,
+final plan decisions, and delegation.
+
+## Content Quality Sizing Rule
+
+`agent-quality-curator` is **universal recommended** for generated agent systems.
+Generate it as a separate read-only subagent for normal, complex, cross-runtime,
+audit, improve, replication, MCP, release, skill-heavy, or multi-wave setups.
+For tiny direct setups, merge the responsibility into `reviewer` and record
+`content_quality_curator = merged`. Skip only with explicit rationale.
+
+The quality curator uses the signal taxonomy in
+[content quality](./content-quality.md): `generic-description`,
+`empty-rationale`, `padding-repetition`, `slop-completeness`,
+`invented-attribution`, `context-bloat`, `vague-ownership`,
+`unsupported-assertion`, `silent-gate-gap`, and `prompt-hygiene-risk`. It
+reports `Content quality: ok|warn|fail|n/a; signals=<list|none>` and never
+replaces reviewer, tester, security, architecture, or validator roles.
 
 ## Sizing Rule
 

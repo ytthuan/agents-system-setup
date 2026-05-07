@@ -1,6 +1,6 @@
 # Interview Script
 
-Use `ask_user` for **every** question. One question per call. Multiple-choice when possible (the runtime adds a freeform option automatically — never include "Other" in choices).
+Use the provider-native human-input tool for **every** question (Copilot CLI uses session `ask_user`; see [human input](./human-input.md)). One question per call. Multiple-choice when possible (the runtime adds a freeform option automatically — never include "Other" in choices).
 
 ## 0. Opening prompt (detect first, then choose mode/platforms)
 
@@ -90,8 +90,9 @@ place. Skip runtime-specific questions when that runtime is not selected.
 
 - Q: "How should generated agents store durable learnings from past work?"
 - Choices: `["Project-tracked curated memory (Recommended for teams)", "Project-local / untracked memory (Recommended for personal setup)", "Personal/global memory outside this repo", "Disabled"]`
-- Record as `learning_memory_profile`.
+- Record as `learning_memory_profile` and `native_learning_surface = document-only` unless the user explicitly asks to enable a provider-native memory feature.
 - Do not ask a separate blocking Learning Check question by default. Record `learning_gate_strength = recommended` and `learning_update_policy = overwrite requires orchestrator approval`. Only make Learning Check blocking when the user explicitly requests it.
+- Native memory options are provider-specific; use [learning memory](./learning-memory.md) and never emit unsupported fields such as Codex agent TOML `memory`.
 
 ## 10. Plugin / Skill / MCP Discovery Scope
 - Q: "Which capabilities should I look up in the marketplaces (github/awesome-copilot, github/copilot-plugins, anthropics/skills, openai/skills, OpenCode catalogs, Gemini extensions)? (comma-separated, e.g., 'playwright, azure, postgres')"

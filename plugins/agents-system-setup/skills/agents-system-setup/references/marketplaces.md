@@ -1,6 +1,6 @@
 # Well-Known Marketplaces & Catalogs (lookup order)
 
-> Last verified: 2026-04-29. Star counts are approximate; check the upstream link for current state.
+> Last verified: 2026-05-06. Star counts are approximate; check the upstream link for current state.
 >
 > Doc anchors:
 > - Copilot CLI plugins: <https://docs.github.com/en/copilot/concepts/agents/copilot-cli/about-cli-plugins>
@@ -153,6 +153,7 @@ Terminal (outside the session):
 copilot plugin install <owner>/<repo>
 copilot plugin install <owner>/<repo>/<plugin-subpath>
 copilot plugin install <path/to/local/plugin>
+copilot plugin update agents-system-setup
 ```
 
 Interactive slash-command (inside a running session):
@@ -162,13 +163,21 @@ copilot
 > /plugin install PLUGIN@MARKETPLACE
 ```
 
+Use `copilot plugin update agents-system-setup` only when updating the installed
+plugin. It must not silently rewrite MCP config or generated artifacts.
+
 ### Claude Code
 
 ```
 claude
 > /plugin install <owner>/<repo>
+> /plugin marketplace update <marketplace-name>
+> /reload-plugins
 # Skills are namespaced as /<plugin>:<skill>
 ```
+
+Run marketplace update and plugin reload interactively. Do not edit
+`.claude/settings.json`, hooks, or MCP config without a separate approval gate.
 
 ### OpenAI Codex CLI install
 
@@ -186,7 +195,17 @@ Codex marketplace sources accept GitHub shorthand, HTTPS/SSH Git URLs, or a loca
 
 ### OpenCode
 
-OpenCode "plugins" are JS/TS or npm/config-based (there is no `opencode plugin install` CLI command). Skill-style content is installed by clone-and-copy under `~/.config/opencode/skills/` (user) or `.opencode/skills/` (project); skills are activated via the skill tool and a `permission.skill` config entry. Agent Markdown belongs under `~/.config/opencode/agents/` or `.opencode/agents/`. MCP servers go in `opencode.json` › `mcp`. Slash commands are defined as Markdown files under `.opencode/commands/<name>.md` (or inline in `opencode.json`) and invoked with `/name` inside the session.
+OpenCode plugin modules are invoked with `opencode plugin <module>` and are
+JS/TS or npm/config-based; do not add an install subcommand. Skill-style content
+is installed by clone-and-copy under `~/.config/opencode/skills/` (user) or
+`.opencode/skills/` (project); skills are activated via the skill tool and a
+`permission.skill` config entry. Agent Markdown belongs under
+`~/.config/opencode/agents/` or `.opencode/agents/`. MCP servers go in
+`opencode.json` › `mcp`. Slash commands are defined as Markdown files under
+`.opencode/commands/<name>.md` (or inline in `opencode.json`) and invoked with
+`/name` inside the session. Update the module source with the package-manager or
+Git command documented by that module, then rerun `opencode plugin <module>` if
+the module provides a refresh step.
 
 ### Gemini CLI
 
@@ -198,6 +217,13 @@ GEMINI.md
 gemini
 > /agents
 > @<agent-name> <task>
+```
+
+Extension updates are terminal commands:
+
+```sh
+gemini extensions update <name>
+gemini extensions update --all
 ```
 
 Gemini extension recommendations must identify what the extension actually ships: `gemini-extension.json`, MCP servers (`mcpServers` in extension manifests), commands, hooks, skills, context files, and/or `agents/*.md`. Do not claim a generic Gemini plugin install path for this package. Project-local generated subagents go under `.gemini/agents/*.md`; inline MCP belongs under loader-valid `mcp_servers:` and stays approval-gated.

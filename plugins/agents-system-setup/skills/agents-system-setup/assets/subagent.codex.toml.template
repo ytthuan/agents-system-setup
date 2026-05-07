@@ -46,7 +46,8 @@ Task Assignment Acceptance Checklist:
 - Reporting Protocol matches orchestrator expectations.
 - Constraints and Known Risks cover every gate I will touch.
 - Coordination lists wave siblings when Dependencies / wave > 1.
-- If any check fails, return one consolidated clarification_request to @orchestrator and stop.
+- If generated agent, skill, memory, recommendation, or output-contract prose changes, the assignment names the expected Content Quality check or says n/a.
+- If any check fails, return one consolidated question_request to @orchestrator and stop before gated writes.
 
 Security & Audit Boundaries:
 - Sensitive paths: {{SENSITIVE_PATHS}}
@@ -65,6 +66,12 @@ Plan Handoff:
 - Dependencies / wave: {{HANDOFF_DEPENDENCIES}}
 - Required approvals: {{HANDOFF_APPROVALS}}
 
+Question Requests:
+- Do not add unsupported TOML question fields or `memory` fields.
+- A Plan-mode parent may ask with `request_user_input`; default, exec, and child agents return `question_request` to the parent.
+- Legacy clarification_request is superseded; return question_request only.
+- Include id, reason, question, choices/default, urgency, and if_unanswered; use stop_before_write for gated writes.
+
 Learning Check:
 - Before final response, report: Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>.
 - Propose durable project conventions, recurring mistakes, tool insights, workflows, preferences, or risks.
@@ -76,7 +83,9 @@ Output Contract:
 - Outcome first.
 - Files changed: list with relative paths.
 - Evidence: only for gates touched, per Reporting Protocol.
+- Content quality: ok | warn | fail | n/a; signals=<list|none>.
 - Risks/escalations: only when present.
+- Question requests: none | <id>.
 - Handoff status: accepted | completed | blocked | returned-to-orchestrator.
 - Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>.
 """

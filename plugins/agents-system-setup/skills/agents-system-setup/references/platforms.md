@@ -21,8 +21,10 @@ This skill targets five agent runtimes. The user picks one or more in **Phase 0*
 | MCP servers | `.mcp.json` (root) | `.mcp.json` (root, shared with Copilot) | `opencode.json` › `"mcp": { ... }` | `.mcp.json` (root, shared) | per-agent `mcp_servers:` in `.gemini/agents/*.md`; extension manifests use `mcpServers`; all MCP writes are approval-gated |
 | Hooks | `.github/hooks/*.json` | `.claude/settings.json` › `"hooks"` | `.opencode/hooks/` | not supported | native `settings.json` hooks at project / user / system scope; extension `hooks/hooks.json` when packaging; not extension-only |
 | Commands | plugin `commands/<cmd>.md` under plugin root | plugin `commands/<cmd>.md` supported for slash commands (not legacy); project commands at `.claude/commands/<cmd>.md` | `.opencode/commands/<name>.md` or `command` config key; invoked as `/<name>`; `$ARGUMENTS`/`$1` are body placeholders, not invocation syntax; keep separate from skills | not a standard surface | Gemini extensions can bundle `commands/*.md`; no native project command surface |
+| Human input | Session `ask_user`; disabled by `--no-ask-user`; not a custom-agent `tools:` alias | `AskUserQuestion` tool; include in restrictive `tools:` only for ask-capable agents | `question` tool, granted with nested `permission: { question: allow }` | `request_user_input` in Plan mode only; no TOML field | `ask_user` tool; valid in `tools:` allowlists for interactive agents |
 | Project memory | `AGENTS.md` (root) | `CLAUDE.md` (symlink → `AGENTS.md` on macOS/Linux; copy on Windows) | `AGENTS.md` (native) | `AGENTS.md` (native — primary consumer in Codex CLI + App artifact flows) | `GEMINI.md` is Gemini's native context file; keep it a compact pointer/sync copy of canonical `AGENTS.md` when Gemini is selected |
 | Personal memory | `~/.copilot/AGENTS.md` | `~/.claude/CLAUDE.md` | `~/.config/opencode/AGENTS.md` | `~/.codex/AGENTS.md` | `~/.gemini/GEMINI.md` plus `~/.gemini/agents/` |
+| Native durable learning | Copilot Memory public preview: transparent server-side durable repo memory; plugin-managed learning remains complementary | `memory: user|project|local` for project/user/session agents; plugin agents support memory but not `hooks`, `mcpServers`, or `permissionMode` | No durable auto-learning beyond AGENTS.md, skills, compaction, and plugin patterns | Memories feature via `[features] memories = true` and `~/.codex/memories/`; off by default/region-limited; do not emit `memory` in agent TOML | `save_memory`, `GEMINI.md`, `/memory`, and experimental `autoMemory`; skills use `activate_skill` |
 
 ## Agent Frontmatter — per platform
 
@@ -44,6 +46,8 @@ mcp-servers:                                           # optional, hyphenated ke
 Copilot source-backed runtime notes:
 - Custom agents are agent profiles. The main Copilot agent can run them as subagents in a separate context window, automatically by description, explicitly by `/agent`, by prompt mention, or programmatically with `copilot --agent <name> --prompt ...`.
 - Prefer public tool aliases in generated `tools:`: `vscode`, `execute`, `read`, `edit`, `search`, `agent`, `web`, `todo`. Compatible aliases such as `Bash`, `Read`, `Grep`, `Glob`, `Task`, and MCP-prefixed names are import-safe, but emit public aliases to keep profiles portable across Copilot surfaces.
+- Human input is the session-level `ask_user` tool; `--no-ask-user` disables it. Do not add `ask_user` to custom-agent `tools:` because it is not in the documented alias table. Subagents return `question_request` to the orchestrator/session when they need clarification.
+- Copilot Memory is a public-preview, transparent server-side durable repo memory surface. Treat plugin-managed Learning Check artifacts as complementary, explicit project policy and audit records.
 - `vscode` exposes the VS Code chat-host tool set (e.g., `vscode/extensions`, `vscode/runCommands`) when the agent runs inside VS Code Chat. Copilot CLI and other surfaces ignore it harmlessly per the documented "All unrecognized tool names are ignored" rule, so it is safe to ship as a baseline.
 - `agent` / `custom-agent` / `Task` enables one custom agent to invoke another. Grant it only to orchestrator-style agents; read-only reviewers should not be able to spawn broad workers.
 - `/fleet` is a parent-orchestrated mode for independent subtasks. The generator's wave table should be usable as a `/fleet` prompt, but `/fleet` is optional CLI UX — do not make generated files depend on it.
@@ -80,9 +84,9 @@ Sources:
 Only `name` + `description` required. Defaults: `model: inherit`, all tools inherited from parent. Source: https://docs.claude.com/en/docs/claude-code/sub-agents
 ```yaml
 ---
-name: planner                    # REQUIRED — lowercase + hyphens, unique, matches filename
-description: Use when ...        # REQUIRED — drives delegation
-tools: Read, Grep, Glob, Bash    # optional comma-string allowlist; omit = inherit all
+name: planner                                  # REQUIRED — lowercase + hyphens, unique, matches filename
+description: Use when ...                      # REQUIRED — drives delegation
+tools: Read, Grep, Glob, Bash, AskUserQuestion # optional comma-string allowlist; omit = inherit all
 disallowedTools: Write, Edit     # optional denylist (applied before `tools`)
 model: sonnet                    # optional: sonnet | opus | haiku | <full-id> | inherit (default)
 permissionMode: default          # optional: default | acceptEdits | auto | dontAsk | bypassPermissions | plan
@@ -95,7 +99,9 @@ color: blue                      # optional UI color
 ```
 > Tool names are Claude's canonical names (`Read`, `Edit`, `Write`, `Bash`, `Grep`, `Glob`, `Agent`, `WebFetch`). Do **not** copy Copilot tool names verbatim. Scope precedence: managed settings > `--agents` CLI > project (`.claude/agents/`) > user (`~/.claude/agents/`) > plugin.
 >
-> Project/user/session agents and plugin-shipped agents are not the same schema surface. Project/user/session agents may use richer fields such as `mcpServers`, `hooks`, and `permissionMode`; plugin-shipped agents must not rely on unsupported fields such as `hooks`, `mcpServers`, or `permissionMode`.
+> Project/user/session agents and plugin-shipped agents are not the same schema surface. Project/user/session agents may use richer fields such as `mcpServers`, `hooks`, and `permissionMode`; plugin-shipped agents support `memory` but must not rely on unsupported fields such as `hooks`, `mcpServers`, or `permissionMode`.
+>
+> Use `AskUserQuestion` only when a restrictive `tools:` allowlist would otherwise prevent an agent that is expected to ask the user. If it is absent or the run is headless, the subagent reports `question_request` to the orchestrator.
 >
 > **Commands vs skills:** Plugin `commands/` (under the plugin root) remain fully supported for slash commands and are not legacy. Use `commands/` for prompt-template slash commands; prefer skills for reusable multi-step workflows. Project-level slash commands live at `.claude/commands/<cmd>.md`.
 >
@@ -116,6 +122,7 @@ prompt: "{file:./prompts/review.txt}"                      # optional external s
 steps: 5                                                   # optional max agentic iterations
 hidden: false                                              # hide from @ autocomplete
 permission:                                                # preferred over deprecated `tools:`
+  question: allow                                          # ask the user from interactive primary agents
   edit: deny                                               # allow | ask | deny
   webfetch: deny
   bash:
@@ -130,6 +137,8 @@ permission:                                                # preferred over depr
 >
 > Permission keys: `read`, `edit`, `glob`, `grep`, `list`, `bash`, `task`, `external_directory`, `todowrite`, `webfetch`, `websearch`, `codesearch`, `lsp`, `skill`, `question`, `doom_loop`. Prefer `permission:` for new configs; `tools:` is deprecated.
 >
+> Human input uses the `question` tool. Grant it with nested YAML such as `permission: { question: allow }` or the block above; do not emit a literal dotted key. OpenCode has no durable auto-learning surface beyond AGENTS.md, skills, compaction, and plugin-managed patterns.
+>
 > Primary agents are selected directly (Tab / configured `switch_agent` keybind). Subagents are invoked automatically by primary agents or manually with `@<agent-name>`. When a subagent creates a child session, users navigate with `session_child_first`, `session_child_cycle`, `session_child_cycle_reverse`, and `session_parent`; include these as "Try it" notes, not schema fields. Gate subagent spawning with `permission.task` when an agent should only call specific workers. Generated orchestrators default to `permission.task` with `"*": deny` plus explicit roster-agent allows.
 
 #### Canonical OpenCode primary task gate
@@ -140,6 +149,7 @@ mapping. The wildcard/default entry must be `deny` or `ask`; never emit
 
 ```yaml
 permission:
+  question: allow
   task:
     "*": deny
     "reviewer": allow
@@ -208,6 +218,8 @@ For high-volume row-per-agent fan-out, Codex exposes `spawn_agents_on_csv`; docu
 
 Codex source-backed runtime notes:
 - Current Codex releases enable subagent workflows by default, but Codex only spawns subagents when explicitly asked. The orchestrator may say "spawn one agent per row/concern" and Codex handles child threads, waits for results, and returns a consolidated response.
+- `request_user_input` is a Plan-mode human-input tool, not an agent TOML field. Child/default/exec flows should return `question_request` to the parent/session instead of embedding prompt-tool config in `.codex/agents/*.toml`.
+- Native memories are enabled with `[features] memories = true` and stored under `~/.codex/memories/`; the feature is off by default and may be region-limited. Do not emit `memory` in agent TOML.
 - Subagents inherit the current sandbox policy and live runtime approval overrides. A custom TOML `sandbox_mode` can narrow defaults, but interactive `/approvals` or `--yolo` choices still apply to spawned child sessions.
 - `agents.max_threads` caps concurrent open child threads; `agents.max_depth = 1` is the safe default to avoid recursive fan-out; `agents.job_max_runtime_seconds` supplies the default timeout for CSV jobs.
 - `spawn_agents_on_csv` requires an input CSV, an instruction template, and exactly one `report_agent_job_result` call per worker. Exported CSV status and metadata are an advanced batch workflow, not the default multi-agent topology.
@@ -227,6 +239,7 @@ tools:                              # optional allowlist; omit = inherit parent 
   - read_file
   - grep_search
   - run_shell_command
+  - ask_user
 mcp_servers:                        # optional per-agent MCP; approval-gated
   docs:
     command: node
@@ -244,9 +257,11 @@ Gemini source-backed runtime notes:
 - The main agent can delegate automatically by description or explicitly with `@<agent-name>`. The subagent appears to the parent as a tool.
 - Subagents run in isolated context loops and cannot call other subagents. Even `tools: ['*']` does not expose subagent tools to a subagent. Keep fan-out at the root/orchestrator session.
 - `tools:` supports wildcards such as `*`, `mcp_*`, and `mcp_<server>_*`. Prefer narrow allowlists for reviewers and docs agents.
+- Human input uses `ask_user`; include it in `tools:` only for interactive agents expected to ask. Headless agents return `question_request`.
 - The docs prose shows `mcpServers`, but the loader schema validates `mcp_servers`. Emit snake_case `mcp_servers:` and normalize imported camelCase examples with a warning.
 - Remote A2A subagents (`kind: remote`, `agent_card_url`, `agent_card_json`, `auth`) are advanced/import-only; do not emit them by default.
 - Gemini CLI supports native skills loaded from `.gemini/skills/<name>/SKILL.md` (project) or `~/.gemini/skills/<name>/SKILL.md` (user); `.agents/skills/<name>/SKILL.md` is also recognized. Activation is model-side via skill loading; use `/skills` to manage loaded skills. There is no `$skill` or `/<skill>` invocation syntax — skills are not slash commands.
+- Gemini native memory includes `save_memory`, `GEMINI.md`, `/memory`, and experimental `autoMemory`. Skills are activated with `activate_skill`; subagents still cannot call subagents.
 - Gemini extensions can bundle subagents, skills, MCP servers, commands, hooks, and context files. Treat extension packaging as marketplace/plugin work, not the default project-agent path.
 
 ## MCP Configuration — per platform
@@ -339,7 +354,10 @@ link_project_memory(selected_platforms)
 
 - Writing Copilot frontmatter to a `.claude/agents/*.md` file (Claude will silently ignore unknown keys).
 - Using `mcp-servers:` (hyphen) in OpenCode — OpenCode uses top-level `mcp` in `opencode.json`, not per-agent.
+- Using a literal OpenCode `permission.question` key — use nested `permission: { question: allow }` or a YAML block.
 - Using `mcpServers` or `mcp-servers` in Gemini local subagents — emit `mcp_servers:` and keep the MCP gate.
+- Adding Copilot `ask_user` to custom-agent `tools:` — Copilot human input is session-level and subagents return `question_request`.
+- Emitting Codex `request_user_input` or `memory` in `.codex/agents/*.toml` — Plan-mode input and native memories are not TOML agent fields.
 - Symlinking `CLAUDE.md` or `GEMINI.md` on Windows.
 - Overwriting `opencode.json` instead of merging the `mcp` key.
 - Letting Gemini subagents recursively invoke other subagents — the runtime blocks this, so route fan-out through the parent/orchestrator session.

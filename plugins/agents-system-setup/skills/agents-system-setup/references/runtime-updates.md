@@ -1,6 +1,6 @@
 # Runtime Update Audit
 
-> Last verified: 2026-05-05. This file records upstream runtime drift that affects generation, replication, and validation. It is source material for the supported-runtime docs, not a generated user artifact.
+> Last verified: 2026-05-06. This file records upstream runtime drift that affects generation, replication, and validation. It is source material for the supported-runtime docs, not a generated user artifact.
 
 ## Support policy
 
@@ -30,7 +30,23 @@ Current supported runtimes are **Copilot CLI**, **Claude Code**, **OpenCode**, *
 4. **Keep app/web compatibility separate from CLI-only UX.** Codex shared artifacts must be useful without CLI-only commands; plugin installation and slash commands stay in CLI usage notes.
 5. **Emit loader-valid Gemini frontmatter.** Use `mcp_servers:` for Gemini agent-local MCP config even when upstream prose shows `mcpServers`; importers may accept and normalize the docs spelling but must warn on emission.
 6. **Never bypass MCP approval gates.** Copilot `mcp-servers:`, Claude `.mcp.json`/`mcpServers`, OpenCode `opencode.json` › `mcp`, Codex `.mcp.json`/TOML `[mcp_servers.*]`, Gemini `mcp_servers:`, and extension/plugin MCP manifests all require the Phase 3.5 gate.
-7. **Generated memory is artifact policy, not runtime-native memory.** The Memory & Learning System is rendered into `AGENTS.md`, runtime agent bodies, and approved memory artifacts. Do not claim a runtime has native long-term learning unless source docs confirm it.
+7. **Generated memory is artifact policy and complements runtime-native memory.** The Memory & Learning System is rendered into `AGENTS.md`, runtime agent bodies, and approved memory artifacts. Use native memory only where source docs confirm it, and keep plugin-managed learning explicit, approval-safe, and no-secrets.
+
+## Human input, self-update, and native-learning audit — 2026-05-06
+
+| Runtime | Human input finding | Native learning / update impact |
+|---|---|---|
+| Copilot CLI | `ask_user` is a session tool; `--no-ask-user` disables it. The custom-agent `tools:` alias table does not include `ask_user`, so generated Copilot profiles must not add it. Subagents return `question_request` to the orchestrator/session. | Copilot Memory is public-preview, transparent, server-side durable repo memory. Plugin-managed Learning Check artifacts remain complementary. Provider update note: `copilot plugin update agents-system-setup`. |
+| Claude Code | `AskUserQuestion` is the official ask tool. Include it in restrictive `tools:` allowlists only when an agent is expected to ask. | Native subagent `memory` supports `user`, `project`, and `local`. Plugin-shipped agents support memory but not `hooks`, `mcpServers`, or `permissionMode`. Provider update note: `/plugin marketplace update <marketplace-name>` then `/reload-plugins`. |
+| OpenCode | `question` is the official question tool. New output must use nested `permission: { question: allow }` or equivalent YAML, not a literal dotted key. | No durable auto-learning surface beyond AGENTS.md, skills, compaction, and plugin patterns. Provider update note: `opencode plugin <module>`; there is no install subcommand. |
+| OpenAI Codex (CLI + App) | `request_user_input` is available in Plan mode only. There is no `.codex/agents/*.toml` field for it; child/default/exec flows use `question_request`. | Memories exist via `[features] memories = true` and `~/.codex/memories/`, off by default and region-limited. Do not emit `memory` in agent TOML. Provider update note: `codex plugin marketplace upgrade [name]`. |
+| Gemini CLI | `ask_user` is valid in Gemini tool allowlists for interactive use; headless flows use `question_request`. | Native memory includes `save_memory`, `GEMINI.md`, `/memory`, and experimental `autoMemory`. Skills use `activate_skill`; subagents cannot call subagents. Provider update note: `gemini extensions update <name>` or `gemini extensions update --all`. |
+
+Self-update preflight is now Phase -1: check
+`${AGENTS_SYSTEM_SETUP_HOME:-$HOME/github/agents-system-setup}`, fast-forward only
+clean Git checkouts with an upstream, ask or return `question_request` on dirty,
+missing, divergent, or install-manager ambiguity, and never update MCP/plugin
+config silently.
 
 ## Invocation and packaging audit — 2026-05-05
 
@@ -41,7 +57,7 @@ Source-backed invocation syntax is provider-specific. Do not generalize `/`,
 |---|---|---|
 | Copilot CLI | Official command surfaces remain slash-based: `/agent`, `/skills`, `/plugin`, `/mcp`, and `/fleet`. Skills can auto-trigger by description and can be selected through skills slash-command UX; no official `$skill` syntax. Plugin installs must distinguish terminal `copilot plugin install <owner>/<repo>` from in-session `/plugin install PLUGIN@MARKETPLACE`. | Keep emitting `.github/agents/<name>.agent.md`; scan `.github/agents/<name>.md` as an import/upstream-drift signal. Keep plugin install examples split by terminal vs interactive context. |
 | Claude Code | Skills auto-load by description and are invoked as `/skill-name`. `$ARGUMENTS`, `$0`, and `$name` are substitution variables, not invocation. Plugin `commands/` remain supported for slash commands; `skills/` are preferred for reusable multi-step workflows. | Do not label Claude plugin `commands/` as legacy-only. Keep plugin skill namespacing and plugin-agent schema split separate from project/user agents. |
-| OpenCode | Agents are invoked with `@<agent>`; skills are loaded through the `skill` tool and gated by `permission.skill`; commands live at `.opencode/commands/<name>.md` or config `command` and invoke as `/name`. `$ARGUMENTS` and `$1` are command placeholders. Official plugins are JS/TS or npm/config-based; there is no `opencode plugin install` CLI command. | Keep skills, commands, agents, and plugins as separate surfaces. Document clone/copy or config-based OpenCode plugin installation, not a nonexistent install command. |
+| OpenCode | Agents are invoked with `@<agent>`; skills are loaded through the `skill` tool and gated by `permission.skill`; commands live at `.opencode/commands/<name>.md` or config `command` and invoke as `/name`. `$ARGUMENTS` and `$1` are command placeholders. Official plugins are JS/TS or npm/config-based and run as `opencode plugin <module>`; there is no `opencode plugin install` CLI command. | Keep skills, commands, agents, and plugins as separate surfaces. Document clone/copy, package-manager, or config-based OpenCode plugin installation, plus `opencode plugin <module>` where a module command is documented. |
 | OpenAI Codex (CLI + App) | Skills auto-activate and support explicit `$skill-name` selection plus `/skills` browsing. `/plugins` opens plugin browsing in CLI; the App has a Plugins UI. Typing `@` selects an installed plugin in the composer, but hardcoded plugin-name mentions must not be documented as bundled skill invocation. | Use `$skill-name` or `/skills` for skill examples. Keep CLI-only `/plugins`, `/skills`, `/agent`, and `codex exec` guidance out of shared App artifact requirements. |
 | Gemini CLI | Local subagents still use `@<agent>` and `/agents`. Native skills are discovered from `.gemini/skills/<name>/SKILL.md`, compatible `.agents/skills/<name>/SKILL.md`, and user equivalents; users manage skills with `/skills` while the model activates them. Hooks can be native `settings.json` hooks or extension `hooks/hooks.json`. `$VAR` is environment expansion, not skill invocation. | Document native Gemini skills and hooks in addition to extension packaging. Do not generate or document `/<skill>` or `$skill` Gemini invocation. |
 

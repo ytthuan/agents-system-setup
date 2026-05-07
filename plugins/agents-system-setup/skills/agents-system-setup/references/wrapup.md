@@ -8,6 +8,8 @@ Single consolidated prompt run **after** Phase 7 (Verify & Summarize) and **befo
 - **Presentation:** single multi-select checklist via the runtime's ask-user tool.
 - **Context budget:** show only item name, source, and one-line action in the prompt. Keep extended rationale in this reference.
 - **Filtering:** filter the menu by signals from Phase 1.7 (domain) + Phase 3 (selected plugins) + Phase 3.5 (MCP). Never show an item the user already installed.
+- **Learning / hook de-duplication:** if Phase 1.9/1.10 already selected a Memory & Learning profile, native memory behavior, or optional hooks, do not ask for the same setup again. Only show a follow-up when the plan explicitly deferred it with a `question_request`.
+- **Update de-duplication:** if Phase -1 self-update preflight already checked or updated the plugin, do not show a generic plugin update item. If preflight returned `requires-human`, include that unresolved `question_request` in the final output instead of asking again.
 - **Execution:** for each selected item, prefer dispatching to an existing dedicated skill. If none, run the inline action documented below.
 - **No silent installs.** Every item still carries its own confirmation if it writes files or edits config beyond `AGENTS.md` notes.
 

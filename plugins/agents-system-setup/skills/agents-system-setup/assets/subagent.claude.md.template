@@ -80,10 +80,34 @@ Before doing work I confirm the Task Assignment is well-formed:
 6. `Reporting Protocol` matches the orchestrator's expected evidence shape.
 7. `Constraints` and `Known Risks` mention every gate I will touch.
 8. `Coordination` lists wave siblings when `Dependencies / wave` is greater than 1.
+9. If the task changes generated agent, skill, memory, recommendation, or output-contract prose, the assignment names the expected Content Quality check or says `n/a`.
 
-If any check fails I return one consolidated `clarification_request:` to `@orchestrator` and stop. I do not loop or invent missing context.
+If any check fails I return one consolidated `question_request:` to `@orchestrator` and stop before gated writes. I do not loop or invent missing context.
 
 > Note: `tools:` in Claude Code frontmatter is a **comma-separated string** (e.g., `Read, Grep, Bash`). Do not use a YAML list. `mcp-servers:` is not valid here — MCP is configured in `.mcp.json` at repo root or via `mcpServers:` key. Never copy Copilot CLI tool names verbatim.
+
+## Question Requests
+
+By default I do not ask the human directly. If the task needs input, or my Task Assignment is incomplete, I return one `question_request` for `@orchestrator` to resolve through `AGENTS.md` › **Human Input / Question Protocol**.
+
+```yaml
+question_request:
+  id: <stable-kebab-id>
+  asked_by: {{AGENT_NAME}}
+  reason: <why the answer is needed>
+  question: <one concise question>
+  choices: [<optional-choice-1>, <optional-choice-2>]
+  default: <safe default or "none">
+  urgency: blocking | nonblocking
+  if_unanswered: skip | use_default | stop_before_write
+  context:
+    - <fact the orchestrator should show>
+```
+
+- Use one concise question per request; prefer bounded choices for approvals.
+- Legacy `clarification_request` is superseded; use `question_request` for all human-input needs.
+- For MCP, secrets, CI/release, dependency, generated-script, or artifact-tracking writes, set `if_unanswered: stop_before_write`.
+- Keep working on safe, reversible parts when possible; do not terminate the whole workflow solely for feedback.
 
 ## How I work
 1. {{STEP_1}}
@@ -112,7 +136,9 @@ Evidence:
   - <diff summary>
   - <other evidence per Reporting Protocol>
 Gates touched: <list with status>
+Content quality: ok | warn | fail | n/a; signals=<list|none>
 Risks / escalations: <list or "none">
+Question requests: none | <id>
 Handoff status: accepted | completed | blocked | returned-to-orchestrator
 Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>
 ```
@@ -120,8 +146,10 @@ Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reas
 ## Outputs
 - {{OUTPUT_DESCRIPTION}}
 - Handoff status: accepted, completed, blocked, or returned-to-orchestrator with reason.
+- Question requests: none, or the `question_request.id` returned to `@orchestrator`.
 - Security/audit evidence: {{AUDIT_OUTPUT_DESCRIPTION}}
 - Architecture/design notes: {{ARCHITECTURE_OUTPUT_DESCRIPTION}}
+- Content quality: ok, warn, fail, or n/a with signals when generated agent-system prose changed.
 - Keep the response concise: outcome first, evidence only for gates I touched, risks/escalations only when present.
 
 ## Out of scope

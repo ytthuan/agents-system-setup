@@ -1,16 +1,20 @@
 # Output Contract
 
-Use this contract at the end of `init`, `update`, `improve`, and `replicate` flows. Keep the user-facing summary concise; include full detail only when useful or requested. For `Compact` and `Balanced`, lead with an 8-line summary, then warnings/approvals, then detail-on-request.
+Use this contract at the end of `init`, `update`, `improve`, and `replicate` flows. Keep the user-facing summary concise; include full detail only when useful or requested. For `Compact` and `Balanced`, lead with a compact summary, then warnings/approvals, then detail-on-request.
 
 ```text
 ✅ Mode/platforms: <mode> · <selected platforms only>
 ✅ Footprint: <pre-existing artifacts summary>
 ✅ Files: created=<n>, updated=<n with .bak>, platform breakdown=<compact>
 ✅ Agents: subagents=<n>, skills=<n>, waves=<n>
+✅ Requirements triage: <separate|merged|skipped>; ambiguities=<n>; triage_question_requests=<count|none>; routing=<wave_0 summary|n/a>
 ✅ Gates: security/audit=<present|n/a>, threat model=<present|n/a>, architecture=<count|n/a>, quality gates=<summary>
+✅ Update preflight: <checked|already-current|ff-updated|requires-human|skipped>; source=<path-or-manager>; evidence=<git range|question_request id|n/a>
+✅ Human input: <native matrix rendered|question_request fallback|disabled>; unresolved=<count|none>
 ✅ Context profile: <balanced|compact|full>; Context split: <inline + overflow refs>; budget=<largest surfaces>
 ✅ Plan handoff: <present|n/a>, task assignment quality=<short|full, required minimum filled, clarification count>
-✅ Learning memory: <disabled|project-tracked|project-local|personal-global>, Learning check=<checked>/<total>, updates=<ids|none>
+✅ Content quality: <ok|warn|fail|n/a>; curator=<separate|merged|skipped>; signals=<list|none>
+✅ Learning memory: <disabled|project-tracked|project-local|personal-global>, native=<documented|enabled|disabled>, Learning check=<checked>/<total>, updates=<ids|none>
 
 Warnings / approvals:
 - MCP servers: <selected list> (approval: <approve-all | selective | skipped>; marker: <present|n/a>)
@@ -19,6 +23,9 @@ Warnings / approvals:
 - Model overrides: <none — runtime defaults | scoped overrides set>
 - Copilot CLI tools profile: <standard | read-only | runner | research | inherit | minimal | custom>
 - Runtime drift notes: <only notes relevant to selected platforms>
+- Human-input approvals: <native tool used | question_request ids | none>
+- Requirements triage: <intake brief used | merged into planner | skipped with rationale>
+- Content-quality review: <curator report | merged reviewer check | skipped with rationale>
 - Learning updates: <new ids | updated ids | superseded ids | deferred ids | none>
 - Git: <initialized | left untouched | already present>
 - Wrap-up add-ons: selected=<list or none>, skipped=<list or none>
@@ -27,6 +34,9 @@ Details on request:
 - Full file list by platform
 - Full subagent and skill list
 - Full plugin/MCP recommendation table with [Tier · Vendor]
+- Full update-preflight and human-input evidence
+- Full requirements-triage intake brief and routing rationale
+- Full content-quality signal list and curator rationale
 - Full governance matrices and ADR refs
 - Codex subagent files: <selected-platform only list of .codex/agents/*.toml; CLI + App compatible artifacts>
 - Gemini subagent files: <selected-platform only list of .gemini/agents/*.md; non-recursive local subagents>
@@ -42,6 +52,7 @@ Details on request:
 ✅ Audit findings: <ok / warn / fail counts>
 ✅ Security findings: <ok / warn / fail / requires-human counts>
 ✅ Architecture findings: <ok / warn / fail / requires-human counts>
+✅ Content-quality findings: <ok / warn / fail / n/a counts>
 ✅ Deltas applied: <count>
 ✅ Deltas skipped: <count>
 ✅ Requires-human: <count>
@@ -71,6 +82,8 @@ Always include a `Context budget` line summarizing the largest generated context
 ✅ Context budget: AGENTS.md=<N> lines · largest subagent=<path>:<N> lines · skill description=<N> chars · Codex developer_instructions max=<N> lines
 ✅ Task assignment quality: <short-form | full-form, required minimum filled, expansion blocks: <list or "none">>
 ✅ Clarifications requested: <count>
+✅ Triage status: <separate | merged | skipped>; intake brief=<present|n/a>
+✅ Content quality: <ok | warn | fail | n/a>; curator=<separate | merged | skipped>; signals=<list | none>
 ```
 
 Use the values measured at write time. If a surface is not generated for this run, use `n/a` for that field.
