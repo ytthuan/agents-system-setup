@@ -2,6 +2,25 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [1.0.2] - 2026-05-07
+
+### Added
+
+- Provider-aware human-input/question protocol across Copilot CLI, Claude Code, OpenCode, OpenAI Codex, and Gemini CLI, including non-terminating `question_request` fallback guidance for subagents.
+- Safe self-update preflight before setup, with fast-forward-only update rules and no silent MCP/plugin/runtime config edits.
+- Default-on `requirements-triage` role for decomposing ambiguous, risky, cross-runtime, release, MCP, replication, audit, improve, or multi-wave setup requests.
+- Universal content-quality / anti-slop guardrails with a read-only `agent-quality-curator`, signal taxonomy, output markers, and validator coverage.
+
+### Changed
+
+- Generated AGENTS, GEMINI, orchestrator, subagent, and Codex TOML templates now include human-input, requirements-triage, learning, and content-quality reporting surfaces while preserving provider-specific schemas.
+- Handoff, output-contract, topology, context-optimization, marketplace, platform, runtime-update, wrap-up, and learning-memory references now document the latest generated-system workflow and quality gates.
+- Validator guardrails now cover human-input tool names, self-update safety, requirements-triage boundaries, content-quality policy, and current `question_request` terminology.
+
+### Fixed
+
+- Current handoff guidance now consistently uses `question_request`; legacy `clarification_request` remains documented only as superseded.
+
 ## [1.0.1] - 2026-05-05
 
 ### Added
