@@ -2,6 +2,26 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [Unreleased]
+
+### Added
+
+### Changed
+
+### Fixed
+
+## [1.0.3] - 2026-05-14
+
+### Added
+
+- Structured main-to-subagent prompt handoff guidance with an Orchestrator Assignment Format, Context Packet, assignment-quality reporting, and provider-aware template coverage.
+
+### Changed
+
+- Generated AGENTS, GEMINI, orchestrator, subagent, and Codex TOML templates now include compact assignment intake and prompt-contract quality expectations.
+
+### Fixed
+
 ## [1.0.2] - 2026-05-07
 
 ### Added
@@ -38,18 +58,6 @@ All notable changes to this plugin are documented here. Format: [Keep a Changelo
 
 - Claude Code plugin `commands/` are no longer described as legacy-only; the docs now keep commands for slash-command prompts and recommend skills for reusable workflows.
 - Copilot plugin install examples now separate terminal `copilot plugin install ...` usage from in-session `/plugin install PLUGIN@MARKETPLACE` usage.
-
-## [Unreleased]
-
-### Added
-
-- Structured main-to-subagent prompt handoff guidance with an Orchestrator Assignment Format, Context Packet, assignment-quality reporting, and provider-aware template coverage.
-
-### Changed
-
-- Generated AGENTS, GEMINI, orchestrator, subagent, and Codex TOML templates now include compact assignment intake and prompt-contract quality expectations.
-
-### Fixed
 
 ## [1.0.0] - 2026-05-03
 
