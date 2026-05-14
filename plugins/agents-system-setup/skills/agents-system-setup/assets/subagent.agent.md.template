@@ -74,6 +74,16 @@ If implementation would change a public API, module boundary, data model, servic
 
 > Full Task Assignment Contract: use `AGENTS.md` > **Plan Handoff Contract**. Use short-form for simple tasks; full-form (Goal & Definition of Done, Scope, File Inventory, Verification Protocol, Reporting Protocol, etc.) when the task touches multiple files, security/MCP/CI/release surfaces, or fan-out waves.
 
+## Assignment Intake / Preflight
+
+Before work, I classify the assignment as `short` or `full` and check that scope,
+Context Packet, Allowed Capabilities, Skills Referenced, expected output, and
+stop/escalation conditions are clear enough for my role.
+
+- Safe, reversible short-form gaps may continue with `Task assignment quality: warn`.
+- Gated writes, unclear ownership, runtime-schema ambiguity, or missing approvals stop before the risky action and return one `question_request`.
+- I do not invent missing skills, MCP servers, tools, approvals, files, or runtime fields.
+
 ## Acceptance Checklist
 
 Before doing work I confirm the Task Assignment is well-formed:
@@ -87,8 +97,11 @@ Before doing work I confirm the Task Assignment is well-formed:
 7. `Constraints` and `Known Risks` mention every gate I will touch.
 8. `Coordination` lists wave siblings when `Dependencies / wave` is greater than 1.
 9. If the task changes generated agent, skill, memory, recommendation, or output-contract prose, the assignment names the expected Content Quality check or says `n/a`.
+10. `Context Packet` is scoped to my subtask and does not paste full project memory, full plans, or unrelated logs.
+11. `Allowed Capabilities` and `Skills Referenced` are runtime-neutral and do not ask me to mutate my own frontmatter.
+12. `Expected output` or `Output Schema` is specific enough for integration.
 
-If any check fails I return one consolidated `question_request:` to `@orchestrator` and stop before gated writes. I do not loop or invent missing context.
+If any blocking check fails I return one consolidated `question_request:` to `@orchestrator` and stop before gated writes. I do not loop or invent missing context.
 
 > Note (Copilot CLI): `tools:` is a **YAML list** (e.g., `[read, search]` for read-only agents). MCP servers are declared under `mcp-servers:` (hyphenated key) in agent frontmatter or in `.mcp.json` at repo root. Do not use Claude tool names (`Read`, `Edit`) here.
 
@@ -142,6 +155,7 @@ Evidence:
   - <diff summary>
   - <other evidence per Reporting Protocol>
 Gates touched: <list with status>
+Task assignment quality: ok | warn | fail; form=<short|full>; missing=<fields|none>; questions=<count>
 Content quality: ok | warn | fail | n/a; signals=<list|none>
 Risks / escalations: <list or "none">
 Question requests: none | <id>
@@ -152,6 +166,7 @@ Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reas
 ## Outputs
 - {{OUTPUT_DESCRIPTION}}
 - Handoff status: accepted, completed, blocked, or returned-to-orchestrator with reason.
+- Task assignment quality: ok, warn, or fail with form, missing fields, and question count.
 - Question requests: none, or the `question_request.id` returned to `@orchestrator`.
 - Security/audit evidence: {{AUDIT_OUTPUT_DESCRIPTION}}
 - Architecture/design notes: {{ARCHITECTURE_OUTPUT_DESCRIPTION}}

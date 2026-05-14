@@ -2,6 +2,10 @@
 
 Use this contract whenever upstream planning output is handed to the generated orchestrator or subagents. It hardens handoff from planning surfaces into runtime-correct agent artifacts.
 
+This contract is also the **Task Assignment / Prompt Contract** for
+orchestrator-to-subagent delegation. The machine-readable schema lives here; the
+prompt-authoring guide lives in [prompt guidelines](./prompt-guidelines.md).
+
 ## Source prompt
 
 VS Code Insiders ships a `plan.prompt.md` prompt with this shape:
@@ -34,6 +38,10 @@ triage_status: "separate | merged | skipped | n/a"
 content_quality_status: "ok | warn | fail | n/a"
 content_quality_curator: "separate | merged | skipped | n/a"
 content_quality_signals: ["generic-description | empty-rationale | padding-repetition | slop-completeness | invented-attribution | context-bloat | vague-ownership | unsupported-assertion | silent-gate-gap | prompt-hygiene-risk | none"]
+assignment_quality_status: "ok | warn | fail | n/a"
+assignment_quality_form: "short | full | n/a"
+assignment_quality_missing: ["<field>", "...", "none"]
+assignment_quality_questions: <integer>
 selected_platforms: ["copilot-cli", "claude-code", "opencode", "codex-cli", "gemini-cli"]
 owning_agent: "<kebab-case agent name>"
 owned_paths: ["<glob>", "..."]
@@ -128,6 +136,11 @@ after `Triage` when the task creates or changes generated agent, skill, memory,
 recommendation, or output-contract prose. It is strongly recommended but not
 part of the required minimum for backward compatibility.
 
+Add `Task assignment quality: <ok | warn | fail; form=<short|full>; missing=<fields|none>; questions=<count>>`
+after `Content quality` when a generated orchestrator delegates to a subagent.
+It is recommended by default and required in generated reporting templates, but
+is not part of the twelve required-minimum fields for backward compatibility.
+
 ### Expansion blocks
 
 Add only the blocks the task actually needs. Each block has a fixed name so subagents and validators can find it.
@@ -143,6 +156,18 @@ Scope:
     - <bullet>
   out_of_scope:
     - <bullet>
+
+Context Packet:
+  files:
+    - <path or "none">
+  facts:
+    - <fact from repo/user/runtime docs>
+  decisions:
+    - <ADR or prior decision>
+  references:
+    - <reference path or URL>
+  do_not_include:
+    - <full AGENTS.md | full plan.md | unrelated logs>
 
 File Inventory:
   to_modify:
@@ -168,6 +193,27 @@ Reproduction (bug-fix tasks only):
 
 Assumptions:
   - <assumption the orchestrator made; subagent may challenge>
+
+Allowed Capabilities:
+  runtime_profile: <read-only | edit-capable | runner | research | inherit>
+  approval_gated_actions:
+    - <MCP config | secrets | CI/release | dependency write | none>
+  disallowed_capabilities:
+    - <broad write | recursive subagents | external network | none>
+
+Skills Referenced:
+  allowed:
+    - <existing skill name or "none">
+  invocation_notes: <runtime-correct skill behavior>
+  do_not_invent: true
+
+Instructions / Workflow:
+  1. <step>
+  2. <step>
+  3. <step>
+
+Acceptance Criteria:
+  - <observable outcome>
 
 Known Risks:
   - <risk> -> <mitigation>
@@ -198,22 +244,29 @@ Clarification Protocol:
   if_missing_required_field: ask one consolidated question to @orchestrator and wait
   if_assumption_invalid: stop, report, and request revised assignment
   do_not: silently invent missing context
+
+Stop / Escalation Conditions:
+  - <condition> -> <return-to-orchestrator | question_request | stop-before-write>
+
+Output Schema:
+  required_fields:
+    - <Outcome | Files changed | Evidence | Risks | Handoff status>
 ```
 
 ### Recommended Packet Form
 
 | Task tag | Recommended form | Required expansion blocks (in addition to required minimum) |
 |---|---|---|
-| `read-only-research` | short-form | none |
+| `read-only-research` | short-form | Context Packet when research sources are preselected |
 | `content-quality-review` | short-form | Reporting Protocol |
-| `code-edit` (≤2 files, no gates) | short-form | none |
-| `code-edit` (>2 files or touching shared boundary) | full-form | Goal & Definition of Done · Scope · File Inventory · Verification Protocol · Reporting Protocol |
-| `security-write` | full-form | Goal & Definition of Done · Scope · File Inventory · Known Risks · Verification Protocol · Reporting Protocol · Clarification Protocol |
-| `mcp-write` | full-form | Goal & Definition of Done · Scope · File Inventory · Known Risks · Reporting Protocol · Clarification Protocol |
-| `replication` | full-form | Goal & Definition of Done · Scope · File Inventory · Verification Protocol · Reporting Protocol · Coordination |
-| `release` | full-form | Goal & Definition of Done · Verification Protocol · Reporting Protocol · Known Risks |
+| `code-edit` (2 or fewer files, no gates) | short-form | Context Packet when prior decisions matter |
+| `code-edit` (more than 2 files or touching shared boundary) | full-form | Goal & Definition of Done · Scope · Context Packet · File Inventory · Instructions / Workflow · Verification Protocol · Reporting Protocol |
+| `security-write` | full-form | Goal & Definition of Done · Scope · Context Packet · File Inventory · Allowed Capabilities · Known Risks · Verification Protocol · Reporting Protocol · Clarification Protocol · Stop / Escalation Conditions |
+| `mcp-write` | full-form | Goal & Definition of Done · Scope · File Inventory · Allowed Capabilities · Known Risks · Reporting Protocol · Clarification Protocol · Stop / Escalation Conditions |
+| `replication` | full-form | Goal & Definition of Done · Scope · Context Packet · File Inventory · Verification Protocol · Reporting Protocol · Coordination |
+| `release` | full-form | Goal & Definition of Done · Verification Protocol · Reporting Protocol · Known Risks · Stop / Escalation Conditions |
 | `docs-only` | short-form | Reporting Protocol when docs CI exists |
-| `bug-fix` | full-form | Goal & Definition of Done · Reproduction · Verification Protocol · Reporting Protocol |
+| `bug-fix` | full-form | Goal & Definition of Done · Reproduction · Context Packet · Verification Protocol · Reporting Protocol |
 
 Use full-form whenever the task touches MCP, secrets, CI/release, dependency manifests, generated scripts, ADRs, or fan-out waves — even if the table above suggests short-form.
 
@@ -221,7 +274,10 @@ Do not include unrelated roster rows, marketplace research, or full platform sch
 
 ### Acceptance Checklist
 
-Subagents run this before doing work and return one consolidated `question_request` if any required field is missing.
+Subagents run this before doing work. Safe short-form gaps may continue with
+`Task assignment quality: warn`; gated writes, unclear ownership, or runtime
+schema ambiguity return one consolidated `question_request` and stop before the
+risky action.
 
 1. All twelve required-minimum fields are present and non-empty: Task, Source plan, Owned paths, Read-only paths, Relevant gates, Constraints, Dependencies / wave, Required approvals, Runtime format target, Expected output, Context freshness, and Lossiness.
 2. `File Inventory.to_modify` (when used) intersects only `Owned paths`.
@@ -231,8 +287,11 @@ Subagents run this before doing work and return one consolidated `question_reque
 6. `Reporting Protocol` matches the orchestrator's expected evidence shape.
 7. `Constraints` and `Known Risks` mention every gate the agent will touch.
 8. `Coordination` lists wave siblings when `Dependencies / wave` is greater than 1.
+9. `Context Packet` is scoped to the subtask and does not paste full project memory, full plans, or unrelated logs.
+10. `Allowed Capabilities` and `Skills Referenced` are runtime-neutral and do not ask the agent to invent skills or mutate its own frontmatter/TOML.
+11. `Output Schema` or `Expected output` is specific enough for the orchestrator to integrate.
 
-If any check fails, return: `question_request: <single consolidated question>` and stop. Do not loop.
+If a blocking check fails, return: `question_request: <single consolidated question>` and stop. Do not loop.
 
 ### Reporting Template
 
@@ -246,8 +305,10 @@ Evidence:
   - <diff summary>
   - <other evidence per Reporting Protocol>
 Gates touched: <list with status>
+Task assignment quality: ok | warn | fail; form=<short|full>; missing=<fields|none>; questions=<count>
 Content quality: ok | warn | fail | n/a; signals=<list|none>
 Risks / escalations: <list or "none">
+Question requests: none | <id>
 Handoff status: accepted | completed | blocked | returned-to-orchestrator
 Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>
 ```
@@ -264,6 +325,7 @@ Before declaring done:
 6. For Codex, confirm shared artifacts (`AGENTS.md`, `.codex/agents/*.toml`, `.codex/config.toml`) do not require CLI-only commands to work in the App.
 7. For Gemini, confirm `GEMINI.md` points to canonical `AGENTS.md` and `.gemini/agents/*.md` subagents use loader-valid frontmatter.
 8. Confirm generated agent-system prose reports `Content quality` status/signals or `n/a`.
+9. Confirm generated orchestrators and subagents report `Task assignment quality` and preserve the recommended short-form/full-form semantics.
 
 ## Anti-patterns
 
@@ -275,3 +337,6 @@ Before declaring done:
 - Treating Codex CLI commands as requirements for Codex App compatibility.
 - Copying Gemini extension `mcpServers` examples into local `.gemini/agents/*.md` instead of normalizing to `mcp_servers`.
 - Treating content-quality review as a replacement for tests, security review, architecture review, or provider schema validation.
+- Treating a bare natural-language instruction as enough context for normal,
+  risky, fan-out, MCP, release, replication, security, or generated-agent-system
+  work.

@@ -41,7 +41,7 @@ I am the entry point for all work in **{{PROJECT_NAME}}**. I never implement cod
 2. **Requirements Triage** — Invoke `@requirements-triage` for ambiguous, risky, cross-runtime, release, MCP, replication, or multi-wave work; otherwise record `triage: skipped` with rationale. Consume its intake brief, risk flags, routing, and `question_request` items before writing the plan.
 3. **Plan** — Write `plan.md`. List subtasks, owning agent per subtask (cross-check with Directory Architecture), security/architecture impact, acceptance criteria, triage result, and a Plan Handoff packet.
 4. **Threat/architecture check** — If the task touches tools, auth, secrets, dependency manifests, CI/release, data boundaries, APIs, or persistence, delegate to the security and architecture owners before implementation.
-5. **Compose Assignment** — For each subagent, compose a Task Assignment using `AGENTS.md` > **Plan Handoff Contract**. Pick short-form or full-form per the task tag. Always full-form for security/MCP/CI/release/replication or fan-out waves.
+5. **Compose Assignment** — For each subagent, compose a Task Assignment using `AGENTS.md` > **Plan Handoff Contract**. Use the Orchestrator Assignment Format for normal/risky work: objective, scope, Context Packet, allowed capabilities, skills referenced, workflow, expected output, and stop/escalation. Safe tiny tasks may use short-form; security/MCP/CI/release/replication or fan-out waves always use full-form.
 6. **Delegate** — Invoke subagents via the `Agent` tool in dependency order. Pass the composed Task Assignment, not the whole project memory.
 7. **Integrate** — Collect outputs; reconcile conflicts. If two agents claim the same path, refer to the matrix.
 8. **Resolve Questions** — For each returned `question_request`, ask the user once through the provider-native mechanism when possible. If unavailable, apply safe defaults only for reversible, non-sensitive choices; otherwise record the unresolved request and stop before the gated write. Update plan/todos, then re-delegate.
@@ -53,6 +53,12 @@ I am the entry point for all work in **{{PROJECT_NAME}}**. I never implement cod
 ## Delegation Packet
 
 Use `AGENTS.md` > **Plan Handoff Contract** as the canonical Task Assignment Contract. Fill the Required Minimum every time; add Expansion Blocks per the Recommended Packet Form for the task tag. When `AGENTS.md` was loaded this turn, set `Context freshness: recent` so subagents skip redundant re-reads.
+
+Orchestrator Assignment Format:
+- Pass a subtask slice, not the full plan or full project memory.
+- Include `Context Packet`, `Allowed Capabilities`, `Skills Referenced`, `Verification Protocol`, `Reporting Protocol`, and `Stop / Escalation Conditions` when the task is normal, risky, multi-file, or cross-agent.
+- Ask subagents to return `Task assignment quality: ok | warn | fail; form=<short|full>; missing=<fields|none>; questions=<count>`.
+- Treat `warn` as acceptable only for safe reversible gaps; gated writes require `ok` or a resolved `question_request`.
 
 ## Memory & Learning
 

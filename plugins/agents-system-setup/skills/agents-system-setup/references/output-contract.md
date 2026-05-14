@@ -12,7 +12,8 @@ Use this contract at the end of `init`, `update`, `improve`, and `replicate` flo
 ✅ Update preflight: <checked|already-current|ff-updated|requires-human|skipped>; source=<path-or-manager>; evidence=<git range|question_request id|n/a>
 ✅ Human input: <native matrix rendered|question_request fallback|disabled>; unresolved=<count|none>
 ✅ Context profile: <balanced|compact|full>; Context split: <inline + overflow refs>; budget=<largest surfaces>
-✅ Plan handoff: <present|n/a>, task assignment quality=<short|full, required minimum filled, clarification count>
+✅ Plan handoff: <present|n/a>, task assignment quality=<ok|warn|fail; form=<short|full>; missing=<fields|none>; questions=<count>>
+✅ Task assignment quality: <ok|warn|fail; form=<short|full>; missing=<fields|none>; questions=<count>>
 ✅ Content quality: <ok|warn|fail|n/a>; curator=<separate|merged|skipped>; signals=<list|none>
 ✅ Learning memory: <disabled|project-tracked|project-local|personal-global>, native=<documented|enabled|disabled>, Learning check=<checked>/<total>, updates=<ids|none>
 
@@ -24,6 +25,7 @@ Warnings / approvals:
 - Copilot CLI tools profile: <standard | read-only | runner | research | inherit | minimal | custom>
 - Runtime drift notes: <only notes relevant to selected platforms>
 - Human-input approvals: <native tool used | question_request ids | none>
+- Task assignment quality: <ok | warn | fail; form=<short | full>; missing=<fields | none>; questions=<count>>
 - Requirements triage: <intake brief used | merged into planner | skipped with rationale>
 - Content-quality review: <curator report | merged reviewer check | skipped with rationale>
 - Learning updates: <new ids | updated ids | superseded ids | deferred ids | none>
@@ -36,6 +38,7 @@ Details on request:
 - Full plugin/MCP recommendation table with [Tier · Vendor]
 - Full update-preflight and human-input evidence
 - Full requirements-triage intake brief and routing rationale
+- Full Task Assignment / Prompt Contract quality findings
 - Full content-quality signal list and curator rationale
 - Full governance matrices and ADR refs
 - Codex subagent files: <selected-platform only list of .codex/agents/*.toml; CLI + App compatible artifacts>
@@ -52,6 +55,7 @@ Details on request:
 ✅ Audit findings: <ok / warn / fail counts>
 ✅ Security findings: <ok / warn / fail / requires-human counts>
 ✅ Architecture findings: <ok / warn / fail / requires-human counts>
+✅ Task-assignment findings: <ok / warn / fail counts>
 ✅ Content-quality findings: <ok / warn / fail / n/a counts>
 ✅ Deltas applied: <count>
 ✅ Deltas skipped: <count>
@@ -80,7 +84,7 @@ Always include a `Context budget` line summarizing the largest generated context
 
 ```text
 ✅ Context budget: AGENTS.md=<N> lines · largest subagent=<path>:<N> lines · skill description=<N> chars · Codex developer_instructions max=<N> lines
-✅ Task assignment quality: <short-form | full-form, required minimum filled, expansion blocks: <list or "none">>
+✅ Task assignment quality: <ok | warn | fail; form=<short | full>; missing=<fields | none>; questions=<count>; expansion blocks=<list | none>>
 ✅ Clarifications requested: <count>
 ✅ Triage status: <separate | merged | skipped>; intake brief=<present|n/a>
 ✅ Content quality: <ok | warn | fail | n/a>; curator=<separate | merged | skipped>; signals=<list | none>

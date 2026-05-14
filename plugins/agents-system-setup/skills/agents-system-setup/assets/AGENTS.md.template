@@ -171,6 +171,10 @@ Legend: ✅ primary owner · 🟡 assists · *(blank)* not involved.
 - **Canonical required fields (12):** Task; Source plan; Owned paths; Read-only paths; Relevant gates; Constraints; Dependencies / wave; Required approvals; Runtime format target; Expected output; Context freshness; Lossiness.
 - **Expansion fields:** Owning agent, Evidence, and task-specific expansion blocks are included only when useful; they are not part of the required minimum.
 - **Triage seed:** requirements-triage may prefill intent, scope, risks, questions, and routing, but the orchestrator must validate it before delegation.
+- **Prompt assignment quality:** normal/risky work uses a structured subtask slice; safe tiny work may use short-form and report `warn` for non-blocking gaps.
+- **Context packet rule:** pass task-specific files, facts, decisions, and references; do not paste full project memory, full plans, or unrelated logs into every subagent prompt.
+- **Capabilities and skills:** describe allowed capabilities and skills referenced; never invent skill names or ask agents to mutate their own runtime frontmatter/TOML.
+- **Assignment marker:** `Task assignment quality: ok | warn | fail; form=<short|full>; missing=<fields|none>; questions=<count>`.
 - **Format rule:** generated artifacts must use the selected runtime's native schema; never copy prompt frontmatter or another runtime's frontmatter into this project.
 - **Platform format targets:** {{PLATFORM_FORMAT_NOTES}}
 - **Handoff evidence:** {{HANDOFF_EVIDENCE}}

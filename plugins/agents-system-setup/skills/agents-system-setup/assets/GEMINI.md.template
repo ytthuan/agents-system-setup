@@ -14,6 +14,7 @@
 5. Follow `AGENTS.md` › **Memory & Learning System**. Gemini subagents propose Learning Check entries; this root session or the orchestrator owns memory writes.
 6. Resolve subagent `question_request` items through `AGENTS.md` › **Human Input / Question Protocol**. Use Gemini `ask_user` only when interactive and allowed; otherwise record the unresolved request or stop before gated writes.
 7. Follow `AGENTS.md` › **Content Quality / Anti-Slop Review** before final output when generated agent-system prose changes; Gemini subagents return `Content quality` status to this root session.
+8. Use `AGENTS.md` › **Plan Handoff Contract** when assigning Gemini subagents: pass a subtask slice, expected output, allowed capabilities, and `Task assignment quality` marker from this root session.
 
 ## Local Subagents
 
