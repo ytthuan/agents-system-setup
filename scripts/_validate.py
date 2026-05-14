@@ -26,7 +26,9 @@ Checks (per the CONTRIBUTING.md contract):
   19. Human-input/question tooling is provider-specific and non-terminating
   20. Self-update preflight is safe, fast-forward-only, and config-silent
   21. Generated content-quality / anti-slop review is universal, compact,
-      read-only by default, and provider-schema safe
+       read-only by default, and provider-schema safe
+  22. Main-to-subagent prompt handoff guidance is structured, compact,
+       provider-neutral, and schema-safe
 
 Exits non-zero on any failure. Designed to be invoked from CI on
 Linux / macOS / Windows runners with only Python 3.10+ available
@@ -2328,6 +2330,164 @@ def check_plan_handoff_policy() -> None:
     )
 
 
+# ---------- 15b: prompt handoff quality ----------
+
+def check_prompt_handoff_quality_policy() -> None:
+    """Guard the main-agent to subagent prompt-assignment contract."""
+
+    prompt_ref = SKILL_ROOT / "references" / "prompt-guidelines.md"
+    if not prompt_ref.is_file():
+        err(f"{prompt_ref.relative_to(REPO).as_posix()}: required prompt guidelines reference is missing")
+        return
+
+    require_contains(
+        prompt_ref,
+        (
+            "Prompt Guidelines for Main-to-Subagent Handoff",
+            "Orchestrator Assignment Format",
+            "Context Packet",
+            "Allowed Capabilities",
+            "Skills Referenced",
+            "Stop / Escalation Conditions",
+            "Task assignment quality: ok | warn | fail",
+            "provider-neutral",
+            "subtask slice",
+            "do not load this reference by default",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "handoff.md",
+        (
+            "Task Assignment / Prompt Contract",
+            "prompt-guidelines.md",
+            "assignment_quality_status",
+            "Context Packet",
+            "Allowed Capabilities",
+            "Skills Referenced",
+            "Instructions / Workflow",
+            "Stop / Escalation Conditions",
+            "Output Schema",
+            "Task assignment quality: ok | warn | fail",
+            "These twelve fields are mandatory",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "Prompt assignment quality",
+            "Context packet rule",
+            "Capabilities and skills",
+            "Assignment marker",
+            "Task assignment quality: ok | warn | fail",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "GEMINI.md.template",
+        (
+            "Plan Handoff Contract",
+            "subtask slice",
+            "Task assignment quality",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "context-optimization.md",
+        (
+            "Prompt guidelines",
+            "Context Packet rule",
+            "prompt-contract-review",
+            "embedded Assignment Intake",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "output-contract.md",
+        (
+            "Task assignment quality: <ok|warn|fail",
+            "Task-assignment findings",
+            "Full Task Assignment / Prompt Contract quality findings",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "replication.md",
+        (
+            "Context Packet",
+            "Allowed Capabilities",
+            "Skills Referenced",
+            "Stop / Escalation Conditions",
+            "Task assignment quality",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "Main-to-subagent handoff is structured",
+            "prompt-guidelines.md",
+            "Orchestrator Assignment Format",
+            "Task assignment quality",
+        ),
+    )
+
+    for name in (
+        "orchestrator.agent.md.template",
+        "orchestrator.claude.md.template",
+        "orchestrator.opencode.md.template",
+    ):
+        require_contains(
+            SKILL_ROOT / "assets" / name,
+            (
+                "Orchestrator Assignment Format",
+                "subtask slice",
+                "Allowed Capabilities",
+                "Skills Referenced",
+                "Stop / Escalation Conditions",
+                "Task assignment quality: ok | warn | fail",
+            ),
+        )
+
+    for name in (
+        "subagent.agent.md.template",
+        "subagent.claude.md.template",
+        "subagent.opencode.md.template",
+        "subagent.gemini.md.template",
+    ):
+        path = SKILL_ROOT / "assets" / name
+        require_contains(
+            path,
+            (
+                "## Assignment Intake / Preflight",
+                "Context Packet",
+                "Allowed Capabilities",
+                "Skills Referenced",
+                "Task assignment quality: ok | warn | fail",
+                "Expected output",
+            ),
+        )
+        text = path.read_text(encoding="utf-8")
+        if "prompt-guidelines.md" in text:
+            err(f"assets/{name}: subagent templates must not load prompt-guidelines.md by default")
+
+    opencode_template = (SKILL_ROOT / "assets" / "subagent.opencode.md.template").read_text(encoding="utf-8")
+    if "Use `permission:`" not in opencode_template:
+        err("assets/subagent.opencode.md.template: prompt handoff guidance must use OpenCode `permission` vocabulary")
+
+    codex_path = SKILL_ROOT / "assets" / "subagent.codex.toml.template"
+    require_contains(
+        codex_path,
+        (
+            "Assignment Intake / Preflight",
+            "Context Packet",
+            "Allowed Capabilities",
+            "Skills Referenced",
+            "Task assignment quality: ok | warn | fail",
+        ),
+    )
+    structural_toml = _strip_toml_triple_strings(codex_path.read_text(encoding="utf-8"))
+    if re.search(
+        r"(?m)^\s*(?:tools|question|request_user_input|memory|expected_output|assignment_quality|context_packet|allowed_capabilities)\s*=",
+        structural_toml,
+    ):
+        err("assets/subagent.codex.toml.template: prompt handoff fields must stay in developer_instructions, not TOML fields")
+
+
 # ---------- 16: Codex CLI + App compatibility ----------
 
 def check_codex_cli_app_compatibility() -> None:
@@ -3118,6 +3278,7 @@ def main() -> int:
     check_context_optimization()
     check_local_tracking_policy()
     check_plan_handoff_policy()
+    check_prompt_handoff_quality_policy()
     check_codex_cli_app_compatibility()
     check_runtime_update_policy()
     check_runtime_invocation_policy()

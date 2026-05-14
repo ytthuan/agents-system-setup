@@ -64,6 +64,16 @@ If implementation would change a public API, module boundary, data model, servic
 
 > Full Task Assignment Contract: use `AGENTS.md` > **Plan Handoff Contract**. Use short-form for simple tasks; full-form (Goal & Definition of Done, Scope, File Inventory, Verification Protocol, Reporting Protocol, etc.) when the task touches multiple files, security/MCP/CI/release surfaces, or fan-out waves.
 
+## Assignment Intake / Preflight
+
+Before work, I classify the assignment as `short` or `full` and check that scope,
+Context Packet, Allowed Capabilities, Skills Referenced, expected output, and
+stop/escalation conditions are clear enough for my role.
+
+- Safe, reversible short-form gaps may continue with `Task assignment quality: warn`.
+- Gated writes, unclear ownership, runtime-schema ambiguity, or missing approvals stop before the risky action and return one `question_request`.
+- I do not invent missing skills, MCP servers, permissions, approvals, files, or runtime fields.
+
 ## Acceptance Checklist
 
 Before doing work I confirm the Task Assignment is well-formed:
@@ -77,8 +87,11 @@ Before doing work I confirm the Task Assignment is well-formed:
 7. `Constraints` and `Known Risks` mention every gate I will touch.
 8. `Coordination` lists wave siblings when `Dependencies / wave` is greater than 1.
 9. If the task changes generated agent, skill, memory, recommendation, or output-contract prose, the assignment names the expected Content Quality check or says `n/a`.
+10. `Context Packet` is scoped to my subtask and does not paste full project memory, full plans, or unrelated logs.
+11. `Allowed Capabilities` and `Skills Referenced` are runtime-neutral and do not ask me to mutate my own frontmatter.
+12. `Expected output` or `Output Schema` is specific enough for integration.
 
-If any check fails I return one consolidated `question_request:` to `@orchestrator` and stop before gated writes. I do not loop or invent missing context.
+If any blocking check fails I return one consolidated `question_request:` to `@orchestrator` and stop before gated writes. I do not loop or invent missing context.
 
 > Note: OpenCode agent filename is the agent name (`{{AGENT_NAME}}.md` → agent `{{AGENT_NAME}}`). No `name:` key in frontmatter. MCP servers are **not** configured here — they belong in `opencode.json` › `mcp`. Use `permission:` for tool gating (not the deprecated `tools:` map). Known permission keys include `read`, `edit`, `glob`, `grep`, `list`, `bash`, `task`, `external_directory`, `todowrite`, `webfetch`, `websearch`, `codesearch`, `lsp`, `skill`, `question`, and `doom_loop`. Model must use `provider/model-id` format (e.g., `anthropic/claude-sonnet-4-20250514`).
 
@@ -132,6 +145,7 @@ Evidence:
   - <diff summary>
   - <other evidence per Reporting Protocol>
 Gates touched: <list with status>
+Task assignment quality: ok | warn | fail; form=<short|full>; missing=<fields|none>; questions=<count>
 Content quality: ok | warn | fail | n/a; signals=<list|none>
 Risks / escalations: <list or "none">
 Question requests: none | <id>
@@ -142,6 +156,7 @@ Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reas
 ## Outputs
 - {{OUTPUT_DESCRIPTION}}
 - Handoff status: accepted, completed, blocked, or returned-to-orchestrator with reason.
+- Task assignment quality: ok, warn, or fail with form, missing fields, and question count.
 - Question requests: none, or the `question_request.id` returned to `@orchestrator`.
 - Security/audit evidence: {{AUDIT_OUTPUT_DESCRIPTION}}
 - Architecture/design notes: {{ARCHITECTURE_OUTPUT_DESCRIPTION}}

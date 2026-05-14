@@ -22,6 +22,7 @@ If the user is unsure, choose `Balanced`.
 | Runtime agent files | Role-specific execution instructions | Include role, owned/read-only paths, triggers, security boundary, output contract. Avoid repeating full project policy. |
 | Requirements triage output | Intake brief before planning | Keep inline in the plan as a compact scope/risk/routing seed; do not duplicate full repo memory. |
 | Content quality review | Anti-slop signal check before final output | Keep only status/signals inline; link `content-quality.md` for taxonomy and fixes. |
+| Prompt guidelines | Generator-side authoring guide for main-to-subagent assignments | Load only for orchestrator/generator/replication prompt-contract work; subagents use embedded intake checks. |
 | Memory & learning files | Durable lessons and Learning Index | Load the index first; load detailed entries only when category/path/runtime matches the task. |
 | Reference files | Deep detail | Load only when task needs that domain or when the user asks for full detail. |
 | Plans / summaries | Temporary task state | Lead with outcome, keep evidence concise, link or name files for detail. |
@@ -85,12 +86,27 @@ Use these defaults in generated content:
 5. Use "read this first" / "load when needed" language.
 6. Use explicit `n/a — <reason>` instead of omitting mandatory sections.
 7. Cap recommendations at 3 unless the user asks for "show more".
+8. Pass a subtask slice to subagents; never paste full `AGENTS.md`, full
+   `plan.md`, or unrelated logs into every assignment.
 
 ## 6. Concise delegation packets
 
 The orchestrator should pass subagents enough context to act without dumping the full project memory. **The canonical Delegation Packet schema lives in [`handoff.md`](./handoff.md#delegation-packet-canonical-schema).** Every orchestrator template and runtime renderer fills the same fields in the same order; do not redefine the schema here.
 
 When updating field semantics or adding a field, edit `handoff.md` first, then re-link from this section.
+
+### Context Packet rule
+
+Use the Orchestrator Assignment Format from
+[`prompt-guidelines.md`](./prompt-guidelines.md#orchestrator-assignment-format)
+only when composing or reviewing assignments. Runtime subagents should not load
+that reference by default. Their embedded Assignment Intake is enough.
+
+Every non-trivial assignment gets a small `Context Packet` with task-specific
+files, facts, decisions, references, and explicit `do_not_include` notes. The
+packet should point to `AGENTS.md` rows by section name instead of copying the
+whole file. Set `Context freshness` so subagents know whether to trust the
+orchestrator's snapshot or reload.
 
 ## Context freshness rule
 
@@ -113,6 +129,7 @@ Map common task tags to the references each agent should load (or skip), and to 
 | `read-only-research` | `AGENTS.md` Read First, Directory Architecture | `topology.md` if topology questions | Security & Audit Matrix detail, Threat Model long rationale, MCP gate | short-form |
 | `requirements-triage` | `AGENTS.md` Read First, Directory Architecture, Human Input / Question Protocol | `topology.md`, platform/runtime refs, Security & Audit rows, prior plan only when relevant | Source files outside requested scope, full marketplace research | short-form intake brief |
 | `content-quality-review` | `AGENTS.md` Read First, Content Quality / Anti-Slop Review, Directory Architecture | `content-quality.md`, `output-contract.md`, `handoff.md`, runtime refs for generated artifacts | Source implementation files unrelated to generated prose | short-form quality signals |
+| `prompt-contract-review` | `handoff.md`, `prompt-guidelines.md`, relevant runtime template | `context-optimization.md`, `output-contract.md` | Source implementation files unrelated to generated prompts | short-form with Reporting Protocol |
 | `code-edit` | `AGENTS.md` Read First, Directory Architecture, owning agent boundary | Quality Gates row for this path | Marketplace research, full platform schemas | short-form (≤2 files) · full-form when >2 files or shared boundary |
 | `security-write` | Security & Audit Matrix, Threat Model, owning agent boundary | `security-audit-architecture.md` rows for the change | Long marketplace candidate research | full-form |
 | `mcp-write` | MCP approval gate (Phase 3.5), Security & Audit Matrix | `plugin-discovery.md` MCP rendering | Architecture Decisions detail | full-form |
@@ -144,6 +161,8 @@ Renderers must keep section headings (so validators and humans can find them) an
 - Moving security/audit/architecture gates into a file that `AGENTS.md` does not link.
 - Repeating the same policy paragraph in every subagent.
 - Adding anti-slop bloat instead of a compact `Content quality` status and linked signal taxonomy.
+- Loading `prompt-guidelines.md` in every runtime subagent instead of using the
+  embedded Assignment Intake.
 - Generating full marketplace research inline when only one candidate was selected.
 - Hiding lossy replication drops to save space.
 - Loading the full learning ledger for every task instead of the Learning Index and matching entries.

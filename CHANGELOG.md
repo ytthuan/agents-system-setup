@@ -43,7 +43,11 @@ All notable changes to this plugin are documented here. Format: [Keep a Changelo
 
 ### Added
 
+- Structured main-to-subagent prompt handoff guidance with an Orchestrator Assignment Format, Context Packet, assignment-quality reporting, and provider-aware template coverage.
+
 ### Changed
+
+- Generated AGENTS, GEMINI, orchestrator, subagent, and Codex TOML templates now include compact assignment intake and prompt-contract quality expectations.
 
 ### Fixed
 
