@@ -806,6 +806,15 @@ def check_opencode_markdown_agents() -> None:
                     err(f"{rel}: OpenCode primary agents must set `permission.task` as a mapping with `\"*\": deny` or `\"*\": ask`")
             elif task_permission.get("*") not in {"deny", "ask"}:
                 err(f"{rel}: OpenCode primary `permission.task` must include `\"*\": deny` or `\"*\": ask`; permissive wildcard allow is not allowed")
+            else:
+                named_allows = [
+                    name
+                    for name, action in task_permission.items()
+                    if name != "*" and action == "allow"
+                ]
+                skip_marker = "agents-system-setup:permission-task-roster: skipped" in frontmatter_body
+                if not named_allows and not skip_marker:
+                    warn(f"{rel}: OpenCode primary `permission.task` has no named subagent allows; add roster allows or the skipped-roster marker")
         for key in ("mcp-servers", "mcpServers"):
             if key in fm:
                 err(f"{rel}: OpenCode agents must not set `{key}`; configure MCP in opencode.json `mcp`")
@@ -1096,6 +1105,7 @@ def check_human_input_protocol() -> None:
         SKILL_ROOT / "assets" / "subagent.claude.md.template",
     ]
     _require_aggregate_marker("Claude human-input tooling", _aggregate_policy_text(claude_paths), "AskUserQuestion")
+    _require_aggregate_marker("Claude background human-input fallback", _aggregate_policy_text(claude_paths), "background: true")
     for path, rel, line_no, line, _ in _iter_policy_lines(claude_paths):
         claude_context = "claude" in rel.casefold() or re.search(r"\bClaude\b", line)
         if not claude_context:
@@ -1116,6 +1126,8 @@ def check_human_input_protocol() -> None:
                 lowered_tools = {tool.casefold() for tool in _frontmatter_tools(fm.get("tools"))}
                 if lowered_tools & {"ask_user", "question", "request_user_input"}:
                     err(f"{rel}: Claude frontmatter `tools:` must use `AskUserQuestion` for question tooling")
+                if fm.get("background") is True and "askuserquestion" in lowered_tools:
+                    err(f"{rel}: Claude background agents must return `question_request`, not rely on `AskUserQuestion`")
 
     # OpenCode must emit nested permission syntax, not a dotted config key.
     opencode_paths = [
@@ -2088,7 +2100,9 @@ def _check_codex_developer_instructions_budget(path: Path) -> None:
         return
     body_lines = len(match.group(1).strip("\n").splitlines())
     if body_lines > 80:
-        warn(f"{rel}: Codex developer_instructions block is {body_lines} lines; target is <= 60 (apply summary + pointer rule).")
+        err(f"{rel}: Codex developer_instructions block is {body_lines} lines; hard limit is <= 80 (apply summary + pointer rule).")
+    elif body_lines > 65:
+        warn(f"{rel}: Codex developer_instructions block is {body_lines} lines; target is <= 65 (apply summary + pointer rule).")
 
 
 def _check_agents_template_read_first_budget(path: Path) -> None:
@@ -2379,6 +2393,10 @@ def check_prompt_handoff_quality_policy() -> None:
             "Capabilities and skills",
             "Assignment marker",
             "Task assignment quality: ok | warn | fail",
+            "Platform-native delegation",
+            "OpenAI Codex (CLI + App)",
+            ".codex/agents/*.toml",
+            "Codex uses this root `AGENTS.md` section",
         ),
     )
     require_contains(
@@ -2387,6 +2405,37 @@ def check_prompt_handoff_quality_policy() -> None:
             "Plan Handoff Contract",
             "subtask slice",
             "Task assignment quality",
+            "## Lifecycle",
+            "## Delegation Packet",
+            "Requirements Triage",
+            "Content Quality / Anti-Slop Review",
+            "root session",
+        ),
+    )
+    for name in (
+        "AGENTS.md.template",
+        "GEMINI.md.template",
+        "orchestrator.agent.md.template",
+        "orchestrator.claude.md.template",
+        "orchestrator.opencode.md.template",
+    ):
+        require_contains(
+            SKILL_ROOT / "assets" / name,
+            (
+                "## Wave Execution",
+                "agents-system-setup:wave-execution",
+                "fan out",
+                "parallel-safe",
+                "wave",
+            ),
+        )
+    require_contains(
+        SKILL_ROOT / "references" / "agent-format.md",
+        (
+            "{{OPTIONAL_BACKGROUND_LINE}}",
+            "background: true",
+            "permission-task-roster: skipped",
+            "named roster allows",
         ),
     )
     require_contains(
@@ -2458,6 +2507,10 @@ def check_prompt_handoff_quality_policy() -> None:
                 "Allowed Capabilities",
                 "Skills Referenced",
                 "Task assignment quality: ok | warn | fail",
+                "{{HANDOFF_TRIAGE_STATUS}}",
+                "{{HANDOFF_CONTENT_QUALITY_STATUS}}",
+                "{{HANDOFF_CONTEXT_FRESHNESS}}",
+                "`Context freshness` is explicit",
                 "Expected output",
             ),
         )
@@ -2478,6 +2531,10 @@ def check_prompt_handoff_quality_policy() -> None:
             "Allowed Capabilities",
             "Skills Referenced",
             "Task assignment quality: ok | warn | fail",
+            "{{HANDOFF_TRIAGE_STATUS}}",
+            "{{HANDOFF_CONTENT_QUALITY_STATUS}}",
+            "{{HANDOFF_CONTEXT_FRESHNESS}}",
+            "Confirm Context freshness is explicit",
         ),
     )
     structural_toml = _strip_toml_triple_strings(codex_path.read_text(encoding="utf-8"))
@@ -2615,8 +2672,10 @@ def check_runtime_update_policy() -> None:
             ".github/agents/<name>.agent.md",
             "Claude Code",
             "plugin-shipped agents",
+            "background: true",
             "OpenCode",
             "Permission keys",
+            "permission.task",
             "OpenAI Codex (CLI + App)",
             "job_max_runtime_seconds",
             "spawn_agents_on_csv",
@@ -2625,6 +2684,7 @@ def check_runtime_update_policy() -> None:
             ".gemini/agents/*.md",
             "extension `agents/*.md`",
             "mcp_servers",
+            "mcpServers",
             "agent_card_url",
             "agent_card_json",
         ),
@@ -2648,12 +2708,15 @@ def check_runtime_update_policy() -> None:
             "Emit `.github/agents/<name>.agent.md`",
             ".github/agents/<name>.md",
             "plugin-shipped agents",
+            "background: true",
             "Permission keys",
+            "permission.task",
             "job_max_runtime_seconds",
             "spawn_agents_on_csv",
             ".gemini/agents/<name>.md",
             "extension `agents/*.md`",
             "mcp_servers",
+            "mcpServers",
         ),
     )
     require_contains(
@@ -2663,6 +2726,8 @@ def check_runtime_update_policy() -> None:
             "Schema split",
             "Plugin-shipped agents",
             "Permission keys",
+            "{{OPTIONAL_BACKGROUND_LINE}}",
+            "permission-task-roster: skipped",
             "job_max_runtime_seconds",
             "spawn_agents_on_csv",
             "Gemini CLI",

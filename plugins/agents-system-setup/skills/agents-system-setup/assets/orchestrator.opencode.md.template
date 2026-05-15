@@ -59,6 +59,19 @@ Orchestrator Assignment Format:
 - Ask subagents to return `Task assignment quality: ok | warn | fail; form=<short|full>; missing=<fields|none>; questions=<count>`.
 - Treat `warn` as acceptable only for safe reversible gaps; gated writes require `ok` or a resolved `question_request`.
 
+## Wave Execution
+
+<!-- agents-system-setup:wave-execution -->
+
+For independent work, **fan out** all parallel-safe subagents in the current
+wave through OpenCode `task` / `@<agent-name>` delegation. Wait for every result,
+synthesize, then start the next wave. Primary agents must gate this with
+`permission.task`: wildcard `deny` or `ask` plus named roster allows, unless an
+explicit skipped-roster marker is rendered.
+
+Sequential delegation is allowed only when owned paths overlap, a worker depends
+on a previous result, or a gate requires review before the next write.
+
 ## Memory & Learning
 
 Use `AGENTS.md` > **Memory & Learning System**. Ask subagents to return `Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>`. Subagents propose; I approve updates and route writes to the memory owner.

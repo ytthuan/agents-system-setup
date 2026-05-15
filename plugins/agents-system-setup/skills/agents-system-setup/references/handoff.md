@@ -103,6 +103,20 @@ actions, learning overwrites, or security-sensitive changes.
 
 Skills are portable `SKILL.md` files; if a skill consumes handoff data, describe the HandoffIR fields in the skill body rather than inventing runtime-specific frontmatter.
 
+## Runtime-native delegation syntax
+
+Use the same HandoffIR for every provider, then express delegation in the
+runtime's native coordination surface. Do not copy these call-surface notes into
+another provider's frontmatter or TOML.
+
+| Runtime | Native delegation surface | Handoff rule |
+|---|---|---|
+| Copilot CLI / VS Code | Task/custom-agent call via the `agent` tool; optional `/fleet` prompt for independent batches | Use Task/agent fan-out when results need orchestrator synthesis. Treat `/fleet` as optional CLI UX, not required artifact behavior. |
+| Claude Code | `Agent` tool for normal subagent work; experimental Agent Teams only when enabled | Fan out multiple `Agent` calls for independent wave members. Return `question_request` from background/headless workers instead of relying on `AskUserQuestion`. |
+| OpenCode | `task` permission plus `@<agent-name>` routing from a primary agent | Primary agents use `permission.task` with wildcard `deny`/`ask` and named roster allows, or an explicit skipped-roster marker. |
+| OpenAI Codex (CLI + App) | Root `AGENTS.md` asks Codex to spawn child agents; specialists live in `.codex/agents/*.toml` | Keep shared artifacts free of required CLI-only slash commands. Use `.codex/config.toml` `[agents] max_depth = 1` unless the user approves deeper recursion. |
+| Gemini CLI | Root Gemini session delegates to local subagents by description or `@<agent-name>` | Keep all fan-out in the root session because Gemini subagents cannot recursively call other subagents. |
+
 ## Delegation packet (canonical schema)
 
 The orchestrator passes subagents a **Task Assignment**. Renderers fill the same fields in the same order. **This section is the single source of truth** — `references/context-optimization.md` and every orchestrator template must reference it instead of redefining it. The packet has two layers: a Required Minimum (always sent) and Expansion Blocks (sent when applicable).
@@ -280,16 +294,18 @@ schema ambiguity return one consolidated `question_request` and stop before the
 risky action.
 
 1. All twelve required-minimum fields are present and non-empty: Task, Source plan, Owned paths, Read-only paths, Relevant gates, Constraints, Dependencies / wave, Required approvals, Runtime format target, Expected output, Context freshness, and Lossiness.
-2. `File Inventory.to_modify` (when used) intersects only `Owned paths`.
-3. `File Inventory.to_read_only` (when used) does not include any path the agent owns exclusively.
-4. `Required approvals` lists every approval the task could trigger, or `none`.
-5. `Verification Protocol` is provided when the task is full-form; otherwise fall back to `AGENTS.md` › Quality Gates.
-6. `Reporting Protocol` matches the orchestrator's expected evidence shape.
-7. `Constraints` and `Known Risks` mention every gate the agent will touch.
-8. `Coordination` lists wave siblings when `Dependencies / wave` is greater than 1.
-9. `Context Packet` is scoped to the subtask and does not paste full project memory, full plans, or unrelated logs.
-10. `Allowed Capabilities` and `Skills Referenced` are runtime-neutral and do not ask the agent to invent skills or mutate its own frontmatter/TOML.
-11. `Output Schema` or `Expected output` is specific enough for the orchestrator to integrate.
+2. `Context freshness` is explicit (`recent`, an `AGENTS.md` revision, or `reload`) and matches the staleness risk.
+3. `File Inventory.to_modify` (when used) intersects only `Owned paths`.
+4. `File Inventory.to_read_only` (when used) does not include any path the agent owns exclusively.
+5. `Required approvals` lists every approval the task could trigger, or `none`.
+6. `Verification Protocol` is provided when the task is full-form; otherwise fall back to `AGENTS.md` › Quality Gates.
+7. `Reporting Protocol` matches the orchestrator's expected evidence shape.
+8. `Constraints` and `Known Risks` mention every gate the agent will touch.
+9. `Coordination` lists wave siblings when `Dependencies / wave` is greater than 1.
+10. If the task changes generated agent, skill, memory, recommendation, or output-contract prose, the assignment names the expected Content Quality check or says `n/a`.
+11. `Context Packet` is scoped to the subtask and does not paste full project memory, full plans, or unrelated logs.
+12. `Allowed Capabilities` and `Skills Referenced` are runtime-neutral and do not ask the agent to invent skills or mutate its own frontmatter/TOML.
+13. `Output Schema` or `Expected output` is specific enough for the orchestrator to integrate.
 
 If a blocking check fails, return: `question_request: <single consolidated question>` and stop. Do not loop.
 

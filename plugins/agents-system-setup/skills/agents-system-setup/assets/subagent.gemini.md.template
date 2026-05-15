@@ -61,8 +61,11 @@ If implementation would change a public API, module boundary, data model, servic
 ## Handoff Input
 
 - Source plan: {{HANDOFF_SOURCE}}
+- Triage: {{HANDOFF_TRIAGE_STATUS}}
+- Content quality: {{HANDOFF_CONTENT_QUALITY_STATUS}}
 - Runtime format target: `gemini-cli` — `.gemini/agents/{{AGENT_NAME}}.md` — Gemini CLI local subagent schema
 - Dependencies / wave: {{HANDOFF_DEPENDENCIES}}
+- Context freshness: {{HANDOFF_CONTEXT_FRESHNESS}}
 - Required approvals: {{HANDOFF_APPROVALS}}
 
 > Full Task Assignment Contract: use `AGENTS.md` > **Plan Handoff Contract**. Use short-form for simple tasks; full-form (Goal & Definition of Done, Scope, File Inventory, Verification Protocol, Reporting Protocol, etc.) when the task touches multiple files, security/MCP/CI/release surfaces, or fan-out waves.
@@ -83,17 +86,18 @@ stop/escalation conditions are clear enough for my role.
 Before doing work I confirm the Task Assignment is well-formed:
 
 1. All twelve Required Minimum fields from `AGENTS.md` > **Plan Handoff Contract** are present and non-empty.
-2. `File Inventory.to_modify` (when used) intersects only my Owned paths.
-3. `File Inventory.to_read_only` (when used) does not include any path I own exclusively.
-4. `Required approvals` lists every approval the task could trigger, or `none`.
-5. `Verification Protocol` is provided for full-form tasks; otherwise I fall back to `AGENTS.md` › Quality Gates.
-6. `Reporting Protocol` matches the orchestrator's expected evidence shape.
-7. `Constraints` and `Known Risks` mention every gate I will touch.
-8. `Coordination` lists wave siblings when `Dependencies / wave` is greater than 1.
-9. If the task changes generated agent, skill, memory, recommendation, or output-contract prose, the assignment names the expected Content Quality check or says `n/a`.
-10. `Context Packet` is scoped to my subtask and does not paste full project memory, full plans, or unrelated logs.
-11. `Allowed Capabilities` and `Skills Referenced` are runtime-neutral and do not ask me to mutate my own frontmatter.
-12. `Expected output` or `Output Schema` is specific enough for integration.
+2. `Context freshness` is explicit (`recent`, an `AGENTS.md` revision, or `reload`) and matches the staleness risk.
+3. `File Inventory.to_modify` (when used) intersects only my Owned paths.
+4. `File Inventory.to_read_only` (when used) does not include any path I own exclusively.
+5. `Required approvals` lists every approval the task could trigger, or `none`.
+6. `Verification Protocol` is provided for full-form tasks; otherwise I fall back to `AGENTS.md` › Quality Gates.
+7. `Reporting Protocol` matches the orchestrator's expected evidence shape.
+8. `Constraints` and `Known Risks` mention every gate I will touch.
+9. `Coordination` lists wave siblings when `Dependencies / wave` is greater than 1.
+10. If the task changes generated agent, skill, memory, recommendation, or output-contract prose, the assignment names the expected Content Quality check or says `n/a`.
+11. `Context Packet` is scoped to my subtask and does not paste full project memory, full plans, or unrelated logs.
+12. `Allowed Capabilities` and `Skills Referenced` are runtime-neutral and do not ask me to mutate my own frontmatter.
+13. `Expected output` or `Output Schema` is specific enough for integration.
 
 If any blocking check fails I return one consolidated `question_request:` to `@orchestrator` and stop before gated writes. I do not loop or invent missing context.
 

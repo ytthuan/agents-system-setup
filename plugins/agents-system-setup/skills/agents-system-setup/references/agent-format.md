@@ -79,7 +79,7 @@ You are a <role>...
 > **Schema split:** project/user/session subagents can use the richer field set above. Plugin-shipped agents are narrower: do not rely on `hooks`, `mcpServers`, or `permissionMode` in plugin-bundled agent files.
 > Plugin-shipped agents do support `memory`; keep that separate from unsupported hook/MCP/permission fields.
 >
-> Add `AskUserQuestion` to restrictive `tools:` allowlists only when the agent is expected to ask the user. Otherwise subagents report `question_request` to the orchestrator.
+> Add `AskUserQuestion` to restrictive `tools:` allowlists only when the agent is interactive and expected to ask the user. Agents marked `background: true` or used in headless workflows must return `question_request` to the orchestrator instead of relying on `AskUserQuestion`.
 >
 > **Primitive split:** a Claude subagent file is a reusable definition. Tool-based subagent invocation via `Agent` launches that definition inside the current session and returns a summary to the caller. Agent teams are a separate experimental feature: independent Claude Code instances, peer-to-peer messages, and a shared task list; only use them when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is enabled and the work benefits from teammate discussion.
 
@@ -127,7 +127,7 @@ You are a <role>...
 >
 > Human input uses the `question` tool. Grant it with nested YAML (`permission: { question: allow }` or the block above), not a literal dotted key. OpenCode does not provide durable auto-learning beyond AGENTS.md, skills, compaction, and plugin patterns.
 >
-> `mode: primary` agents are directly selectable; `mode: subagent` agents are invoked by primary agents or manually with `@<agent-name>`. Use `permission.task` to constrain which subagents a primary or broad worker may spawn. Child sessions are navigated with OpenCode's `session_child_first`, `session_child_cycle`, `session_child_cycle_reverse`, and `session_parent` keybinds; keep those in usage notes, not frontmatter.
+> `mode: primary` agents are directly selectable; `mode: subagent` agents are invoked by primary agents or manually with `@<agent-name>`. Use `permission.task` to constrain which subagents a primary or broad worker may spawn. Primary agents should use wildcard `deny`/`ask` plus named roster allows; if a primary intentionally has no named allows, render `# agents-system-setup:permission-task-roster: skipped` near the `task` block. Child sessions are navigated with OpenCode's `session_child_first`, `session_child_cycle`, `session_child_cycle_reverse`, and `session_parent` keybinds; keep those in usage notes, not frontmatter.
 
 ## OpenAI Codex CLI + App — split layout: `AGENTS.md` + `.codex/agents/*.toml`
 
@@ -170,7 +170,9 @@ enabled = false
 4. Keep an explicit short checklist only when the agent owns sensitive surfaces (MCP, secrets, CI/release, dependency manifests, generated scripts).
 5. Keep the `Outcome first` and `Handoff status` lines because Codex sessions surface those directly.
 
-Validators warn when a Codex subagent's `developer_instructions` block grows beyond ~60 lines because it usually means the pointer rule was skipped.
+Validators warn when a Codex subagent's `developer_instructions` block grows
+beyond about 65 lines and fail above 80 lines because longer prompts usually
+mean the pointer rule was skipped.
 
 Codex shared artifact rules:
 - **Required fields**: `name`, `description`, `developer_instructions`. Missing any → silent skip.
@@ -319,10 +321,11 @@ placeholder in generated runtime agent directories.
 | `{{OPTIONAL_MCP_SERVERS_BLOCK}}` | Approved runtime-native MCP block: Copilot `mcp-servers:`, Claude `mcpServers:`, or Gemini `mcp_servers:`. | Empty string and no MCP key. |
 | `{{OPTIONAL_MCP_APPROVAL_MARKER}}` | Markdown body marker `<!-- agents-system-setup:mcp-approved: <approval-ref> -->`. | Skipped marker `<!-- agents-system-setup:mcp-skipped: no MCP written -->` when MCP was considered; otherwise empty string. |
 | `{{OPTIONAL_MCP_APPROVAL_COMMENT}}` | Top-level Codex TOML comment body `agents-system-setup:mcp-approved: <approval-ref>` rendered as `# agents-system-setup:mcp-approved: <approval-ref>`. | `agents-system-setup:mcp-skipped: no MCP written` when skipped, or `agents-system-setup:mcp-not-applicable` when no MCP was considered. |
-| `{{OPTIONAL_PERMISSION_TASK_BLOCK}}` | OpenCode primary-agent `permission.task` block with `"*": deny` first and approved roster entries set to `allow`, or `"*": ask` only after explicit approval. | Empty string for non-OpenCode/non-primary agents; for OpenCode primary agents with no delegated subagents, render `"*": deny`. |
+| `{{OPTIONAL_PERMISSION_TASK_BLOCK}}` | OpenCode primary-agent `permission.task` block with `"*": deny` first and approved roster entries set to `allow`, or `"*": ask` only after explicit approval. | Empty string for non-OpenCode/non-primary agents; for OpenCode primary agents with no delegated subagents, render `"*": deny` plus `# agents-system-setup:permission-task-roster: skipped`. |
 | `{{OPTIONAL_DISPLAY_NAME_LINE}}` | Gemini `display_name: <human-readable name>`. | Empty string. |
 | `{{OPTIONAL_TEMPERATURE_LINE}}` | Runtime-native `temperature: <number>` line. | Empty string. |
 | `{{OPTIONAL_MAX_TURNS_LINE}}` | Runtime-native max-turn line: Claude `maxTurns: <int>` or Gemini `max_turns: <int>`. | Empty string. |
+| `{{OPTIONAL_BACKGROUND_LINE}}` | Claude `background: true` only when the user explicitly selected background execution. | Empty string. Background Claude agents must return `question_request` instead of relying on `AskUserQuestion`. |
 | `{{OPTIONAL_TIMEOUT_MINS_LINE}}` | Gemini `timeout_mins: <int>`. | Empty string. |
 | `{{OPTIONAL_STEPS_LINE}}` | OpenCode `steps: <int>`. | Empty string. |
 | `{{OPTIONAL_HIDDEN_LINE}}` | OpenCode `hidden: true` or `hidden: false` when the plan explicitly sets visibility. | Empty string to use OpenCode's default. |
@@ -332,6 +335,17 @@ placeholder in generated runtime agent directories.
 | `{{OPTIONAL_EFFORT_LINE}}` | Claude `effort: <effort>` when explicitly selected (`low`, `medium`, `high`, `xhigh`, or `max`). | Empty string. |
 | `{{OPTIONAL_ISOLATION_LINE}}` | Claude `isolation: worktree` when the plan requests isolated worktrees. | Empty string. |
 | `{{OPTIONAL_SKILLS_BLOCK}}` | Claude `skills: [...]` block when skills are explicitly attached to that subagent. | Empty string. |
+
+### Handoff placeholders
+
+These placeholders are normal managed-content fields in generated subagent
+bodies, not optional runtime frontmatter fields.
+
+| Placeholder | Expected form | Off / not-applicable form |
+|---|---|---|
+| `{{HANDOFF_TRIAGE_STATUS}}` | `separate`, `merged`, `skipped`, or `n/a`, plus question count when relevant. | `n/a`. |
+| `{{HANDOFF_CONTENT_QUALITY_STATUS}}` | `ok`, `warn`, `fail`, or `n/a`, plus curator mode/signals when generated prose changes. | `n/a`. |
+| `{{HANDOFF_CONTEXT_FRESHNESS}}` | `recent`, `AGENTS.md@<revision>`, or `reload`. | `reload` when freshness is unknown. |
 
 ### MCP approval placeholders
 
@@ -363,6 +377,7 @@ MCP skipped or no delegated subagents:
 permission:
   question: allow
   task:
+    # agents-system-setup:permission-task-roster: skipped
     "*": deny
 ```
 
