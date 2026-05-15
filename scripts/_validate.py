@@ -2510,7 +2510,7 @@ def check_prompt_handoff_quality_policy() -> None:
                 "{{HANDOFF_TRIAGE_STATUS}}",
                 "{{HANDOFF_CONTENT_QUALITY_STATUS}}",
                 "{{HANDOFF_CONTEXT_FRESHNESS}}",
-                "Context freshness` is explicit",
+                "`Context freshness` is explicit",
                 "Expected output",
             ),
         )

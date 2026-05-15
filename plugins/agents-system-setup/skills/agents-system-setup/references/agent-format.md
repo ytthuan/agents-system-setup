@@ -170,7 +170,9 @@ enabled = false
 4. Keep an explicit short checklist only when the agent owns sensitive surfaces (MCP, secrets, CI/release, dependency manifests, generated scripts).
 5. Keep the `Outcome first` and `Handoff status` lines because Codex sessions surface those directly.
 
-Validators warn when a Codex subagent's `developer_instructions` block grows beyond ~60 lines because it usually means the pointer rule was skipped.
+Validators warn when a Codex subagent's `developer_instructions` block grows
+beyond about 65 lines and fail above 80 lines because longer prompts usually
+mean the pointer rule was skipped.
 
 Codex shared artifact rules:
 - **Required fields**: `name`, `description`, `developer_instructions`. Missing any → silent skip.
@@ -333,6 +335,17 @@ placeholder in generated runtime agent directories.
 | `{{OPTIONAL_EFFORT_LINE}}` | Claude `effort: <effort>` when explicitly selected (`low`, `medium`, `high`, `xhigh`, or `max`). | Empty string. |
 | `{{OPTIONAL_ISOLATION_LINE}}` | Claude `isolation: worktree` when the plan requests isolated worktrees. | Empty string. |
 | `{{OPTIONAL_SKILLS_BLOCK}}` | Claude `skills: [...]` block when skills are explicitly attached to that subagent. | Empty string. |
+
+### Handoff placeholders
+
+These placeholders are normal managed-content fields in generated subagent
+bodies, not optional runtime frontmatter fields.
+
+| Placeholder | Expected form | Off / not-applicable form |
+|---|---|---|
+| `{{HANDOFF_TRIAGE_STATUS}}` | `separate`, `merged`, `skipped`, or `n/a`, plus question count when relevant. | `n/a`. |
+| `{{HANDOFF_CONTENT_QUALITY_STATUS}}` | `ok`, `warn`, `fail`, or `n/a`, plus curator mode/signals when generated prose changes. | `n/a`. |
+| `{{HANDOFF_CONTEXT_FRESHNESS}}` | `recent`, `AGENTS.md@<revision>`, or `reload`. | `reload` when freshness is unknown. |
 
 ### MCP approval placeholders
 
