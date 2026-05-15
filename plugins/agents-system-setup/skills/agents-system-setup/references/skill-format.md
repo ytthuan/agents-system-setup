@@ -81,3 +81,4 @@ Keep SKILL.md focused. Push depth into `references/`.
 - Folder/name mismatch
 - Absolute paths instead of `./`
 - Procedure without numbered steps
+- Writing the skill folder under `.agents-system-setup/skills/`. That directory is operational state only; runtimes do not load skills from it. Existing misroutes go through [misplaced-artifacts-migration](./misplaced-artifacts-migration.md).

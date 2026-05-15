@@ -58,6 +58,14 @@ Context Packet:
   do_not_include:
     - <full AGENTS.md | full plan.md | unrelated logs>
 
+Security Analysis (security-team tasks only):
+  scope: <diff | repository | report | remediation | program>
+  authorization: <owned-code | approved-target | needs-approval>
+  asset_or_boundary: <asset/trust boundary>
+  candidate_or_finding: <id/title or "n/a">
+  required_evidence:
+    - <source/control/sink | reproduction | counterevidence | severity rationale | proof gaps>
+
 Allowed Capabilities:
   runtime_profile: <read-only | edit-capable | runner | research | inherit>
   approval_gated_actions:
@@ -156,6 +164,20 @@ mutate its own frontmatter or TOML.
 | OpenAI Codex CLI + App | Keep all assignment guidance inside `developer_instructions`; no TOML fields for tools, question, memory, context packet, or expected output. |
 | Gemini CLI | Local subagents cannot recursively call subagents; return cross-agent work to the root/orchestrator session. |
 
+## Security-team handoff notes
+
+For `bug-hunting`, `vulnerability-validation`, `attack-path-analysis`,
+`remediation-verification`, or `disclosure-triage` assignments, include a
+Security Analysis block from [security team](./security-team.md). The block must
+state authorization scope and stop before external scanning, exploit execution,
+credential use, production testing, disclosure outreach, MCP/tool config writes,
+or destructive tests unless the plan explicitly approved them.
+
+Security agents should receive the narrowest useful source/control/sink slice.
+They return validation status, evidence, counterevidence, severity/priority
+rationale, remediation verification needs, and proof gaps. They do not invent
+security plugins or copy proprietary plugin guidance into the task packet.
+
 ## Anti-patterns
 
 - Delegating a bare prompt for normal or risky work.
@@ -164,3 +186,5 @@ mutate its own frontmatter or TOML.
 - Listing skills or MCP servers that were not installed, generated, or approved.
 - Treating assignment quality as a substitute for tests, security review,
   content quality, architecture review, or provider schema validation.
+- Asking a security subagent to scan, exploit, disclose, or write fixes outside
+  its approved authorization scope.

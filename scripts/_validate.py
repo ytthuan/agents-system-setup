@@ -911,6 +911,41 @@ def check_replication_ledger() -> None:
             err(f"{rel}: replication artifact with `.md` extension inside an agents/ tree will be parsed as a malformed agent.")
 
 
+# ---------- 11b: operational state directory artifact-free ----------
+
+OPERATIONAL_STATE_DIR = ".agents-system-setup"
+OPERATIONAL_STATE_FORBIDDEN_SUBTREES = (
+    "agents",
+    "skills",
+    "hooks",
+    "commands",
+    "prompts",
+    "plugins",
+)
+
+
+def check_operational_state_artifacts() -> None:
+    """`.agents-system-setup/` is operational state only. Runtime artifact
+    subtrees (`agents/`, `skills/`, `hooks/`, `commands/`, `prompts/`,
+    `plugins/`) inside it are silently inert and indicate a misroute that
+    must go through misplaced-artifacts-migration.
+    """
+    state_root = REPO / OPERATIONAL_STATE_DIR
+    if not state_root.is_dir():
+        return
+    for entry in state_root.iterdir():
+        if not entry.is_dir():
+            continue
+        if entry.name in OPERATIONAL_STATE_FORBIDDEN_SUBTREES:
+            rel = entry.relative_to(REPO).as_posix()
+            err(
+                f"{rel}: runtime artifact subtree inside `.agents-system-setup/` "
+                f"is silently inert. Move contents to the platform-standard path "
+                f"and record the migration in `.agents-system-setup/migration.jsonl` "
+                f"(see references/misplaced-artifacts-migration.md)."
+            )
+
+
 # ---------- 12: governance baseline ----------
 
 SKILL_ROOT = REPO / "plugins" / "agents-system-setup" / "skills" / "agents-system-setup"
@@ -1914,6 +1949,327 @@ def check_output_quality_policy() -> None:
         err("assets/subagent.codex.toml.template: content-quality/question/memory must stay in developer_instructions, not TOML fields")
 
 
+def check_security_team_policy() -> None:
+    """Dedicated security-team generation must be explicit, source-backed, and
+    read-mostly by default.
+    """
+    security_team_ref = SKILL_ROOT / "references" / "security-team.md"
+    if not security_team_ref.is_file():
+        err("plugins/agents-system-setup/skills/agents-system-setup/references/security-team.md: required security-team reference is missing")
+        return
+
+    require_contains(
+        security_team_ref,
+        (
+            "Security Team Generation",
+            "Source-backed model",
+            "OWASP SAMM",
+            "NIST SSDF",
+            "OWASP Vulnerability Disclosure Cheat Sheet",
+            "CISA Coordinated Vulnerability Disclosure",
+            "FIRST CVSS",
+            "Security team sizing",
+            "Authorization and safety boundaries",
+            "Evidence and output contract",
+            "Do not copy",
+            "proprietary",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "Dedicated security teams are explicit",
+            "Phase 1.8a — Security Team Scope",
+            "security_team_depth",
+            "security_team_scope",
+            "authorization_scope",
+            "Security team operating model",
+            "remediation writes",
+            "external scanning",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "interview.md",
+        (
+            "Security team / Bug hunting",
+            "Security team depth",
+            "security_team_depth",
+            "Dedicated bug-hunting/security analysis team",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "topology.md",
+        (
+            "Security team / Bug hunting",
+            "Security Team Sizing Rule",
+            "vulnerability-researcher",
+            "validation-reproducer",
+            "attack-path-analyst",
+            "remediation-verifier",
+            "read-mostly by default",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "context-optimization.md",
+        (
+            "bug-hunting",
+            "vulnerability-validation",
+            "attack-path-analysis",
+            "remediation-verification",
+            "disclosure-triage",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "handoff.md",
+        (
+            "Security Analysis (security-team tasks only)",
+            "authorization:",
+            "counterevidence",
+            "proof_gaps",
+            "Security analysis: n/a | scope=",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "prompt-guidelines.md",
+        (
+            "Security-team handoff notes",
+            "authorization scope",
+            "counterevidence",
+            "proof gaps",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "plugin-discovery.md",
+        (
+            "Security plugins require license/provenance",
+            "codex-security",
+            "Never mirror proprietary plugin prompts",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "output-contract.md",
+        (
+            "Security team:",
+            "Security-team evidence",
+            "Security-team findings",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "agent-format.md",
+        (
+            "{{SECURITY_TEAM_DEPTH}}",
+            "{{SECURITY_TEAM_OPERATING_MODEL}}",
+            "Security-team placeholders",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "{{SECURITY_TEAM_DEPTH}}",
+            "## Security Team Operating Model",
+            "{{SECURITY_TEAM_OPERATING_MODEL}}",
+            "`bug-hunting`",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "GEMINI.md.template",
+        (
+            "Security Team Operating Model",
+            "Gemini subagents",
+            "Security analysis",
+        ),
+    )
+    for rel in (
+        "orchestrator.agent.md.template",
+        "orchestrator.claude.md.template",
+        "orchestrator.opencode.md.template",
+    ):
+        require_contains(
+            SKILL_ROOT / "assets" / rel,
+            (
+                "Security Team Scope",
+                "Security Team Operating Model",
+                "authorization scope",
+                "proof gaps",
+                "read-mostly",
+            ),
+        )
+    for rel in (
+        "subagent.agent.md.template",
+        "subagent.claude.md.template",
+        "subagent.opencode.md.template",
+        "subagent.gemini.md.template",
+        "subagent.codex.toml.template",
+    ):
+        require_contains(
+            SKILL_ROOT / "assets" / rel,
+            (
+                "Security analysis: n/a | scope=",
+                "authorization=",
+                "validation=",
+                "proof_gaps=",
+            ),
+        )
+
+    forbidden = re.compile(
+        r"(?:vulnerability-researcher|validation-reproducer|attack-path-analyst|bug-bounty-triage|compliance-auditor)[^\n]*(?:full file edit|edit-capable|broad write|\*\s*:\s*allow)",
+        re.IGNORECASE,
+    )
+    for path in (
+        SKILL_ROOT / "references" / "topology.md",
+        SKILL_ROOT / "references" / "security-team.md",
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+    ):
+        rel = path.relative_to(REPO).as_posix()
+        for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+            if forbidden.search(line) and not _has_negative_context(line):
+                err(f"{rel}:{line_no}: security-team research roles must not default to broad write permissions")
+
+
+def check_cwd_reconnaissance_policy() -> None:
+    """Phase 1 must run a safe-readonly cwd reconnaissance with privacy
+    guardrails, render a Reconnaissance Card, and ask the user to confirm
+    or correct it before continuing the interview.
+    """
+    recon_ref = SKILL_ROOT / "references" / "cwd-reconnaissance.md"
+    if not recon_ref.is_file():
+        err(f"{recon_ref.relative_to(REPO).as_posix()}: required cwd-reconnaissance reference is missing")
+        return
+
+    require_contains(
+        recon_ref,
+        (
+            "CWD Project Reconnaissance",
+            "safe-readonly",
+            "Privacy guardrails",
+            "No data file reads",
+            "Magic-byte detection",
+            "Secret redaction",
+            "Reconnaissance Card schema",
+            "project_kind_signals",
+            "data_signals",
+            "privacy_redactions",
+            "User confirmation prompt",
+            "Skip recon",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "Project recon",
+            "cwd-reconnaissance",
+            "Reconnaissance Card",
+            "Privacy guardrails",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "interview.md",
+        (
+            "Recon pre-fill",
+            "cwd reconnaissance card",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "output-contract.md",
+        (
+            "Recon:",
+            "redactions=",
+        ),
+    )
+
+
+def check_misplaced_artifacts_migration_policy() -> None:
+    """Phase 1 detects and Phase 1.5 surfaces misplaced runtime artifacts
+    found under `.agents-system-setup/`. The migration covers all six
+    runtime artifact types with a per-artifact ask_user choice and an
+    operational ledger at `.agents-system-setup/migration.jsonl`.
+    """
+    migration_ref = SKILL_ROOT / "references" / "misplaced-artifacts-migration.md"
+    if not migration_ref.is_file():
+        err(f"{migration_ref.relative_to(REPO).as_posix()}: required misplaced-artifacts-migration reference is missing")
+        return
+
+    require_contains(
+        migration_ref,
+        (
+            "Misplaced Artifacts Migration",
+            "Detection signals",
+            ".agents-system-setup/agents/",
+            ".agents-system-setup/skills/",
+            ".agents-system-setup/hooks/",
+            ".agents-system-setup/commands/",
+            ".agents-system-setup/prompts/",
+            ".agents-system-setup/plugins/",
+            "Per-type, per-platform target mapping",
+            "Migration choices",
+            "File-based artifacts",
+            "Config-embedded artifacts",
+            "Move (Recommended)",
+            "Copy and keep original with deprecation marker",
+            "Leave with warning",
+            "Convert manually",
+            "Delete after explicit confirmation",
+            "Deprecation marker rules",
+            "Multi-runtime portability",
+            "Skills are portable",
+            "portable-manifest-sha256",
+            "File-based migration procedure",
+            "Migration ledger schema",
+            ".agents-system-setup/migration.jsonl",
+            ".agents-system-setup/.bak/",
+            "digest_source",
+            "digest_target",
+            "Hook safety warning",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "Operational state directory is artifact-free",
+            "misplaced-artifacts-migration",
+            "Misplaced artifacts",
+            "migration.jsonl",
+            "Writing runtime artifacts under `.agents-system-setup/`",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "output-contract.md",
+        (
+            "Path migration:",
+            "moved=",
+            "manual=",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "skill-format.md",
+        (
+            ".agents-system-setup/skills/",
+            "misplaced-artifacts-migration",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "agent-format.md",
+        (
+            ".agents-system-setup/",
+            "misplaced-artifacts-migration",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "platforms.md",
+        (
+            "Operational state directory",
+            "misplaced-artifacts-migration",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "local-tracking.md",
+        (
+            "Operational state directory",
+            "misplaced-artifacts-migration",
+        ),
+    )
+
+
 def check_context_optimization() -> None:
     """The skill must stay compact-by-default and preserve progressive loading
     markers in generated templates.
@@ -1921,7 +2277,6 @@ def check_context_optimization() -> None:
     context_ref = SKILL_ROOT / "references" / "context-optimization.md"
     if not context_ref.is_file():
         err(f"{context_ref.relative_to(REPO).as_posix()}: required context optimization reference is missing")
-
     require_contains(
         SKILL_ROOT / "references" / "context-optimization.md",
         (
@@ -3330,11 +3685,15 @@ def main() -> int:
     check_opencode_markdown_agents()
     check_claude_plugin_agent_fields()
     check_replication_ledger()
+    check_operational_state_artifacts()
     check_governance_baseline()
     check_human_input_protocol()
     check_self_update_preflight_policy()
     check_requirements_triage_policy()
     check_output_quality_policy()
+    check_security_team_policy()
+    check_cwd_reconnaissance_policy()
+    check_misplaced_artifacts_migration_policy()
     check_mcp_approval_gate()
     check_central_mcp_approval_evidence()
     check_optional_placeholder_leaks()

@@ -16,9 +16,12 @@
 # Copilot session state (local-only)
 .copilot/session-state/
 
-# agents-system-setup operational state (replication ledger, audit logs, .bak files)
-# NEVER commit these and NEVER place them inside an agents/ directory — runtime
-# loaders will try to parse them as agents.
+# agents-system-setup operational state (replication ledger, migration ledger,
+# MCP approval evidence, learning ledger, audit logs, .bak files).
+# NEVER commit these and NEVER place runtime artifact subtrees inside
+# (`agents/`, `skills/`, `hooks/`, `commands/`, `prompts/`, `plugins/`) —
+# runtimes do not load them and runtime loaders may try to parse misplaced
+# `.md` files as malformed agents.
 .agents-system-setup/
 
 # {{LANG_BLOCK}}

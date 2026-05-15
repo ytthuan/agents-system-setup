@@ -16,6 +16,11 @@ Each row also names the **owned paths** that feed into AGENTS.md › Directory A
 | `tester` | Run/extend tests, triage failures | read + bash | `tests/**`, `**/__tests__/**`, `**/*.test.*`, `**/*.spec.*` |
 | `docs-writer` | Update README/CHANGELOG/docs | docs files only | `README.md`, `CHANGELOG.md`, `docs/**`, `**/*.md` (excluding agent files) |
 | `security-auditor` | Review secrets, tool/MCP boundaries, dependency risk, least privilege | read-only + bash for scanners/tests | *(none by default — read-only; tightly scoped remediation only if approved)* |
+| `threat-modeler` | Map assets, trust boundaries, attacker stories, and security invariants | read-only | *(none — read-only)* |
+| `vulnerability-researcher` | Discover plausible source/control/sink security candidates in authorized scope | read-only + bounded local search | *(none — read-only)* |
+| `validation-reproducer` | Confirm, falsify, or defer candidate findings with bounded evidence | read-only by default; runner only after approval | validation artifacts under approved output path |
+| `attack-path-analyst` | Establish reachability, counterevidence, severity, priority, and proof gaps | read-only | *(none — read-only)* |
+| `remediation-verifier` | Verify fixes, regression tests, and nearby bypass variants | read-only unless routed through owning implementer | tests/verification artifacts when approved |
 | `architecture-reviewer` | Preserve boundaries, ADRs, quality attributes, and design-pattern rationale | read-only + docs write if ADRs approved | `docs/adr/**`, architecture docs |
 | `design-pattern-reviewer` | Check implementation against selected patterns and anti-patterns | read-only | *(none — read-only)* |
 
@@ -57,6 +62,15 @@ Orchestrator + `notebook-runner`, `data-validator`, `model-trainer`, `evaluator`
 ### Infrastructure / DevOps
 Orchestrator + `terraform-planner`, `terraform-applier`, `policy-checker`, `secret-scanner`, `cost-analyst`.
 
+### Security team / Bug hunting
+Orchestrator + `security-lead` (or orchestrator-owned lead in compact setups),
+`threat-modeler`, `vulnerability-researcher`, `validation-reproducer`,
+`attack-path-analyst`, `remediation-verifier`. Add `bug-bounty-triage`,
+`supply-chain-security`, `cloud-infra-security`, `incident-response-liaison`, or
+`compliance-auditor` when the user requests disclosure, release/supply-chain,
+cloud/infra, incident response, or compliance coverage. See
+[security team](./security-team.md).
+
 ## Governance Sizing Rule
 
 Security, audit, architecture, and design-pattern ownership is mandatory, but roles may be merged for small repositories:
@@ -68,6 +82,7 @@ Security, audit, architecture, and design-pattern ownership is mandatory, but ro
 | PII, payments, health, credentials, or regulated data | Dedicated `security-auditor`; consider `compliance-auditor`. |
 | MCP servers, external APIs, or deploy/write tools | Add `threat-modeler` or merge that role into `security-auditor`; MCP approval gate remains mandatory. |
 | Monorepo, microservices, event-driven, or cloud infrastructure | Dedicated `architecture-reviewer`; add `design-pattern-reviewer` when pattern consistency is a goal. |
+| User asks for security team, bug hunting, vulnerability research, disclosure triage, or security analysis | Generate the dedicated security-team topology from [security team](./security-team.md); keep research roles read-mostly by default. |
 
 ## Requirements Triage Sizing Rule
 
@@ -97,6 +112,25 @@ The quality curator uses the signal taxonomy in
 reports `Content quality: ok|warn|fail|n/a; signals=<list|none>` and never
 replaces reviewer, tester, security, architecture, or validator roles.
 
+## Security Team Sizing Rule
+
+Dedicated security-team generation is opt-in or risk-triggered; it is not the
+default for every software project.
+
+| Signal | Security-team decision |
+|---|---|
+| Routine software project | Keep `security-auditor` or merged reviewer security responsibility. |
+| User selects `Security team / Bug hunting` or asks for bug hunting/security analysis | Generate the dedicated team: `security-lead` or orchestrator-owned lead, `threat-modeler`, `vulnerability-researcher`, `validation-reproducer`, `attack-path-analyst`, and `remediation-verifier`. |
+| External reports, disclosure, bounty, or coordinated vulnerability handling | Add `bug-bounty-triage` with read-only communication/triage duties. |
+| Release, dependency, package, CI, or artifact trust is in scope | Add `supply-chain-security` or route supply-chain duties through `security-auditor`. |
+| Cloud, IaC, Kubernetes, network exposure, or secrets boundary is in scope | Add `cloud-infra-security` or merge into infra/security owner. |
+| Confirmed high-impact issue may need containment or comms | Add `incident-response-liaison`; it records escalation paths but does not disclose publicly. |
+| Compliance evidence is required | Add `compliance-auditor` with read-only evidence mapping. |
+
+Security discovery, validation, attack-path, triage, and compliance agents are
+read-mostly by default. Remediation writes route through the owning implementer
+unless the plan explicitly grants narrow owned paths and approvals.
+
 ## Sizing Rule
 
 > One subagent per **durable concern** (lasts beyond a single task). One-shot procedures are **skills**, not subagents.
@@ -120,6 +154,7 @@ Add **always-present** rows regardless of project type:
 | `.github/skills/**`, `.claude/skills/**`, `.opencode/skills/**` | Skill packages | `@orchestrator` | `additive-only` |
 | `.mcp.json`, `opencode.json` | MCP / runtime config | `@orchestrator` | `owned` (gated by approval) |
 | `.env*`, secret/config files | Secrets and local config | `@security-auditor` | `read-only` |
+| `docs/security/**`, `security-reports/**` | Security team findings, threat models, and approved audit artifacts | `@security-lead` / `@security-auditor` | `additive-only` unless the plan grants update ownership |
 | CI/release config (`.github/workflows/**`, release scripts) | Supply-chain and release controls | `@release-publisher` + `@security-auditor` | `shared` |
 | Dependency manifests / lockfiles | Dependency inventory and supply-chain review | `@security-auditor` + language owner | `shared` |
 | `docs/adr/**`, architecture docs | Architecture decisions and design rationale | `@architecture-reviewer` | `additive-only` |

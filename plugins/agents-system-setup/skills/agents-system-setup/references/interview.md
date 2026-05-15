@@ -15,6 +15,9 @@ Use the provider-native human-input tool for **every** question (Copilot CLI use
 ## 1. Purpose
 - Q: "In one sentence, what does this project do?"
 - Freeform.
+- **Recon pre-fill:** when the Phase 1 cwd reconnaissance card has a
+  `docs_signals.summary` or a strong `project_kind_signals` entry, render
+  the suggested purpose inline and let the user accept, edit, or replace.
 
 ## 2. Mode follow-up
 - Q0 is the mode decision. Do not ask a second mode question during the normal
@@ -27,7 +30,11 @@ Use the provider-native human-input tool for **every** question (Copilot CLI use
 
 ## 3. Project Type
 - Q: "What type of project is this?"
-- Choices: `["Documentation site", "Web — .NET", "Web — Node.js/TypeScript", "Web — Python", "Web — Go", "Web — Other", "iOS app", "Android app", "CLI tool", "Library / SDK", "Monorepo", "Data / ML", "Infrastructure / DevOps"]`
+- Choices: `["Documentation site", "Web — .NET", "Web — Node.js/TypeScript", "Web — Python", "Web — Go", "Web — Other", "iOS app", "Android app", "CLI tool", "Library / SDK", "Monorepo", "Data / ML", "Infrastructure / DevOps", "Security team / Bug hunting"]`
+- **Recon pre-fill:** when the Phase 1 cwd reconnaissance card has
+  `project_kind_signals`, sort or highlight the matching choices first
+  (for example `data_signals` lifts `Data / ML`, `infra_signals` lifts
+  `Infrastructure / DevOps`). The user always confirms — never auto-pick.
 
 After showing detected purpose/type/language/test/deploy values, offer a fast
 path for non-gated questions:
@@ -62,6 +69,22 @@ path for non-gated questions:
 - Show the suggestion derived from project type via [topology.md](./topology.md).
 - Q: "Suggested subagents: <list>. Accept, add, or remove?"
 - Freeform with the suggested list pre-printed.
+
+## 9a. Security team depth (only when requested or selected)
+
+Ask this only when Q3 is `Security team / Bug hunting`, or when the user brief
+mentions bug hunting, vulnerability research, appsec review, security analysis,
+disclosure triage, bug bounty, exploitability, threat modeling, or remediation
+verification.
+
+- Q: "How deep should the generated security team be?"
+- Choices: `["Baseline security auditor only", "Dedicated bug-hunting/security analysis team (Recommended)", "Expanded AppSec program with disclosure/supply-chain/cloud/compliance options"]`
+- Record as `security_team_depth`: `baseline | dedicated | expanded`.
+
+If `dedicated` or `expanded`, load [security team](./security-team.md) for role
+sizing and safe authorization boundaries. Do not auto-enable external scanning,
+exploit execution, disclosure outreach, MCP servers, or security plugins from
+this answer alone.
 
 ## 9b. Advanced agent behavior
 

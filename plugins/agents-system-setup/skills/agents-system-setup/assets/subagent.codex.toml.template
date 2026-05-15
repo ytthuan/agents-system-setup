@@ -49,12 +49,12 @@ Assignment Intake / Preflight:
 - Confirm the twelve Required Minimum fields from AGENTS.md > Plan Handoff Contract.
 - Confirm Context freshness is explicit: recent, AGENTS.md revision, or reload.
 - Check Context Packet, Allowed Capabilities, Skills Referenced, expected output, and Stop / Escalation Conditions.
+- For security-team tasks, confirm authorization scope, validation status, counterevidence, severity rationale, remediation verification need, and proof-gap reporting.
 - Use AGENTS.md > Plan Handoff Contract and handoff.md > Acceptance Checklist for the full checklist.
 - Safe, reversible short-form gaps may continue with Task assignment quality: warn.
 - Blocking gaps, gated writes, unclear ownership, or runtime-schema ambiguity return one consolidated question_request and stop before writes.
 
-Task Assignment Acceptance Checklist:
-- Use the checklist in AGENTS.md / handoff.md; do not duplicate it here.
+Task Assignment Acceptance Checklist: use AGENTS.md / handoff.md; do not duplicate it here.
 
 Security & Audit Boundaries:
 - Use AGENTS.md rows by name instead of duplicating long policy prose.
@@ -85,6 +85,7 @@ Output Contract:
 - Evidence: only for gates touched, per Reporting Protocol.
 - Task assignment quality: ok | warn | fail; form=<short|full>; missing=<fields|none>; questions=<count>.
 - Content quality: ok | warn | fail | n/a; signals=<list|none>.
+- Security analysis: n/a | scope=<diff|repository|report|remediation|program>; authorization=<owned-code|approved-target|needs-approval>; validation=<confirmed|likely|needs-info|duplicate|not-reproducible|out-of-scope|mitigated|deferred>; severity=<P0|P1|P2|P3|n/a>; proof_gaps=<none|summary>.
 - Risks/escalations: only when present.
 - Question requests: none | <id>.
 - Handoff status: accepted | completed | blocked | returned-to-orchestrator.
