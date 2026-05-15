@@ -60,6 +60,18 @@ Orchestrator Assignment Format:
 - Ask subagents to return `Task assignment quality: ok | warn | fail; form=<short|full>; missing=<fields|none>; questions=<count>`.
 - Treat `warn` as acceptable only for safe reversible gaps; gated writes require `ok` or a resolved `question_request`.
 
+## Wave Execution
+
+<!-- agents-system-setup:wave-execution -->
+
+For independent work, **fan out** all parallel-safe subagents in the current
+wave using Copilot Task/agent calls. Wait for every result, synthesize, then
+start the next wave. Use `/fleet` only as optional CLI UX for independent
+batches; generated project instructions must not depend on `/fleet`.
+
+Sequential delegation is allowed only when owned paths overlap, a worker depends
+on a previous result, or a gate requires review before the next write.
+
 ## Memory & Learning
 
 Use `AGENTS.md` > **Memory & Learning System**. Ask subagents to return `Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>`. Subagents propose; I approve updates and route writes to the memory owner.

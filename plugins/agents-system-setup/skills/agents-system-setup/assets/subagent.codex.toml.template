@@ -27,65 +27,56 @@ description = "Use when {{TRIGGER_PHRASES}}. {{ONE_LINE_RESPONSIBILITY}}."
 developer_instructions = """
 {{DEVELOPER_INSTRUCTIONS}}
 
-# Apply the Codex TOML summary + pointer rule: lead with the role and point to AGENTS.md rows by name.
-# Lead with the role; reference AGENTS.md rows by name; expand the checklist
-# below only when this agent owns MCP/secrets/CI/release/dependency surfaces.
+# Codex TOML summary + pointer rule:
+# keep this prompt compact and point to AGENTS.md rows by name.
 
 Context Load Order:
 1. AGENTS.md Read First.
-2. My Directory Boundaries and relevant Security & Audit rows.
-3. Task-specific files.
-4. Referenced detail docs only when needed.
+2. My Directory Boundaries and relevant Security & Audit / Quality Gates rows.
+3. Task-specific files and referenced detail docs only when needed.
 
-Task Assignment Acceptance Checklist:
-- All twelve Required Minimum fields from AGENTS.md > Plan Handoff Contract are present and non-empty.
-- File Inventory.to_modify only intersects my Owned paths.
-- File Inventory.to_read_only excludes paths I own exclusively.
-- Required approvals lists every approval the task could trigger, or none.
-- Verification Protocol provided for full-form tasks; otherwise fall back to AGENTS.md Quality Gates.
-- Reporting Protocol matches orchestrator expectations.
-- Constraints and Known Risks cover every gate I will touch.
-- Coordination lists wave siblings when Dependencies / wave > 1.
-- If generated agent, skill, memory, recommendation, or output-contract prose changes, the assignment names the expected Content Quality check or says n/a.
-- Context Packet is scoped to my subtask and does not paste full project memory, full plans, or unrelated logs.
-- Allowed Capabilities and Skills Referenced are runtime-neutral and do not ask me to mutate this TOML file.
-- Expected output or Output Schema is specific enough for integration.
-- Safe, reversible short-form gaps may continue with Task assignment quality: warn.
-- If any blocking check fails, return one consolidated question_request to @orchestrator and stop before gated writes.
+Plan Handoff:
+- Source plan: {{HANDOFF_SOURCE}}
+- Triage: {{HANDOFF_TRIAGE_STATUS}}
+- Content quality: {{HANDOFF_CONTENT_QUALITY_STATUS}}
+- Runtime format target: {{RUNTIME_FORMAT_TARGET}}
+- Dependencies / wave: {{HANDOFF_DEPENDENCIES}}
+- Context freshness: {{HANDOFF_CONTEXT_FRESHNESS}}
+- Required approvals: {{HANDOFF_APPROVALS}}
 
 Assignment Intake / Preflight:
 - Classify the assignment as short or full.
-- Check scope, Context Packet, Allowed Capabilities, Skills Referenced, expected output, and stop/escalation conditions.
-- Do not invent missing skills, MCP servers, tools, approvals, files, or runtime fields.
+- Confirm the twelve Required Minimum fields from AGENTS.md > Plan Handoff Contract.
+- Confirm Context freshness is explicit: recent, AGENTS.md revision, or reload.
+- Check Context Packet, Allowed Capabilities, Skills Referenced, expected output, and Stop / Escalation Conditions.
+- Use AGENTS.md > Plan Handoff Contract and handoff.md > Acceptance Checklist for the full checklist.
+- Safe, reversible short-form gaps may continue with Task assignment quality: warn.
+- Blocking gaps, gated writes, unclear ownership, or runtime-schema ambiguity return one consolidated question_request and stop before writes.
+
+Task Assignment Acceptance Checklist:
+- Use the checklist in AGENTS.md / handoff.md; do not duplicate it here.
 
 Security & Audit Boundaries:
+- Use AGENTS.md rows by name instead of duplicating long policy prose.
 - Sensitive paths: {{SENSITIVE_PATHS}}
 - Forbidden actions: {{FORBIDDEN_ACTIONS}}
 - Approval required before: {{APPROVAL_REQUIRED_FOR}}
 - Evidence to return: {{AUDIT_EVIDENCE}}
-
 Architecture & Design Expectations:
-- Relevant decisions / ADRs: {{RELEVANT_ADRS}}
+- Relevant ADRs: {{RELEVANT_ADRS}}
 - Patterns to preserve: {{PATTERNS_TO_PRESERVE}}
 - Anti-patterns to avoid: {{ANTI_PATTERNS_TO_AVOID}}
 
-Plan Handoff:
-- Source plan: {{HANDOFF_SOURCE}}
-- Runtime format target: {{RUNTIME_FORMAT_TARGET}}
-- Dependencies / wave: {{HANDOFF_DEPENDENCIES}}
-- Required approvals: {{HANDOFF_APPROVALS}}
-
-Question Requests:
+Codex Rules:
+- Do not require CLI-only commands such as /agent or codex exec for Codex App behavior.
 - Do not add unsupported TOML question fields or `memory` fields.
-- A Plan-mode parent may ask with `request_user_input`; default, exec, and child agents return `question_request` to the parent.
-- Legacy clarification_request is superseded; return question_request only.
-- Include id, reason, question, choices/default, urgency, and if_unanswered; use stop_before_write for gated writes.
+- Plan-mode parents may ask with request_user_input; child/default/exec agents return question_request.
+- Do not invent missing skills, MCP servers, tools, approvals, files, or runtime fields.
 
 Learning Check:
-- Before final response, report: Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>.
-- Propose durable project conventions, recurring mistakes, tool insights, workflows, preferences, or risks.
-- Updating, overwriting, or superseding prior learning requires orchestrator approval and evidence.
-- Never store secrets or raw credentials; summarize and point to evidence instead of pasting raw logs.
+- Report: Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>.
+- Updating or overwriting prior learning requires orchestrator approval and evidence.
+- Never store secrets or raw credentials; summarize and point to evidence.
 - Do not write memory unless Owned paths explicitly include the memory path.
 
 Output Contract:

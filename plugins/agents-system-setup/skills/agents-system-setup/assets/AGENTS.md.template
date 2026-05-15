@@ -179,6 +179,25 @@ Legend: ✅ primary owner · 🟡 assists · *(blank)* not involved.
 - **Platform format targets:** {{PLATFORM_FORMAT_NOTES}}
 - **Handoff evidence:** {{HANDOFF_EVIDENCE}}
 
+### Platform-native delegation
+
+| Runtime | Delegation surface | Note |
+|---|---|---|
+| Copilot CLI / VS Code | Task/custom-agent calls through the orchestrator's `agent` capability | Use Task/agent fan-out for synthesized work; `/fleet` is optional CLI UX for independent batches. |
+| Claude Code | `Agent` tool | Fan out independent subagents in one wave; Agent Teams remain opt-in/experimental. |
+| OpenCode | `task` / `@<agent-name>` from a primary agent | Gate delegation with `permission.task` wildcard deny/ask plus named roster allows. |
+| OpenAI Codex (CLI + App) | Root `AGENTS.md` asks Codex to spawn child agents; specialists live in `.codex/agents/*.toml` | Keep shared artifacts free of required CLI-only slash commands. |
+| Gemini CLI | Root `GEMINI.md` session delegates to `.gemini/agents/*.md` local subagents | Gemini subagents cannot recursively delegate; root session owns all fan-out. |
+
+## Wave Execution
+
+<!-- agents-system-setup:wave-execution -->
+
+- For independent work, the orchestrator must **fan out** all parallel-safe subagents in the current wave, wait for all results, synthesize, then start the next wave.
+- Sequential delegation is only for overlapping owned paths, direct dependencies, shared-state writes, or approval gates that must complete first.
+- Codex uses this root `AGENTS.md` section as its orchestrator guidance; specialized Codex workers stay in `.codex/agents/*.toml`.
+- Gemini keeps this policy canonical here and mirrors only root-session notes in `GEMINI.md`.
+
 ## Security & Audit Matrix
 
 | Risk / control | Owner agent | Applies to paths | Evidence required | Source |

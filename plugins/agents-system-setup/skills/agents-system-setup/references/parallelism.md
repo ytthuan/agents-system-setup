@@ -48,7 +48,9 @@ The orchestrator prompt (Phase 4) is rendered with explicit fan-out instructions
 ### Copilot CLI / OpenCode / OpenAI Codex / Gemini CLI (parallel subagents)
 
 ```markdown
-## Coordination protocol
+## Wave Execution
+
+<!-- agents-system-setup:wave-execution -->
 
 For independent work, **fan out**: invoke all parallel-safe subagents in a
 single turn using the runtime's native subagent call surface (Task/agent tool,
@@ -64,9 +66,9 @@ Never serialize parallel-safe work.
 ```
 
 Runtime-specific notes:
-- **Copilot CLI:** the orchestrator may use multiple subagent calls directly, or the user can start with `/fleet` to ask Copilot to decompose independent subtasks. Custom agents can be referenced with `@<custom-agent-name>` inside a `/fleet` prompt.
-- **OpenCode:** primary agents can invoke subagents automatically or via `@<agent-name>`; users inspect child sessions with the child/parent session keybinds.
-- **Codex:** child agent threads are explicitly requested and visible in the CLI/App. Use `.codex/config.toml` `[agents] max_threads = 6`, `max_depth = 1` as safe defaults.
+- **Copilot CLI:** use Task/agent calls when the orchestrator must synthesize results. `/fleet` is optional CLI UX for independent batches that do not need provider-agnostic generated files to depend on it.
+- **OpenCode:** primary agents can invoke subagents automatically or via `@<agent-name>`; gate this with `permission.task` wildcard deny/ask plus named roster allows.
+- **Codex:** child agent threads are explicitly requested and visible in the CLI/App. Use `.codex/config.toml` `[agents] max_threads = 6`, `max_depth = 1` as safe defaults. Keep `/agent` and `codex exec` as optional CLI usage notes only.
 - **Gemini CLI:** subagents cannot recursively call other subagents. Keep all parallel fan-out in the root/orchestrator session and tell workers to return cross-boundary work rather than delegating.
 
 ### Claude Code (agent team option)

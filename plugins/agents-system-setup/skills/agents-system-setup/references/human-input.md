@@ -7,7 +7,7 @@
 | Runtime | Native human-input surface | Emit / allowlist rule | Non-interactive or child-agent fallback |
 |---|---|---|---|
 | Copilot CLI | Session tool `ask_user`; `--no-ask-user` disables it. | Use from the orchestrator/session. Do **not** add `ask_user` to Copilot custom-agent `tools:` profiles; it is not in the documented custom-agent tool alias table. | Subagents return `question_request`; the orchestrator asks if interactive or records the unresolved request. |
-| Claude Code | Tool `AskUserQuestion`. | Include `AskUserQuestion` in restrictive Claude `tools:` allowlists only when that agent is expected to ask the user. Omit the allowlist to inherit. | If not allowed, or when running headless, return `question_request` to the orchestrator. |
+| Claude Code | Tool `AskUserQuestion`. | Include `AskUserQuestion` in restrictive Claude `tools:` allowlists only when that interactive agent is expected to ask the user. Omit the allowlist to inherit. | If not allowed, when running headless, or when `background: true` is set, return `question_request` to the orchestrator. |
 | OpenCode | Tool `question`. | Grant with nested permission syntax, for example `permission: { question: allow }` or the YAML block below. Do not write a literal dotted key. | Return `question_request`; the primary agent decides whether to ask, use a safe default, or stop. |
 | OpenAI Codex CLI + App | Tool `request_user_input`, available in Plan mode only. | There is no `.codex/agents/*.toml` field for this. Do not emit `request_user_input` or `memory` in agent TOML. | Codex child/default/exec flows return `question_request` to the parent/session. |
 | Gemini CLI | Tool `ask_user`. | Valid in Gemini `tools:` allowlists for interactive agents that are expected to ask. | Headless or restricted agents return `question_request`; Gemini subagents still cannot call other subagents. |
@@ -50,7 +50,7 @@ Rules:
 1. **Orchestrator asks; workers request.** Let the root session or orchestrator call the native question tool. Subagents use `question_request` unless their runtime-specific allowlist explicitly grants a question tool.
 2. **Do not synthesize tool names.** Only emit native question tools documented for the target runtime.
 3. **Never bypass approval gates.** Human-input tools collect approval; they do not replace the MCP approval gate, artifact-tracking choice, or security evidence requirements.
-4. **Headless is safe-by-default.** In non-interactive modes, use safe defaults only for reversible, non-sensitive choices. Otherwise skip or stop before write.
+4. **Headless/background is safe-by-default.** In non-interactive or background modes, use safe defaults only for reversible, non-sensitive choices. Otherwise skip or stop before write.
 5. **Keep provider syntax exact.** Claude uses `AskUserQuestion`; OpenCode uses nested `permission` with `question`; Codex does not use TOML; Gemini can allow `ask_user`; Copilot custom-agent `tools:` must not include `ask_user`.
 
 ## Anti-patterns

@@ -50,7 +50,7 @@ Copilot source-backed runtime notes:
 - Copilot Memory is a public-preview, transparent server-side durable repo memory surface. Treat plugin-managed Learning Check artifacts as complementary, explicit project policy and audit records.
 - `vscode` exposes the VS Code chat-host tool set (e.g., `vscode/extensions`, `vscode/runCommands`) when the agent runs inside VS Code Chat. Copilot CLI and other surfaces ignore it harmlessly per the documented "All unrecognized tool names are ignored" rule, so it is safe to ship as a baseline.
 - `agent` / `custom-agent` / `Task` enables one custom agent to invoke another. Grant it only to orchestrator-style agents; read-only reviewers should not be able to spawn broad workers.
-- `/fleet` is a parent-orchestrated mode for independent subtasks. The generator's wave table should be usable as a `/fleet` prompt, but `/fleet` is optional CLI UX — do not make generated files depend on it.
+- Task/agent fan-out is the default when the orchestrator must synthesize results. `/fleet` is a parent-orchestrated mode for independent CLI batches; the generator's wave table may be useful in a `/fleet` prompt, but generated files must not depend on `/fleet`.
 - If `mcp-servers:` appears in frontmatter, the Phase 3.5 MCP approval gate must have rendered and approved it first, and the rendered agent must carry an `agents-system-setup:mcp-approved` marker.
 
 #### Copilot CLI Standard Tool Profiles
@@ -101,7 +101,7 @@ color: blue                      # optional UI color
 >
 > Project/user/session agents and plugin-shipped agents are not the same schema surface. Project/user/session agents may use richer fields such as `mcpServers`, `hooks`, and `permissionMode`; plugin-shipped agents support `memory` but must not rely on unsupported fields such as `hooks`, `mcpServers`, or `permissionMode`.
 >
-> Use `AskUserQuestion` only when a restrictive `tools:` allowlist would otherwise prevent an agent that is expected to ask the user. If it is absent or the run is headless, the subagent reports `question_request` to the orchestrator.
+> Use `AskUserQuestion` only when a restrictive `tools:` allowlist would otherwise prevent an interactive agent that is expected to ask the user. If it is absent, the run is headless, or `background: true` is set, the subagent reports `question_request` to the orchestrator instead.
 >
 > **Commands vs skills:** Plugin `commands/` (under the plugin root) remain fully supported for slash commands and are not legacy. Use `commands/` for prompt-template slash commands; prefer skills for reusable multi-step workflows. Project-level slash commands live at `.claude/commands/<cmd>.md`.
 >
@@ -139,7 +139,7 @@ permission:                                                # preferred over depr
 >
 > Human input uses the `question` tool. Grant it with nested YAML such as `permission: { question: allow }` or the block above; do not emit a literal dotted key. OpenCode has no durable auto-learning surface beyond AGENTS.md, skills, compaction, and plugin-managed patterns.
 >
-> Primary agents are selected directly (Tab / configured `switch_agent` keybind). Subagents are invoked automatically by primary agents or manually with `@<agent-name>`. When a subagent creates a child session, users navigate with `session_child_first`, `session_child_cycle`, `session_child_cycle_reverse`, and `session_parent`; include these as "Try it" notes, not schema fields. Gate subagent spawning with `permission.task` when an agent should only call specific workers. Generated orchestrators default to `permission.task` with `"*": deny` plus explicit roster-agent allows.
+> Primary agents are selected directly (Tab / configured `switch_agent` keybind). Subagents are invoked automatically by primary agents or manually with `@<agent-name>`. When a subagent creates a child session, users navigate with `session_child_first`, `session_child_cycle`, `session_child_cycle_reverse`, and `session_parent`; include these as "Try it" notes, not schema fields. Gate subagent spawning with `permission.task` when an agent should only call specific workers. Generated orchestrators default to `permission.task` with `"*": deny` plus explicit roster-agent allows. If a primary intentionally has no named task allows, render `# agents-system-setup:permission-task-roster: skipped`.
 
 #### Canonical OpenCode primary task gate
 
@@ -258,7 +258,7 @@ Gemini source-backed runtime notes:
 - Subagents run in isolated context loops and cannot call other subagents. Even `tools: ['*']` does not expose subagent tools to a subagent. Keep fan-out at the root/orchestrator session.
 - `tools:` supports wildcards such as `*`, `mcp_*`, and `mcp_<server>_*`. Prefer narrow allowlists for reviewers and docs agents.
 - Human input uses `ask_user`; include it in `tools:` only for interactive agents expected to ask. Headless agents return `question_request`.
-- The docs prose shows `mcpServers`, but the loader schema validates `mcp_servers`. Emit snake_case `mcp_servers:` and normalize imported camelCase examples with a warning.
+- The docs prose may show `mcpServers`, but the local subagent loader schema validates `mcp_servers`. Emit snake_case `mcp_servers:` in `.gemini/agents/*.md`; reserve camelCase `mcpServers` for Gemini extension manifest/package surfaces and normalize imported local-agent examples with a warning.
 - Remote A2A subagents (`kind: remote`, `agent_card_url`, `agent_card_json`, `auth`) are advanced/import-only; do not emit them by default.
 - Gemini CLI supports native skills loaded from `.gemini/skills/<name>/SKILL.md` (project) or `~/.gemini/skills/<name>/SKILL.md` (user); `.agents/skills/<name>/SKILL.md` is also recognized. Activation is model-side via skill loading; use `/skills` to manage loaded skills. There is no `$skill` or `/<skill>` invocation syntax — skills are not slash commands.
 - Gemini native memory includes `save_memory`, `GEMINI.md`, `/memory`, and experimental `autoMemory`. Skills are activated with `activate_skill`; subagents still cannot call subagents.

@@ -16,6 +16,40 @@
 7. Follow `AGENTS.md` › **Content Quality / Anti-Slop Review** before final output when generated agent-system prose changes; Gemini subagents return `Content quality` status to this root session.
 8. Use `AGENTS.md` › **Plan Handoff Contract** when assigning Gemini subagents: pass a subtask slice, expected output, allowed capabilities, and `Task assignment quality` marker from this root session.
 
+## Hard Rules
+
+1. Route by `AGENTS.md` › **Directory Architecture** before any write.
+2. Treat `GEMINI.md` as Gemini's root-session pointer, not a replacement for canonical `AGENTS.md`.
+3. Resolve `question_request` items through the root session; use Gemini `ask_user` only when interactive and allowed.
+4. Do not ask a Gemini subagent to call another subagent. Return cross-agent work here.
+5. Keep generated artifacts provider-native: local agents use `mcp_servers`, extension manifests use `mcpServers`.
+
+## Lifecycle
+
+1. **Triage** — Use `AGENTS.md` › **Requirements Triage** for ambiguous, risky, cross-runtime, MCP, replication, release, or multi-wave work.
+2. **Plan** — Write or update the plan with owners, waves, approvals, and quality gates from `AGENTS.md`.
+3. **Assign** — Compose the Delegation Packet from `AGENTS.md` › **Plan Handoff Contract** and pass only the subtask slice.
+4. **Delegate** — Invoke matching `.gemini/agents/*.md` local subagents from this root session.
+5. **Integrate** — Collect results, resolve `question_request` items, and re-delegate when needed.
+6. **Review** — Run required security, architecture, tester, reviewer, and content-quality checks from `AGENTS.md`.
+7. **Report** — Include evidence, risks, `Task assignment quality`, `Content quality`, `Handoff status`, and `Learning Check`.
+
+## Delegation Packet
+
+- Required fields stay in `AGENTS.md` › **Plan Handoff Contract**.
+- Include optional `Triage`, `Content quality`, and `Task assignment quality` when applicable.
+- Use `Context freshness: recent` when `AGENTS.md` was already loaded this turn; use `reload` when context may be stale.
+- Describe allowed capabilities in provider-neutral terms and keep Gemini frontmatter unchanged during task execution.
+
+## Wave Execution
+
+<!-- agents-system-setup:wave-execution -->
+
+- For independent work, **fan out** all parallel-safe Gemini subagents for the current wave from this root session.
+- Wait for every wave result, synthesize, then start the next wave.
+- Sequential delegation is only for overlapping owned paths, direct data dependencies, shared state, or gates that require review before the next write.
+- Gemini subagents cannot recursively call subagents, so workers return cross-boundary follow-up work to this root session.
+
 ## Local Subagents
 
 - Project agents: `.gemini/agents/<name>.md`

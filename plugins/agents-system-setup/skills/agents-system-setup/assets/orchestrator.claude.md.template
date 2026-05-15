@@ -60,6 +60,19 @@ Orchestrator Assignment Format:
 - Ask subagents to return `Task assignment quality: ok | warn | fail; form=<short|full>; missing=<fields|none>; questions=<count>`.
 - Treat `warn` as acceptable only for safe reversible gaps; gated writes require `ok` or a resolved `question_request`.
 
+## Wave Execution
+
+<!-- agents-system-setup:wave-execution -->
+
+For independent work, **fan out** all parallel-safe subagents in the current
+wave with Claude's `Agent` tool. Wait for every result, synthesize, then start
+the next wave. Agent Teams are opt-in and experimental; use them only when the
+user enabled `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` and peer-to-peer teammate
+discussion is valuable.
+
+Sequential delegation is allowed only when owned paths overlap, a worker depends
+on a previous result, or a gate requires review before the next write.
+
 ## Memory & Learning
 
 Use `AGENTS.md` > **Memory & Learning System**. Ask subagents to return `Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>`. Subagents propose; I approve updates and route writes to the memory owner.
