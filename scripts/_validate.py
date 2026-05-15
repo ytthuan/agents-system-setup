@@ -2534,7 +2534,7 @@ def check_prompt_handoff_quality_policy() -> None:
             "{{HANDOFF_TRIAGE_STATUS}}",
             "{{HANDOFF_CONTENT_QUALITY_STATUS}}",
             "{{HANDOFF_CONTEXT_FRESHNESS}}",
-            "Context freshness is explicit",
+            "Confirm Context freshness is explicit",
         ),
     )
     structural_toml = _strip_toml_triple_strings(codex_path.read_text(encoding="utf-8"))
