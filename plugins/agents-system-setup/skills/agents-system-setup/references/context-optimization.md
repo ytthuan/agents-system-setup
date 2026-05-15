@@ -132,6 +132,11 @@ Map common task tags to the references each agent should load (or skip), and to 
 | `prompt-contract-review` | `handoff.md`, `prompt-guidelines.md`, relevant runtime template | `context-optimization.md`, `output-contract.md` | Source implementation files unrelated to generated prompts | short-form with Reporting Protocol |
 | `code-edit` | `AGENTS.md` Read First, Directory Architecture, owning agent boundary | Quality Gates row for this path | Marketplace research, full platform schemas | short-form (≤2 files) · full-form when >2 files or shared boundary |
 | `security-write` | Security & Audit Matrix, Threat Model, owning agent boundary | `security-audit-architecture.md` rows for the change | Long marketplace candidate research | full-form |
+| `bug-hunting` | Security Team Operating Model, Threat Model, Directory Architecture, authorization scope | `security-team.md`, source-backed public security references, project attack surface docs | Full marketplace research unless plugin selection is in scope | full-form |
+| `vulnerability-validation` | Security Team Operating Model, candidate report, authorization scope, Quality Gates | `security-team.md`, relevant tests/harness docs, affected source/control/sink files | Unrelated product areas and full platform schemas | full-form |
+| `attack-path-analysis` | Security Team Operating Model, Threat Model, validation evidence, affected assets | `security-team.md`, deployment/ingress/IaC evidence when relevant | Implementation files outside the affected path | full-form |
+| `remediation-verification` | Security Team Operating Model, validated finding, fix diff, Quality Gates | `security-team.md`, regression tests, owning implementer notes | New discovery outside nearby bypass checks | full-form |
+| `disclosure-triage` | Security Team Operating Model, authorization/scope, report details | `security-team.md`, OWASP disclosure/CISA CVD references when needed | Source files not needed to determine scope or reproduction | full-form |
 | `mcp-write` | MCP approval gate (Phase 3.5), Security & Audit Matrix | `plugin-discovery.md` MCP rendering | Architecture Decisions detail | full-form |
 | `replication` | `replication.md`, `handoff.md`, `output-contract.md` | `models.md` for explicit overrides | Project-specific quality gate detail | full-form |
 | `release` | Quality Gates, manifests, version sync rules | `runtime-updates.md` for upstream drift | Long architecture rationale | full-form |
@@ -166,3 +171,5 @@ Renderers must keep section headings (so validators and humans can find them) an
 - Generating full marketplace research inline when only one candidate was selected.
 - Hiding lossy replication drops to save space.
 - Loading the full learning ledger for every task instead of the Learning Index and matching entries.
+- Rendering the full Security Team Operating Model for projects that only selected baseline `security-auditor`.
+- Letting security-team context packets paste proprietary plugin text instead of public-source-backed summaries.

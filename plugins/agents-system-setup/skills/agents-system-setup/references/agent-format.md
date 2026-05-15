@@ -277,6 +277,7 @@ The VS Code `plan` prompt (`agent: Plan`) and Spec-Kit `/plan` output are planni
 - Embedding `mcpServers` in a Gemini local subagent (emit `mcp_servers:`).
 - Asking a Gemini subagent to call another subagent (the runtime prevents recursive subagent calls).
 - Overlapping responsibilities between two subagents → orchestrator picks wrong one. Make boundaries explicit in `## Out of scope` and in the **Directory Architecture** in `AGENTS.md`.
+- Writing any agent (or other runtime artifact) under `.agents-system-setup/`. That directory is operational state only; runtimes do not load agents from it. Existing misroutes go through [misplaced-artifacts-migration](./misplaced-artifacts-migration.md).
 
 ## Tool Restriction Patterns (use the platform's syntax)
 
@@ -307,6 +308,13 @@ managed-content placeholders in `AGENTS.md` and related templates. They are not
 runtime frontmatter fields. For Codex TOML, keep content-quality guidance inside
 `developer_instructions`; do not emit unsupported fields such as
 `content_quality`, `ask_user`, `question`, `request_user_input`, or `memory`.
+
+Security-team placeholders such as `{{SECURITY_TEAM_DEPTH}}` and
+`{{SECURITY_TEAM_OPERATING_MODEL}}` are also normal managed-content fields. When
+the dedicated security-team topology is not selected, render the operating model
+as a short `n/a — baseline security-auditor only` line or an empty block. Do not
+emit proprietary security-plugin text into generated agents; recommend vendor
+plugins through the opt-in discovery flow instead.
 
 General default: when a feature is off, unsupported, or not applicable, replace
 the placeholder with an empty string and remove the surrounding blank line or

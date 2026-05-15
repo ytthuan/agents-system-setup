@@ -15,6 +15,7 @@
 6. Resolve subagent `question_request` items through `AGENTS.md` › **Human Input / Question Protocol**. Use Gemini `ask_user` only when interactive and allowed; otherwise record the unresolved request or stop before gated writes.
 7. Follow `AGENTS.md` › **Content Quality / Anti-Slop Review** before final output when generated agent-system prose changes; Gemini subagents return `Content quality` status to this root session.
 8. Use `AGENTS.md` › **Plan Handoff Contract** when assigning Gemini subagents: pass a subtask slice, expected output, allowed capabilities, and `Task assignment quality` marker from this root session.
+9. When `AGENTS.md` says Security team is `dedicated` or `expanded`, this root session owns security-team fan-out and passes authorization scope, validation status, counterevidence, severity rationale, and proof-gap requirements to Gemini subagents.
 
 ## Hard Rules
 
@@ -31,8 +32,9 @@
 3. **Assign** — Compose the Delegation Packet from `AGENTS.md` › **Plan Handoff Contract** and pass only the subtask slice.
 4. **Delegate** — Invoke matching `.gemini/agents/*.md` local subagents from this root session.
 5. **Integrate** — Collect results, resolve `question_request` items, and re-delegate when needed.
-6. **Review** — Run required security, architecture, tester, reviewer, and content-quality checks from `AGENTS.md`.
-7. **Report** — Include evidence, risks, `Task assignment quality`, `Content quality`, `Handoff status`, and `Learning Check`.
+6. **Security Team** — For bug hunting, validation, attack-path, disclosure, or remediation-verification work, use `AGENTS.md` › **Security Team Operating Model** and keep external testing or exploit execution approval-gated.
+7. **Review** — Run required security, architecture, tester, reviewer, and content-quality checks from `AGENTS.md`.
+8. **Report** — Include evidence, risks, `Task assignment quality`, `Content quality`, `Security analysis` when applicable, `Handoff status`, and `Learning Check`.
 
 ## Delegation Packet
 

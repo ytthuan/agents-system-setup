@@ -2,6 +2,36 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [1.1.0] - 2026-05-15
+
+### Added
+
+- **Standard skill paths + per-platform mapping (all six runtime artifact types).** SKILL.md Phase 4 now enumerates per-platform skill paths inline (Copilot `.github/skills/`, Claude `.claude/skills/`, OpenCode `.opencode/skills/`, Gemini `.gemini/skills/`, Codex described in `AGENTS.md`). New hard rule (#31) declares `.agents-system-setup/` operational state only — no `agents/`, `skills/`, `hooks/`, `commands/`, `prompts/`, or `plugins/` subtrees.
+- **Misplaced-artifacts migration** at `plugins/agents-system-setup/skills/agents-system-setup/references/misplaced-artifacts-migration.md` covering all six runtime artifact types. File-based artifacts (agents, skills, OpenCode/Copilot hooks, commands, prompts, plugin manifests) default to `Move (Recommended)` with `.agents-system-setup/.bak/<ts>/` backup, portable manifest digest verify (`sha256(<rel-path> <file-sha256> <octal-mode>` lines, sorted, LC_ALL=C; replaces brittle `tar` hash), then remove. Config-embedded artifacts (Claude/Gemini hooks in `settings.json`) default to `Convert manually (Recommended)` with a copy-pasteable JSON snippet — never auto-rewrite settings.json. Per-artifact `ask_user`; ledger appended to `.agents-system-setup/migration.jsonl`. Skills migrate to all selected runtimes by default; non-portable artifacts ask per-runtime.
+- **Source-type-safe deprecation markers.** Markdown/Text/TOML/YAML get trailing comments; JSON gets a sibling `<source>.agents-system-setup.deprecated.json` sidecar (no in-place mutation); folder artifacts get a top-level `DEPRECATED.md`.
+- **CWD project reconnaissance** at `plugins/agents-system-setup/skills/agents-system-setup/references/cwd-reconnaissance.md`. Phase 1 runs a safe-readonly scan (paths only for data dirs, README/docs ≤100 lines, source tree ≤2 levels deep, manifests ≤200 lines). Renders a Reconnaissance Card and asks `ask_user` to accept/correct/skip before continuing the interview. Privacy guardrails: never open data files; magic-byte detection (NUL/UTF-8); 64 KB cap; secret redaction across AWS classic + env-style, GitHub classic + fine-grained PATs, OpenAI/Anthropic `sk-` keys, Slack tokens, npm `_authToken`, `Authorization: Bearer`, Google service-account `private_key`, generic API-key patterns (quoted + unquoted), private key headers, JWT triplets. Q1/Q3 interview pre-fill from the card.
+- **Hook safety warning** rendered above every `Convert manually` snippet ("This hook is currently inert. Pasting it into settings.json will enable execution. Review commands, env, and any referenced secrets before saving.").
+- **Output contract reporting.** New `Recon: <signals|n/a|skipped>; redactions=<count|none>` and `Path migration: <none|moved=N copied=N skipped=N manual=N failed=N>` lines.
+- **Dedicated security team topology** for bug hunting, vulnerability validation, attack-path analysis, disclosure triage, and remediation verification at `plugins/agents-system-setup/skills/agents-system-setup/references/security-team.md`. Activated explicitly via interview Q3 (`Security team / Bug hunting`) or Q9a depth (`baseline | dedicated | expanded`). Read-mostly defaults; remediation writes / external scanning / exploit execution / credential use / production testing / disclosure outreach require explicit approval. New task tags `bug-hunting`, `vulnerability-validation`, `attack-path-analysis`, `remediation-verification`, `disclosure-triage`. Source-backed by OWASP SAMM, NIST SSDF, OWASP Vulnerability Disclosure, CISA CVD, FIRST CVSS, CWE, OWASP Top 10. License-attributed plugin recommendations only — no proprietary copying.
+
+### Changed
+
+- **`assets/AGENTS.md.template`.** Read First / Context Loading Policy gain `{{RECON_SNAPSHOT}}` (≤5 lines). Project Snapshot, routing, and `## Security Team Operating Model` block added when security depth is `dedicated` or `expanded`.
+- **`assets/gitignore.template`.** Comment now spells out the no-runtime-subtrees rule for `.agents-system-setup/`.
+- **References cross-references.** `references/skill-format.md`, `references/agent-format.md`, `references/platforms.md`, `references/local-tracking.md` all link to `misplaced-artifacts-migration.md` and flag the operational-dir prohibition.
+- **Orchestrator and subagent templates** (Copilot/Claude/OpenCode/Codex TOML/Gemini, plus `GEMINI.md`) now carry security-team scope/checklist/reporting strings, the canonical `Security analysis: …` reporting line, and reference the new `{{SECURITY_TEAM_DEPTH}}` and `{{SECURITY_TEAM_OPERATING_MODEL}}` placeholders.
+
+### Fixed
+
+- **Skill misroute.** Generated skills no longer land in `.agents-system-setup/skills/**` (which no runtime loads). The new hard rule, explicit per-platform mapping, anti-pattern, and validator check make this a hard error in this repo and a prompted migration in user repos.
+- **Brittle directory hash in migration verification.** Replaced `tar -cf - <folder>` (parent-path/format dependent) with a portable manifest digest so source and target compare equal regardless of where they live.
+- **Unsafe deprecation marker on JSON / folder artifacts.** `Copy + deprecate` no longer mutates JSON sources or appends to directories; it uses a sidecar JSON file or a top-level `DEPRECATED.md` instead.
+
+### Validation
+
+- New validator checks: `check_operational_state_artifacts`, `check_cwd_reconnaissance_policy`, `check_misplaced_artifacts_migration_policy`.
+- All gates: `bash scripts/validate.sh` passes (1 informational SKILL.md size warning, expected `.ps1` LF/CRLF warnings); `git diff --check` clean; `markdownlint-cli2@0.22.1` 0 errors over 39 files; `python3 -m py_compile scripts/_validate.py` clean.
+
 ## [Unreleased]
 
 ### Added

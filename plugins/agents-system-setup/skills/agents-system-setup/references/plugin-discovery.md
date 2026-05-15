@@ -11,6 +11,10 @@ Per-platform install commands: see [platforms.md](./platforms.md).
 4. **Per-capability `ask_user`** — present at most 3 candidates with rationale and let the user pick or skip.
 5. **MCP candidates flow into the Phase 3.5 approval gate** — selection here is necessary but not sufficient.
 6. **Compact by default.** Render one-line `why` and `tradeoffs` in the prompt; move long README notes to an overflow reference or omit them.
+7. **Security plugins require license/provenance.** For security scanners,
+   disclosure tooling, or bug-hunting workflows, show vendor and license/terms
+   when available. Never mirror proprietary plugin prompts or workflow text into
+   generated agents.
 
 ## Candidate Schema (must populate every field)
 
@@ -83,6 +87,7 @@ These are *search hints*, not assumed-existing entries.
 | Observability | `grafana`, `datadog` |
 | Design | `figma` |
 | Vector DB | `pinecone`, `weaviate`, `qdrant` |
+| Security team / Bug hunting | `security`, `appsec`, `vulnerability`, `threat model`, `code security`, `codex-security` |
 
 ## MCP Approval Rendering (handed off to Phase 3.5)
 
@@ -153,3 +158,5 @@ Then ask:
 - Auto-installing instead of presenting a choice.
 - Mixing platforms in a single proposed file (Copilot/Claude share `.mcp.json`; OpenCode is separate).
 - Forgetting that "skip this capability" is always a valid choice.
+- Cloning proprietary security-plugin workflows instead of recommending them
+  through this opt-in path.

@@ -58,6 +58,15 @@ opencode.json
 
 Only include paths the skill actually created or modified. If a file already exists and is tracked, do not hide it; ask before changing strategy.
 
+## Operational state directory
+
+`.agents-system-setup/` is reserved for operational state — `replication.jsonl`,
+`migration.jsonl`, MCP approval evidence, learning ledgers, `.bak` files. It
+is `.gitignore`d in this project's template and **must never** contain
+runtime artifact subtrees (`agents/`, `skills/`, `hooks/`, `commands/`,
+`prompts/`, `plugins/`). No runtime loads artifacts from there. Existing
+misroutes go through [misplaced-artifacts-migration](./misplaced-artifacts-migration.md).
+
 ## Privacy callout
 
 `.git/info/exclude` is checkout-local and is not a security boundary. Never hard-code secrets in `.mcp.json`, `opencode.json`, agent `mcp-servers:` / `mcp_servers:`, or Codex `[mcp_servers.<id>]` blocks — always reference environment variables such as `${VAR}`. Excluding a file from git does not protect it from collaborators, local backups, shell history, or other tools that can read the checkout.

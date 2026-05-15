@@ -16,6 +16,7 @@
 - **Output profile:** {{CONTEXT_PROFILE}}  <!-- balanced | compact | full -->
 - **Agent artifact tracking:** {{ARTIFACT_TRACKING}}  <!-- project-tracked | project-local | personal-global -->
 - **Content quality:** {{CONTENT_QUALITY_STATUS}}  <!-- ok | warn | fail | n/a -->
+- **Security team:** {{SECURITY_TEAM_DEPTH}}  <!-- baseline | dedicated | expanded | n/a -->
 
 ## Read First
 
@@ -25,9 +26,10 @@
 4. Run or merge [Content Quality / Anti-Slop Review](#content-quality--anti-slop-review) before final output when generated agent-system prose changes.
 5. Use [Human Input / Question Protocol](#human-input--question-protocol); subagents return `question_request` instead of stopping for feedback.
 6. Check [Self-Update Preflight](#self-update-preflight) before setup or generated-artifact refresh.
-7. Load [Memory & Learning System](#memory--learning-system) entries relevant to the task; do not load the full ledger by default.
-8. Load overflow details only when the task needs them: {{DETAIL_REFERENCES}}.
-9. Respect artifact tracking: {{ARTIFACT_TRACKING_NOTES}}.
+7. If `Security team` is `dedicated` or `expanded`, use [Security Team Operating Model](#security-team-operating-model) before bug hunting, validation, attack-path, disclosure, or remediation-verification work.
+8. Load [Memory & Learning System](#memory--learning-system) entries relevant to the task; do not load the full ledger by default.
+9. Load overflow details only when the task needs them: {{DETAIL_REFERENCES}}.
+10. Respect artifact tracking: {{ARTIFACT_TRACKING_NOTES}}.
 
 ## How Agents Should Work Here
 
@@ -52,6 +54,7 @@ This repo uses an **orchestrator + subagent** model. The orchestrator (`@orchest
 - **Load on demand:** full marketplace research, full platform schemas, detailed threat rationale, long ADRs/examples.
 - **Overflow details:** {{DETAIL_REFERENCES}}
 - **Rule:** if a detail is moved out of this file, link it here so agents can find it.
+- **Project recon snapshot (if captured, ≤5 lines):** {{RECON_SNAPSHOT}}
 
 ## Self-Update Preflight
 
@@ -100,6 +103,11 @@ Use this table to decide which references each agent loads beyond `AGENTS.md` Re
 | `content-quality-review` | Read First, Content Quality, Directory Architecture | Output Contract, Handoff, runtime/platform refs for generated artifacts | Source implementation files unrelated to generated prose | short-form quality signals |
 | `code-edit` | Read First, Directory Architecture, owning agent boundary | Quality Gates row for this path | Marketplace research, full platform schemas | short-form (≤2 files) · full-form when >2 files or shared boundary |
 | `security-write` | Security & Audit Matrix, Threat Model, owning agent boundary | Security/Audit reference rows for the change | Long marketplace candidate research | full-form |
+| `bug-hunting` | Security Team Operating Model, Threat Model, Directory Architecture, authorization scope | `security-team.md`, attack surface docs, relevant source/control/sink files | Full marketplace research unless plugin selection is in scope | full-form |
+| `vulnerability-validation` | Security Team Operating Model, candidate report, authorization scope, Quality Gates | `security-team.md`, affected source/control/sink files, tests/harness docs | Unrelated product areas | full-form |
+| `attack-path-analysis` | Security Team Operating Model, Threat Model, validation evidence, affected assets | `security-team.md`, deployment/ingress/IaC evidence when relevant | Implementation files outside the affected path | full-form |
+| `remediation-verification` | Security Team Operating Model, validated finding, fix diff, Quality Gates | `security-team.md`, regression tests, owning implementer notes | New discovery outside nearby bypass checks | full-form |
+| `disclosure-triage` | Security Team Operating Model, authorization/scope, report details | `security-team.md`, disclosure/CVD references when needed | Source files not needed to determine scope or reproduction | full-form |
 | `mcp-write` | MCP approval gate, Security & Audit Matrix | Plugin/MCP rendering reference | Architecture Decisions detail | full-form |
 | `replication` | Replication contract, Plan Handoff Contract, Output Contract | Models reference for explicit overrides | Project-specific quality gate detail | full-form |
 | `release` | Quality Gates, manifests, version sync rules | Runtime update audit | Long architecture rationale | full-form |
@@ -213,6 +221,10 @@ Legend: ✅ primary owner · 🟡 assists · *(blank)* not involved.
 {{THREAT_MODEL_ROWS}}
 
 > If this model is abbreviated, full detail lives in: {{THREAT_MODEL_DETAILS}}
+
+## Security Team Operating Model
+
+{{SECURITY_TEAM_OPERATING_MODEL}}
 
 ## Architecture & Design Pattern Decisions
 

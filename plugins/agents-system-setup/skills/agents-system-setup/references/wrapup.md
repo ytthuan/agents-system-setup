@@ -56,48 +56,51 @@ Every item below cites a vendor-official doc or a well-known curated catalog. Up
    - Source: <https://csrc.nist.gov/Projects/ssdf>
    - Action: add an SSDF crosswalk to `AGENTS.md` Quality Gates (PO/PS/PW/RV groups) with owner and evidence columns.
 10. **GitHub Code Security baseline** — secret scanning, code scanning, dependency review, Dependabot.
-    - Source: <https://docs.github.com/en/code-security>
-    - Action (GitHub repos): add a `## GitHub Code Security` checklist to `AGENTS.md`; optionally scaffold a CodeQL workflow only after explicit approval.
-11. **SLSA provenance review** — build/release supply-chain integrity.
-    - Source: <https://slsa.dev/spec/v1.1/>
-    - Action (release-producing projects): append SLSA provenance / artifact verification notes to Quality Gates.
-12. **OPA policy-as-code** — explicit, testable policy decisions.
-    - Source: <https://www.openpolicyagent.org/docs/latest/>
-    - Action (infra/platform/API gateway projects): add a policy-as-code section with candidate policy boundaries and test evidence.
+     - Source: <https://docs.github.com/en/code-security>
+     - Action (GitHub repos): add a `## GitHub Code Security` checklist to `AGENTS.md`; optionally scaffold a CodeQL workflow only after explicit approval.
+11. **Security team operating model** — bug-hunting / AppSec team roles and evidence contract.
+    - Source: <https://owasp.org/www-project-samm/>, <https://csrc.nist.gov/Projects/ssdf>, and <https://www.first.org/cvss/>
+    - Action (security-team signal): add the conditional Security Team Operating Model from `references/security-team.md`; do not auto-install scanners.
+12. **SLSA provenance review** — build/release supply-chain integrity.
+     - Source: <https://slsa.dev/spec/v1.1/>
+     - Action (release-producing projects): append SLSA provenance / artifact verification notes to Quality Gates.
+13. **OPA policy-as-code** — explicit, testable policy decisions.
+     - Source: <https://www.openpolicyagent.org/docs/latest/>
+     - Action (infra/platform/API gateway projects): add a policy-as-code section with candidate policy boundaries and test evidence.
 
 ### Architecture & design patterns
 
-13. **C4 architecture views** — context/container/component views.
+14. **C4 architecture views** — context/container/component views.
     - Source: <https://c4model.com/>
     - Action: add a C4 view plan to `AGENTS.md` Architecture section; scaffold docs only after approval.
-14. **ADR index** — architecture decisions with status.
+15. **ADR index** — architecture decisions with status.
     - Source (pattern): C4 / architecture documentation conventions; enterprise option: <https://www.opengroup.org/togaf>
     - Action: add `docs/adr/` plan and ADR index rows; create files only after approval.
-15. **Azure Well-Architected review** — cloud quality pillars.
+16. **Azure Well-Architected review** — cloud quality pillars.
     - Source: <https://learn.microsoft.com/en-us/azure/well-architected/>
     - Action (Azure/cloud target): add reliability/security/cost/operational/performance review gates.
 
 ### Additional well-known subagents
 
-16. **awesome-copilot agent gallery** — curated GitHub-Copilot-CLI agents.
+17. **awesome-copilot agent gallery** — curated GitHub-Copilot-CLI agents.
     - Source: <https://github.com/github/awesome-copilot> (subdir: `agents/`)
     - Action (Copilot target): present a sub-menu of agents not yet installed; replicate selections through the Canonical IR.
-17. **wshobson/agents** — large multi-runtime subagent collection.
+18. **wshobson/agents** — large multi-runtime subagent collection.
      - Source: <https://github.com/wshobson/agents>
      - Action: same flow as #16.
-18. **VoltAgent/awesome-claude-code-subagents** — curated Claude Code subagents.
+19. **VoltAgent/awesome-claude-code-subagents** — curated Claude Code subagents.
      - Source: <https://github.com/VoltAgent/awesome-claude-code-subagents>
      - Action (Claude target): same flow as #16.
-19. **Gemini CLI extension gallery** — discover Gemini extensions that can bundle subagents, MCP servers, commands, hooks, and skills.
+20. **Gemini CLI extension gallery** — discover Gemini extensions that can bundle subagents, MCP servers, commands, hooks, and skills.
      - Source: <https://geminicli.com/extensions/browse/> and <https://github.com/google-gemini/gemini-cli/blob/main/docs/extensions/index.md>
      - Action (Gemini target): present a source-inspected extension submenu; never install or write MCP config without the approval gate.
 
 ### Operations
 
-20. **Prompt versioning / changelog** — per-agent CHANGELOG for prompt drift.
+21. **Prompt versioning / changelog** — per-agent CHANGELOG for prompt drift.
      - Source (pattern): Anthropic prompt-engineering docs <https://docs.claude.com/en/docs/build-with-claude/prompt-engineering/overview>; OpenAI prompt-engineering guide <https://platform.openai.com/docs/guides/prompt-engineering>.
      - Action: scaffold `prompts/CHANGELOG.md` and a `prompts/` dir mirror of each agent's instructions.
-21. **Cost / usage budgeting** — per-provider usage caps.
+22. **Cost / usage budgeting** — per-provider usage caps.
      - Source: Anthropic <https://docs.claude.com/en/api/admin-api/usage-cost/get-usage-report>; OpenAI <https://platform.openai.com/docs/guides/production-best-practices/managing-rate-limits>.
      - Action: append a `## Budgets` section to `AGENTS.md` with target $/day per agent + alert hook.
 
@@ -105,17 +108,18 @@ Every item below cites a vendor-official doc or a well-known curated catalog. Up
 
 | Signal from earlier phases     | Items shown                              |
 |--------------------------------|------------------------------------------|
-| domain == software-dev         | 1, 2 (always also: 3–15, 20, 21)         |
-| domain != software-dev         | 3–8, 13, 14, 20, 21                      |
+| domain == software-dev         | 1, 2 (always also: 3–16, 21, 22)         |
+| domain != software-dev         | 3–8, 14, 15, 21, 22                      |
 | any MCP server selected        | 8 (always)                               |
 | GitHub repo detected           | 10                                       |
-| release/package/CI detected    | 11                                       |
-| infra/platform/API gateway     | 12                                       |
-| cloud/Azure target             | 15                                       |
-| Claude target included         | 6, 18                                    |
-| Copilot target included        | 16                                       |
-| Multi-runtime                  | 17                                       |
-| Gemini target included         | 19                                       |
+| security-team signal           | 11                                       |
+| release/package/CI detected    | 12                                       |
+| infra/platform/API gateway     | 13                                       |
+| cloud/Azure target             | 16                                       |
+| Claude target included         | 6, 19                                    |
+| Copilot target included        | 17                                       |
+| Multi-runtime                  | 18                                       |
+| Gemini target included         | 20                                       |
 
 ## Output addendum
 

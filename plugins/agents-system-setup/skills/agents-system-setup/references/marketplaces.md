@@ -23,7 +23,7 @@ A "marketplace" is a registry where plugins (which can bundle agents, skills, ho
 | `anthropics/skills` | <https://github.com/anthropics/skills> | Anthropic | Reference Agent Skills (open standard) |
 | `anthropics/claude-code` | <https://github.com/anthropics/claude-code> | Anthropic | Claude Code core repo + sub-agent format source-of-truth |
 | `openai/skills` | <https://github.com/openai/skills> | OpenAI | **Skills Catalog for Codex** (~17k★). Authoritative skill registry. |
-| `openai/plugins` | <https://github.com/openai/plugins> | OpenAI | OpenAI plugins (~900★) |
+| `openai/plugins` | <https://github.com/openai/plugins> | OpenAI | OpenAI plugins (~900★), including security workflows when available; inspect manifest license/terms before recommending. |
 | `openai/codex` | <https://github.com/openai/codex> | OpenAI | OpenAI Codex core (~77k★); shared artifacts use `AGENTS.md` + `.codex/agents/*.toml`; plugin manifests may bundle `skills`, `mcpServers`, `apps`, interface assets, `.app.json`, and `.mcp.json` |
 | `openai/codex-plugin-cc` | <https://github.com/openai/codex-plugin-cc> | OpenAI | Use Codex from Claude Code (cross-runtime bridge, ~15k★) |
 | `google-gemini/gemini-cli` | <https://github.com/google-gemini/gemini-cli> | Google | Gemini CLI docs, local subagent schema, extension format, and source-backed loader behavior. |
@@ -100,6 +100,10 @@ These are not all "plugins", but they are approved source material for the gover
 | Source | URL | Use |
 |---|---|---|
 | NIST SSDF SP 800-218 | <https://csrc.nist.gov/Projects/ssdf> | Secure development practice map (PO, PS, PW, RV) |
+| OWASP SAMM | <https://owasp.org/www-project-samm/> | AppSec program and security-team lifecycle model |
+| OWASP Vulnerability Disclosure Cheat Sheet | <https://cheatsheetseries.owasp.org/cheatsheets/Vulnerability_Disclosure_Cheat_Sheet.html> | Disclosure and bug-bounty handling guidance |
+| CISA Coordinated Vulnerability Disclosure | <https://www.cisa.gov/coordinated-vulnerability-disclosure-process> | Coordinated vulnerability disclosure, remediation, and mitigation sharing |
+| FIRST CVSS | <https://www.first.org/cvss/> | Vulnerability severity scoring and environmental enrichment |
 | SLSA v1.1 | <https://slsa.dev/spec/v1.1/> | Build provenance and supply-chain integrity requirements |
 | Open Policy Agent | <https://www.openpolicyagent.org/docs/latest/> | Policy-as-code prior art for CI/CD, Kubernetes, API gateways, and config checks |
 | Azure Well-Architected Framework | <https://learn.microsoft.com/en-us/azure/well-architected/> | Cloud architecture quality pillars and review structure |

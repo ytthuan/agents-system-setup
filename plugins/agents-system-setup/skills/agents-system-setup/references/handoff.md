@@ -205,6 +205,15 @@ Reproduction (bug-fix tasks only):
   actual: <actual behavior>
   environment: <runtime, version, platform>
 
+Security Analysis (security-team tasks only):
+  scope: <diff | repository | report | remediation | program>
+  authorization: <owned-code | approved-target | needs-approval>
+  asset_or_boundary: <asset/trust boundary>
+  candidate_or_finding: <id/title or "n/a">
+  validation_status: <confirmed | likely | needs-info | duplicate | not-reproducible | out-of-scope | mitigated | deferred | n/a>
+  evidence_required:
+    - <source/control/sink | reproduction | counterevidence | severity rationale | proof gaps>
+
 Assumptions:
   - <assumption the orchestrator made; subagent may challenge>
 
@@ -276,6 +285,11 @@ Output Schema:
 | `code-edit` (2 or fewer files, no gates) | short-form | Context Packet when prior decisions matter |
 | `code-edit` (more than 2 files or touching shared boundary) | full-form | Goal & Definition of Done · Scope · Context Packet · File Inventory · Instructions / Workflow · Verification Protocol · Reporting Protocol |
 | `security-write` | full-form | Goal & Definition of Done · Scope · Context Packet · File Inventory · Allowed Capabilities · Known Risks · Verification Protocol · Reporting Protocol · Clarification Protocol · Stop / Escalation Conditions |
+| `bug-hunting` | full-form | Goal & Definition of Done · Scope · Security Analysis · Context Packet · File Inventory · Allowed Capabilities · Known Risks · Reporting Protocol · Stop / Escalation Conditions |
+| `vulnerability-validation` | full-form | Goal & Definition of Done · Scope · Reproduction · Security Analysis · Context Packet · File Inventory · Verification Protocol · Reporting Protocol · Stop / Escalation Conditions |
+| `attack-path-analysis` | full-form | Goal & Definition of Done · Scope · Security Analysis · Context Packet · Evidence · Known Risks · Reporting Protocol |
+| `remediation-verification` | full-form | Goal & Definition of Done · Reproduction · Security Analysis · File Inventory · Verification Protocol · Reporting Protocol |
+| `disclosure-triage` | full-form | Scope · Security Analysis · Allowed Capabilities · Reporting Protocol · Clarification Protocol · Stop / Escalation Conditions |
 | `mcp-write` | full-form | Goal & Definition of Done · Scope · File Inventory · Allowed Capabilities · Known Risks · Reporting Protocol · Clarification Protocol · Stop / Escalation Conditions |
 | `replication` | full-form | Goal & Definition of Done · Scope · Context Packet · File Inventory · Verification Protocol · Reporting Protocol · Coordination |
 | `release` | full-form | Goal & Definition of Done · Verification Protocol · Reporting Protocol · Known Risks · Stop / Escalation Conditions |
@@ -305,7 +319,8 @@ risky action.
 10. If the task changes generated agent, skill, memory, recommendation, or output-contract prose, the assignment names the expected Content Quality check or says `n/a`.
 11. `Context Packet` is scoped to the subtask and does not paste full project memory, full plans, or unrelated logs.
 12. `Allowed Capabilities` and `Skills Referenced` are runtime-neutral and do not ask the agent to invent skills or mutate its own frontmatter/TOML.
-13. `Output Schema` or `Expected output` is specific enough for the orchestrator to integrate.
+13. Security-team tasks include authorization scope, affected asset/boundary, validation status, counterevidence, severity rationale, remediation verification need, and proof-gap reporting.
+14. `Output Schema` or `Expected output` is specific enough for the orchestrator to integrate.
 
 If a blocking check fails, return: `question_request: <single consolidated question>` and stop. Do not loop.
 
@@ -323,6 +338,7 @@ Evidence:
 Gates touched: <list with status>
 Task assignment quality: ok | warn | fail; form=<short|full>; missing=<fields|none>; questions=<count>
 Content quality: ok | warn | fail | n/a; signals=<list|none>
+Security analysis: n/a | scope=<diff|repository|report|remediation|program>; authorization=<owned-code|approved-target|needs-approval>; validation=<confirmed|likely|needs-info|duplicate|not-reproducible|out-of-scope|mitigated|deferred>; severity=<P0|P1|P2|P3|n/a>; proof_gaps=<none|summary>
 Risks / escalations: <list or "none">
 Question requests: none | <id>
 Handoff status: accepted | completed | blocked | returned-to-orchestrator

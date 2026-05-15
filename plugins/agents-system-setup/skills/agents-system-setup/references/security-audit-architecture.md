@@ -16,6 +16,12 @@ Use these sources when generating recommendations. Do not cite unsourced blog po
 | Repository code security | GitHub Code Security: https://docs.github.com/en/code-security | Recommend secret scanning, code scanning, dependency review, Dependabot, and push protection when GitHub is in scope. |
 | Dependency inventory | GitHub Dependency Graph: https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/about-the-dependency-graph | Require dependency inventory and vulnerable dependency review for software projects. |
 | Supply-chain provenance | SLSA v1.1: https://slsa.dev/spec/v1.1/ | Recommend provenance, build integrity, and artifact verification gates for release-producing projects. |
+| AppSec program maturity | OWASP SAMM: https://owasp.org/www-project-samm/ | Source-backed model for dedicated security-team roles and secure lifecycle streams. |
+| Secure development practices | NIST SSDF SP 800-218: https://csrc.nist.gov/Projects/ssdf | Map security-team quality gates to PO, PS, PW, and RV practice groups. |
+| Vulnerability disclosure | OWASP Vulnerability Disclosure Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Vulnerability_Disclosure_Cheat_Sheet.html | Shape bug-bounty/disclosure triage boundaries, reporting expectations, and communication safety. |
+| Coordinated disclosure | CISA Coordinated Vulnerability Disclosure: https://www.cisa.gov/coordinated-vulnerability-disclosure-process | Shape remediation/disclosure coordination and mitigation-sharing guidance for reported vulnerabilities. |
+| Vulnerability severity | FIRST CVSS v4: https://www.first.org/cvss/ | Calibrate technical severity with Base, Threat, Environmental, and Supplemental metrics; enrich with repository context. |
+| Weakness classification | CWE and OWASP Top 10: https://cwe.mitre.org/ and https://owasp.org/www-project-top-ten/ | Classify finding types without inventing taxonomy. |
 | Policy as code | Open Policy Agent: https://www.openpolicyagent.org/docs/latest/ | Recommend OPA/Rego when policy decisions must be explicit and testable. |
 | Cloud architecture quality | Azure Well-Architected Framework: https://learn.microsoft.com/en-us/azure/well-architected/ | Use pillars as quality-attribute prompts: reliability, security, cost, operational excellence, performance efficiency. |
 | Architecture views | C4 Model: https://c4model.com/ | Generate context/container/component views or text equivalents. |
@@ -111,6 +117,7 @@ The governance baseline is mandatory; dedicated agents are adaptive.
 | CI/release/package publishing | Add supply-chain responsibilities to `release-publisher` or `security-auditor`. |
 | Monorepo or multi-service | Add `architecture-reviewer` and make service boundaries explicit. |
 | User asks for patterns/architecture | Add `design-pattern-reviewer` or merge into `architecture-reviewer`. |
+| User asks for security team, bug hunting, vulnerability research, disclosure triage, or security analysis | Use [security team](./security-team.md) to generate a dedicated read-mostly security roster and evidence contract. |
 
 Small repositories may merge roles into one `security-architecture-reviewer`, but the generated plan must still show the security, audit, architecture, and design-pattern responsibilities.
 
@@ -149,6 +156,8 @@ If a target runtime cannot represent a field directly, emit a compact summary in
 - Treating compact output as permission to omit mandatory governance concerns.
 - Writing MCP config before the approval gate.
 - Creating "security-auditor" with broad write access by default.
+- Creating a dedicated security team without authorization scope, read-mostly defaults, validation evidence, counterevidence, and proof-gap reporting.
+- Copying proprietary security-plugin prompts, artifact schemas, or workflow text instead of source-backed original guidance.
 - Generating architecture diagrams or ADRs that are not tied to path ownership or agent responsibilities.
 - Recommending plugins, MCP servers, or policy tools without a source URL.
 - Adding enterprise frameworks like TOGAF to small repositories unless the user asks for enterprise governance.

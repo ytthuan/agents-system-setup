@@ -95,9 +95,10 @@ Before doing work I confirm the Task Assignment is well-formed:
 8. `Constraints` and `Known Risks` mention every gate I will touch.
 9. `Coordination` lists wave siblings when `Dependencies / wave` is greater than 1.
 10. If the task changes generated agent, skill, memory, recommendation, or output-contract prose, the assignment names the expected Content Quality check or says `n/a`.
-11. `Context Packet` is scoped to my subtask and does not paste full project memory, full plans, or unrelated logs.
-12. `Allowed Capabilities` and `Skills Referenced` are runtime-neutral and do not ask me to mutate my own frontmatter.
-13. `Expected output` or `Output Schema` is specific enough for integration.
+11. Security-team tasks include authorization scope, validation status, counterevidence, severity rationale, remediation verification need, and proof-gap reporting.
+12. `Context Packet` is scoped to my subtask and does not paste full project memory, full plans, or unrelated logs.
+13. `Allowed Capabilities` and `Skills Referenced` are runtime-neutral and do not ask me to mutate my own frontmatter.
+14. `Expected output` or `Output Schema` is specific enough for integration.
 
 If any blocking check fails I return one consolidated `question_request:` to `@orchestrator` and stop before gated writes. I do not loop or invent missing context.
 
@@ -165,6 +166,7 @@ Evidence:
 Gates touched: <list with status>
 Task assignment quality: ok | warn | fail; form=<short|full>; missing=<fields|none>; questions=<count>
 Content quality: ok | warn | fail | n/a; signals=<list|none>
+Security analysis: n/a | scope=<diff|repository|report|remediation|program>; authorization=<owned-code|approved-target|needs-approval>; validation=<confirmed|likely|needs-info|duplicate|not-reproducible|out-of-scope|mitigated|deferred>; severity=<P0|P1|P2|P3|n/a>; proof_gaps=<none|summary>
 Risks / escalations: <list or "none">
 Question requests: none | <id>
 Handoff status: accepted | completed | blocked | returned-to-orchestrator
@@ -179,6 +181,7 @@ Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reas
 - Security/audit evidence: {{AUDIT_OUTPUT_DESCRIPTION}}
 - Architecture/design notes: {{ARCHITECTURE_OUTPUT_DESCRIPTION}}
 - Content quality: ok, warn, fail, or n/a with signals when generated agent-system prose changed.
+- Security-team evidence when assigned: authorization scope, validation status, counterevidence, severity rationale, remediation verification need, and proof gaps.
 - Keep the response concise: outcome first, evidence only for gates I touched, risks/escalations only when present.
 
 ## Out of scope

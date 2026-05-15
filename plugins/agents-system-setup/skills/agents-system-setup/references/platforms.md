@@ -26,6 +26,8 @@ This skill targets five agent runtimes. The user picks one or more in **Phase 0*
 | Personal memory | `~/.copilot/AGENTS.md` | `~/.claude/CLAUDE.md` | `~/.config/opencode/AGENTS.md` | `~/.codex/AGENTS.md` | `~/.gemini/GEMINI.md` plus `~/.gemini/agents/` |
 | Native durable learning | Copilot Memory public preview: transparent server-side durable repo memory; plugin-managed learning remains complementary | `memory` set to `user`, `project`, or `local` for project/user/session agents; plugin agents support memory but not `hooks`, `mcpServers`, or `permissionMode` | No durable auto-learning beyond AGENTS.md, skills, compaction, and plugin patterns | Memories feature via `[features] memories = true` and `~/.codex/memories/`; off by default/region-limited; do not emit `memory` in agent TOML | `save_memory`, `GEMINI.md`, `/memory`, and experimental `autoMemory`; skills use `activate_skill` |
 
+> **Operational state directory.** Never write `agents/`, `skills/`, `hooks/`, `commands/`, `prompts/`, or `plugins/` subtrees inside `.agents-system-setup/`. Runtimes do not load artifacts from there; existing misroutes go through [misplaced-artifacts-migration](./misplaced-artifacts-migration.md).
+
 ## Agent Frontmatter — per platform
 
 ### Copilot CLI (`.agent.md`)
