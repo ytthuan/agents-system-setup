@@ -2176,6 +2176,21 @@ def check_cwd_reconnaissance_policy() -> None:
             "redactions=",
         ),
     )
+    # Track regression-prevention for the specific secret-pattern names so
+    # future edits cannot silently drop one.
+    require_contains(
+        recon_ref,
+        (
+            "AKIA[0-9A-Z]",
+            "AWS_SECRET_ACCESS_KEY",
+            "github_pat_",
+            "sk-(?:ant-)?",
+            "_authToken",
+            "Authorization header",
+            "\"private_key\"",
+            "JWT triplet",
+        ),
+    )
 
 
 def check_misplaced_artifacts_migration_policy() -> None:
@@ -2213,6 +2228,9 @@ def check_misplaced_artifacts_migration_policy() -> None:
             "Multi-runtime portability",
             "Skills are portable",
             "portable-manifest-sha256",
+            "Backup directory naming",
+            "migration_id",
+            "external-symlink",
             "File-based migration procedure",
             "Migration ledger schema",
             ".agents-system-setup/migration.jsonl",
