@@ -59,7 +59,7 @@ out of scope for now and must not be enabled without explicit user opt-in.
    - GitHub fine-grained PAT: `github_pat_[A-Za-z0-9_]{22,}`
    - OpenAI / Anthropic style key: `sk-(?:ant-)?[A-Za-z0-9_\-]{20,}`
    - Slack token: `xox[abprs]-[A-Za-z0-9-]+`
-   - npmrc auth token: `(?i)//[^/\s]+/:?_authToken\s*=\s*\S+`
+   - npmrc auth token (registry-scoped or bare): `(?i)(?://[^/\s]+/:?_authToken|(?:^|\s)_authToken)\s*=\s*\S+`
    - Authorization header: `(?i)Authorization:\s*Bearer\s+[A-Za-z0-9._\-+/=]+`
    - Google service-account private key field: `"private_key"\s*:\s*"-----BEGIN [A-Z ]*PRIVATE KEY-----`
    - Private key header (any): `-----BEGIN [A-Z ]*PRIVATE KEY-----`

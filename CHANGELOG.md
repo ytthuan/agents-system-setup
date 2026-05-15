@@ -2,6 +2,19 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [1.1.1] - 2026-05-15
+
+### Fixed
+
+- **Portable folder digest now defines symlink handling explicitly.** The pseudocode in `references/misplaced-artifacts-migration.md` walks with `followlinks=False`, emits a deterministic symlink line `<rel-path> link:<rel-target> <octal-mode>`, aborts with `reason: external-symlink` when a resolved symlink leaves the artifact root, and breaks defensively on inode loops with `reason: digest-loop`. Closes the second-pass critique on Blocking #1 (digest).
+- **Backup directory is collision-resistant.** `Move (Recommended)` and `Delete after explicit confirmation` now use `.agents-system-setup/.bak/<ts>-<migration_id>/<source-rel>` with `<ts>` defined as filesystem-safe ISO-8601 UTC (colon → `-`) and `<migration_id>` as the first 8 characters of `base32(uuid4())`. The leaf directory is created exclusively (`mkdir` without `-p`) with retry on `EEXIST` (`reason: backup-collision` after three retries). The shared `.agents-system-setup/.bak/` parent is created with `-p`.
+- **npm `_authToken` redaction also catches the bare form.** `references/cwd-reconnaissance.md` regex updated from `(?i)//[^/\s]+/:?_authToken\s*=\s*\S+` to `(?i)(?://[^/\s]+/:?_authToken|(?:^|\s)_authToken)\s*=\s*\S+` so bare `.npmrc` lines like `_authToken=…` are also redacted.
+
+### Validation
+
+- `check_cwd_reconnaissance_policy` now `require_contains` the specific secret-pattern names (`AKIA[0-9A-Z]`, `AWS_SECRET_ACCESS_KEY`, `github_pat_`, `sk-(?:ant-)?`, `_authToken`, `Authorization header`, `"private_key"`, `JWT triplet`) so a future edit cannot silently drop one.
+- `check_misplaced_artifacts_migration_policy` now `require_contains` `Backup directory naming`, `migration_id`, and `external-symlink`.
+
 ## [1.1.0] - 2026-05-15
 
 ### Added

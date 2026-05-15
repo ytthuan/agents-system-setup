@@ -46,9 +46,10 @@ Choices vary by `kind` (file-based vs config-embedded):
 ### File-based artifacts
 
 - `Move (Recommended)` — back the source up to
-  `.agents-system-setup/.bak/<ts>/<source-rel>`, copy to the platform
-  target, verify the portable digest, then remove the original. The
-  source directory is `.gitignore`d, so the only recovery path is the
+  `.agents-system-setup/.bak/<ts>-<migration_id>/<source-rel>` (see
+  [Backup directory naming](#backup-directory-naming)), copy to the
+  platform target, verify the portable digest, then remove the original.
+  The source directory is `.gitignore`d, so the only recovery path is the
   in-place backup; users are warned before the move.
 - `Copy and keep original with deprecation marker` — copy to the
   platform target, then mark the source as deprecated using the
@@ -57,8 +58,8 @@ Choices vary by `kind` (file-based vs config-embedded):
   with `action: leave-with-warning` and add to the output contract.
 - `Delete after explicit confirmation` — only after a second `ask_user`
   confirmation; the deletion still writes the in-place
-  `.agents-system-setup/.bak/<ts>/<source-rel>` backup and records the
-  source digest so the user can recover.
+  `.agents-system-setup/.bak/<ts>-<migration_id>/<source-rel>` backup
+  and records the source digest so the user can recover.
 
 #### Deprecation marker rules (source-type-safe)
 
@@ -95,9 +96,12 @@ Choices vary by `kind` (file-based vs config-embedded):
 
 For each accepted `Move`, `Copy + deprecate`, or `Delete`:
 
-1. **Backup** — `mkdir -p .agents-system-setup/.bak/<ts>/$(dirname <source-rel>)`
-   then copy source → backup with `cp -R -p`. The backup is non-destructive
-   and survives the migration so users can roll back.
+1. **Backup** — resolve the backup path per
+   [Backup directory naming](#backup-directory-naming), then `mkdir`
+   the leaf directory exclusively (no `-p` for the leaf; retry with a
+   fresh `migration_id` on `EEXIST`). Copy source → backup with
+   `cp -R -p`. The backup is non-destructive and survives the migration
+   so users can roll back.
 2. **Source digest** — compute the portable digest (see below).
 3. **Target resolution** — use the table above and the multi-runtime rules
    in [Multi-runtime portability](#multi-runtime-portability). Confirm
@@ -118,27 +122,67 @@ A single canonical digest is required for both files and folders so source
 and target compare equal regardless of parent path or `tar` flavor.
 
 - **Files**: `sha256(file_bytes)`.
-- **Folders**: build a sorted manifest with one line per regular file
-  (`<relative-path-from-artifact-root> <sha256-of-bytes> <octal-mode-low-9-bits>`),
-  newline-delimited, then `sha256` over the manifest text.
-  - Walk the artifact root, sort entries by relative path (LC_ALL=C).
+- **Folders**: build a sorted manifest with one line per entry, then
+  `sha256` over the manifest text.
+  - Walk the artifact root with `followlinks=False` (do not descend into
+    symlinked directories) and sort entries by relative path under
+    `LC_ALL=C`.
+  - Track visited inodes (`(st_dev, st_ino)`) to break cycles defensively
+    even though `followlinks=False` already prevents directory loops; if
+    an inode repeats, abort with `reason: digest-loop`.
   - Skip platform metadata: `.DS_Store`, `Thumbs.db`, `.Spotlight-V100/`,
     `.Trashes/`, `__MACOSX/`, `*.bak`.
+  - **Regular file line:**
+    `<relative-path-from-artifact-root> <sha256-of-bytes> <octal-mode-low-9-bits>`.
+  - **Symlink line:**
+    `<relative-path-from-artifact-root> link:<rel-target> <octal-mode-low-9-bits>`.
+    `<rel-target>` is the symlink target as stored on disk; resolve it
+    relative to the artifact root and abort with
+    `reason: external-symlink` when the resolved path leaves the
+    artifact root.
   - Use `octal mode & 0o777`; do not include uid/gid/mtime.
-  - Symlinks: if pointing inside the artifact root, store the target
-    path as `link:<rel-target>`; if pointing outside, abort and record
-    `action: failed-verify` with `reason: external-symlink`.
 
 Pseudocode:
 
 ```text
 manifest_lines = []
-for each regular file under artifact_root, sorted (C locale):
+visited_inodes = set()
+for path in walk(artifact_root, followlinks=False, sorted_C_locale=True):
   rel = path.relative_to(artifact_root).as_posix()
   if rel matches skip-list: continue
-  manifest_lines.append(f"{rel} {sha256(file)} {oct(mode & 0o777)}")
+  st = path.lstat()
+  ino_key = (st.st_dev, st.st_ino)
+  if ino_key in visited_inodes: abort(reason="digest-loop")
+  visited_inodes.add(ino_key)
+  mode = oct(st.st_mode & 0o777)
+  if path.is_symlink():
+    target = readlink(path)
+    resolved = (path.parent / target).resolve()
+    if not resolved.is_relative_to(artifact_root): abort(reason="external-symlink")
+    rel_target = resolved.relative_to(artifact_root).as_posix()
+    manifest_lines.append(f"{rel} link:{rel_target} {mode}")
+  elif path.is_file():
+    manifest_lines.append(f"{rel} {sha256(path.read_bytes())} {mode}")
+  # directories contribute nothing themselves; their entries are walked
 digest = sha256("\n".join(manifest_lines).encode("utf-8"))
 ```
+
+### Backup directory naming
+
+The backup path is
+`.agents-system-setup/.bak/<ts>-<migration_id>/<source-rel>` where:
+
+- `<ts>` — filesystem-safe ISO-8601 UTC timestamp at second precision,
+  e.g. `2026-05-15T22-09-13Z` (colons replaced with `-`).
+- `<migration_id>` — short collision-resistant id; recommended
+  implementation is the first 8 characters of `base32(uuid4())` (lower
+  case, no padding), e.g. `bxa4zk6q`.
+- The leaf directory `<ts>-<migration_id>` is created exclusively (no
+  `-p` for the leaf — `mkdir` without parents-or-recreate). On
+  `EEXIST`, regenerate `<migration_id>` and retry up to three times
+  before aborting with `reason: backup-collision`. The intermediate
+  `.agents-system-setup/.bak/` directory is created with `-p` if
+  missing, since it is shared.
 
 ## Multi-runtime portability
 
