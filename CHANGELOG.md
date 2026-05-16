@@ -2,6 +2,28 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [1.2.0] - 2026-05-16
+
+### Added
+
+- **Purpose-first wizard (hard rule #32).** Phase 0 is restructured into three sub-steps: `0` captures the user's headline purpose first (with the explicit labeled choice `"I'm exploring — let recon lead"` normalized to the `"exploring"` sentinel), `1` detects footprint, `2` shows the profile card and asks mode. The directory no longer anchors the interview — user intent does.
+- **Purpose-aware cwd reconnaissance.** Phase 1 recon now scores signal groups against the captured `headline_purpose` and sorts the Reconnaissance Card by relevance (`high → med → low → n-a`). The card **never filters** — every non-empty group is still rendered, only ordering changes. Tokenization splits on whitespace, commas, `/`, and the conjunctions `and`/`or`/`&` so multi-purpose statements (`"build a payments API and a mobile client"`) keep their facets separable; per-group relevance is the **max across clauses**. Stopwords cover English + generic intent words (`build`, `create`, `make`, `setup`, `improve`, `audit`, `agent`, `agents`, `system`, `project`, `app`, `application`). Improve-mode caveat: purpose-relevance affects card ordering only; broad audit still covers all surfaces.
+- **Exploring fallback.** When `headline_purpose == "exploring"`, every group's relevance is `n-a`, the card renders in default order, and the orchestrator re-asks the purpose question **after** the user confirms the card.
+- **Q1 becomes confirm-or-revisit.** Interview Q1 no longer asks "what does this project do?" from scratch; it confirms the headline (`"Earlier you said: <headline>. Anything to add or correct?"`) or, for `exploring`, defers until after the card and re-asks.
+- **Output contract `Purpose:` line.** New `✅ Purpose: <headline | exploring>` line above the existing `Recon:` line.
+- **AGENTS.md template recon snapshot includes purpose.** `{{RECON_SNAPSHOT}}` first line is `- Purpose: <headline | exploring>` so future agent sessions inherit the captured intent.
+
+### Changed
+
+- **SKILL.md Phase 0 header** renamed from "Detect Footprint & Choose Mode" to "Capture Purpose, Detect Footprint, Choose Mode".
+- **Anti-pattern consolidations** to stay within the 500-line SKILL.md hard cap while adding hard rule #32 and the new "Running deep recon before knowing user purpose" anti-pattern: merged Codex/Gemini subagent-contract anti-patterns (one bullet); merged wrong-directory anti-patterns for operational logs vs runtime artifacts (one bullet); merged wrap-up hygiene trio (one bullet); merged cross-OS slips trio (one bullet); merged governance trio (one bullet); merged plan/MCP/approval-gate trio (one bullet); merged frontmatter-schema trio (one bullet); merged content-quality + artifact-tracking (one bullet). All requirements remain; only repetition was removed.
+
+### Validation
+
+- New validator function `check_purpose_before_footprint_in_phase_0()` enforces that the SKILL.md Phase 0 **body** (header excluded) has the purpose sub-step before the footprint sub-step, and that the canonical markers `Sub-step 0 — Capture headline purpose` and `Sub-step 1 — Detect footprint` are present and correctly ordered.
+- `check_cwd_reconnaissance_policy` gains `require_contains` markers for `Purpose-aware scoring`, `Scoring rubric`, `headline_purpose`, `purpose_relevance`, `Exploring fallback`, `exploring`, `Never filter`, `` `high` → `med` → `low` → `n-a` ``, `normalize`, and `Improve-mode caveat`. The SKILL.md, interview.md, and output-contract.md marker checks are also extended for the v1.2.0 wiring (`Capture Purpose`, `headline_purpose`, `purpose-aware`, `Capture headline purpose`, `Purpose:`).
+- All gates: `bash scripts/validate.sh` passes (1 informational SKILL.md size warning, expected `.ps1` LF/CRLF warnings); `npx markdownlint-cli2 "**/*.md" "!node_modules" "!.git"` clean; rubber-duck on `gpt-5.5` with both blocking findings closed.
+
 ## [1.1.1] - 2026-05-15
 
 ### Fixed

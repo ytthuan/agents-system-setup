@@ -55,6 +55,7 @@ This repo uses an **orchestrator + subagent** model. The orchestrator (`@orchest
 - **Overflow details:** {{DETAIL_REFERENCES}}
 - **Rule:** if a detail is moved out of this file, link it here so agents can find it.
 - **Project recon snapshot (if captured, ≤5 lines):** {{RECON_SNAPSHOT}}
+  <!-- First line MUST be "- Purpose: <headline | exploring>" so future agent runs inherit the captured intent. Remaining lines summarize the top recon signals (e.g. top frameworks, infra signals, data signals). -->
 
 ## Self-Update Preflight
 

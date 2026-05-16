@@ -49,6 +49,7 @@ Scaffold or update a complete agent system for the current project across **Copi
 29. **Main-to-subagent handoff is structured.** Use the [handoff contract](./references/handoff.md) and [prompt guidelines](./references/prompt-guidelines.md) to compose provider-native Task Assignments. Recommended-only for safe tiny work; full-form for normal, risky, multi-file, fan-out, MCP, release, replication, security, architecture, or generated-agent-system work. Pass a subtask slice, not full project memory.
 30. **Dedicated security teams are explicit.** Generate the [security team](./references/security-team.md) topology only when the user selects `Security team / Bug hunting`, asks for bug hunting/security analysis/disclosure triage, or the risk intake justifies it. Security discovery, validation, attack-path, triage, and compliance roles are read-mostly by default; remediation writes, external scanning, exploit execution, credential use, production testing, disclosure outreach, MCP/tool config, and destructive tests require explicit approval and owning-agent routing.
 31. **Operational state directory is artifact-free.** `.agents-system-setup/` holds operational state only (replication ledger, MCP approval evidence, learning ledger, `migration.jsonl`, `.bak` files). Never write `agents/`, `skills/`, `hooks/`, `commands/`, `prompts/`, or `plugins/` subtrees inside it; runtimes do not load them and existing misroutes go through [misplaced-artifacts-migration](./references/misplaced-artifacts-migration.md).
+32. **Capture user purpose before deep recon.** Phase 0 sub-step 0 asks the headline purpose first; Phase 1 recon then **scores and highlights** signals against that intent (never filters). Allow an explicit `"I'm exploring — let recon lead"` sentinel that defers the purpose ask until after the card. See [cwd-reconnaissance](./references/cwd-reconnaissance.md#purpose-aware-scoring).
 
 ## Procedure
 
@@ -70,12 +71,26 @@ Before footprint detection, run the safe preflight from
 Record `update_preflight_status`, source path/manager, and evidence for Phase 2
 and the final output contract.
 
-### Phase 0 — Detect Footprint & Choose Mode
+### Phase 0 — Capture Purpose, Detect Footprint, Choose Mode
 
-Inspect cwd before the first question. Detect the project and agent footprint
-from Phase 1, then show a compact profile card: detected project type, existing
-agent artifacts by runtime, recommended mode, and inferred current runtime(s).
-Ask mode before any runtime/platform expansion:
+**Sub-step 0 — Capture headline purpose first.** Before any directory
+scan or mode choice, ask the user's intent with the provider-native
+human-input tool:
+
+> "In one sentence, what are you trying to achieve with an agent system here?"
+> Freeform; offer `"I'm exploring — let recon lead"` as a labeled choice.
+
+Persist `headline_purpose: string | "exploring"`. This drives Phase 1
+purpose-aware recon scoring — see
+[cwd-reconnaissance](./references/cwd-reconnaissance.md#purpose-aware-scoring).
+When `exploring`, defer the purpose ask until after the recon card.
+
+**Sub-step 1 — Detect footprint.** Inspect cwd for project and agent
+artifacts per Phase 1 step 1; do not run deep recon yet.
+
+**Sub-step 2 — Show profile card and ask mode.** Display the captured
+`headline_purpose`, detected project type, existing agent artifacts by
+runtime, recommended mode, and inferred current runtime(s):
 
 > "I detected `<footprint>`. How should I proceed?"
 > Choices: `["Improve current setup (Recommended when artifacts exist)", "Init new setup", "Replicate / sync to another runtime", "Update managed blocks", "Cancel"]`
@@ -101,7 +116,7 @@ Gemini CLI emits local subagents at `.gemini/agents/*.md`. See [platforms](./ref
      - OpenCode: `opencode.json`, `.opencode/agents/`, `.opencode/skills/`
      - OpenAI Codex: `AGENTS.md` (orchestrator + project rules), `.codex/agents/*.toml` (specialized subagents), `.codex/config.toml`, `~/.codex/AGENTS.md`, `~/.codex/agents/`; CLI-only plugin/command UX stays documented separately
      - Gemini CLI: `GEMINI.md`, `.gemini/agents/*.md`, `.gemini/settings.json`, `~/.gemini/GEMINI.md`, `~/.gemini/agents/`
-   - **Project recon**: run the safe-readonly cwd reconnaissance from [cwd-reconnaissance](./references/cwd-reconnaissance.md), render the Reconnaissance Card, and `ask_user` to accept/correct/skip before continuing the interview. Privacy guardrails (no data file reads, magic-byte detection, secret redaction) are mandatory.
+   - **Project recon**: run the safe-readonly cwd reconnaissance from [cwd-reconnaissance](./references/cwd-reconnaissance.md) **using the Phase 0 `headline_purpose` for scoring**: signals are sorted `high → med → low → n-a` by `purpose_relevance` but never filtered. When `headline_purpose == "exploring"`, render in default order and re-ask the purpose question after card confirmation. Render the Reconnaissance Card and `ask_user` to accept/correct/skip. Privacy guardrails (no data file reads, magic-byte detection, secret redaction) are mandatory.
    - **Misplaced artifacts**: scan for `.agents-system-setup/{agents,skills,hooks,commands,prompts,plugins}/` and queue every match for the per-artifact prompt in [misplaced-artifacts-migration](./references/misplaced-artifacts-migration.md).
 2. **Confirm the Phase 0 mode** — do not re-ask target runtimes before the mode
    choice. Use this table only to pick the recommended mode/default choices shown
@@ -461,36 +476,23 @@ Skip the entire phase only when `mode == update` and no agents/plugins/MCP chang
 
 ## Anti-patterns
 
-- Writing files before showing the plan.
-- Writing MCP config without explicit `ask_user` approval.
-- Bulk-applying recommendations without per-item rationale + choice.
+- **Approval-gate skips.** Never write files before showing the plan; never write MCP config without explicit `ask_user` approval; never bulk-apply recommendations without per-item rationale + choice.
 - Mixing platform frontmatters (e.g., Copilot keys in a Claude agent file).
 - **Pairwise replication code** (Copilot→Claude function, Claude→OpenCode function, …) — always go through the [Canonical IR](./references/replication.md).
 - Replicating without re-triggering the MCP approval gate for the new target(s).
-- Symlinking `CLAUDE.md` on Windows (use the `.ps1` fallback-copy path).
-- Backslashes in generated Markdown paths — always forward slashes.
-- Skipping `.gitattributes` — Windows users get CRLF in `*.sh` and break execution.
+- **Cross-OS slips on generated files** — never symlink `CLAUDE.md` on Windows (use the `.ps1` fallback-copy path); always use forward slashes in generated Markdown paths; always bundle `.gitattributes` so `*.sh` files keep LF on Windows checkouts (CRLF breaks execution).
 - Single monolithic agent (violates orchestrator + subagent rule).
 - Overwriting existing `AGENTS.md` / `opencode.json` without `.bak`.
 - Generic descriptions ("helps with code") — kills discovery.
 - Inventing plugin/skill/MCP names. Always cite `[Tier · Vendor]` from [marketplaces](./references/marketplaces.md).
 - **Sequential-only orchestrator** — must fan out parallel-safe subagents (see [parallelism](./references/parallelism.md)).
-- **Mishandling Codex subagents.** Codex supports project-scoped subagents at `.codex/agents/<name>.toml` (per [openai docs](https://developers.openai.com/codex/subagents)) and surfaces them in both app and CLI; reserve `## <Name>` headings inside `AGENTS.md` for orchestrator + project rules. Every TOML file MUST have `name`, `description`, and `developer_instructions` — missing any = silent skip on load.
-- **Skipping Phase 8 wrap-up** — denies users the curated add-on menu (Spec-Kit, evals, telemetry, security review). See [wrap-up](./references/wrapup.md).
-- **Wrap-up as per-item round-robin** — must be a *single* multi-select prompt.
-- **Citing unofficial sources in the wrap-up menu** — only vendor-official docs or the catalogs listed in [wrap-up](./references/wrapup.md).
-- **Replication ledger as `.md` or inside any `agents/` directory.** The replication ledger and any other operational log MUST be written to `.agents-system-setup/replication.jsonl` (JSON Lines). A `.md` log inside `.claude/agents/` / `.codex/agents/` / `.opencode/agents/` / `.github/agents/` will be parsed as a malformed agent by the runtime loader. See [replication anti-patterns](./references/replication.md#5-anti-patterns).
-- **Writing runtime artifacts under `.agents-system-setup/`.** Any agent, skill, hook, command, prompt, or plugin manifest placed inside the operational state directory is silently inert; it is not loaded by any runtime. Use the per-platform paths from Phase 4 and migrate existing misroutes through [misplaced-artifacts-migration](./references/misplaced-artifacts-migration.md).
-- **Treating security or architecture as optional wrap-up only** — the governance baseline is part of planning and generation, not a postscript.
-- **Generating pattern names without rationale** — every architecture/design-pattern decision needs alternatives, guardrails, and an ADR reference or `n/a` rationale.
-- **Creating a security auditor with broad write access** — security review is read-mostly unless the plan grants tightly scoped remediation paths.
-- **Using verbosity as safety** — long repeated prompts do not make agents safer. Keep gates and ownership inline, link detail, and require evidence.
-- **Content-quality bloat or hidden overflow** — content-quality review must remove generic, unsupported, repetitive prose; do not paste long quality rules into every generated subagent, and any moved overflow detail must be linked from `AGENTS.md` or listed in the output contract.
-- **Assuming agent artifacts should be committed** — always ask tracking mode before writing project files.
-- **Using `.gitignore` for local-only project agents without approval** — local-only mode belongs in `.git/info/exclude`.
-- **Copying plan prompt frontmatter into agent files** — the VS Code `plan` prompt (`agent: Plan`) is an upstream planning surface, not a runtime agent schema. Normalize to HandoffIR, then emit per-platform formats.
-- **Misusing Gemini local-subagent contracts.** Gemini subagents cannot call other subagents — fan-out routes through the parent/orchestrator session. Local subagents must use loader-valid `mcp_servers:` (snake_case), not the docs-spelled `mcpServers`, and still pass the MCP approval gate.
-- **Putting human-input tools in the wrong schema** — no Copilot `ask_user` in custom-agent `tools:`, no literal OpenCode `permission.question`, no Codex TOML `request_user_input`, and no unsupported memory fields.
+- **Mishandling Codex/Gemini subagent contracts.** Codex subagents live at `.codex/agents/<name>.toml` and MUST have `name`, `description`, and `developer_instructions` (missing any = silent skip on load); reserve `## <Name>` headings in `AGENTS.md` for orchestrator + project rules. Gemini local subagents at `.gemini/agents/*.md` cannot recursively delegate (fan-out routes through the parent session) and must use loader-valid `mcp_servers:` (snake_case), not the docs-spelled `mcpServers`. Both still pass the MCP approval gate. See [openai docs](https://developers.openai.com/codex/subagents).
+- **Wrap-up hygiene failures.** Skipping Phase 8 denies users the curated add-on menu; the wrap-up must be a *single* multi-select prompt (not per-item round-robin); only cite vendor-official docs or the catalogs listed in [wrap-up](./references/wrapup.md).
+- **Wrong directory for operational logs / runtime artifacts.** Operational logs (replication, migration, MCP approval evidence) belong in `.agents-system-setup/*.jsonl` — never `.md` and never inside any `agents/` tree (the runtime loader parses them as malformed agents). Writing runtime artifacts under `.agents-system-setup/` (agents, skills, hooks, commands, prompts, plugins) is silently inert; use per-platform paths from Phase 4. See [replication](./references/replication.md#5-anti-patterns) and [misplaced-artifacts-migration](./references/misplaced-artifacts-migration.md).
+- **Running deep recon before knowing user purpose** — anchors the interview on what the directory looks like instead of what the user wants. Phase 0 sub-step 0 captures `headline_purpose` first; Phase 1 recon scores against that intent. See hard rule #32 and [cwd-reconnaissance](./references/cwd-reconnaissance.md#purpose-aware-scoring).
+- **Governance treated as optional.** Security/architecture baselines are part of planning and generation (not a wrap-up postscript); every architecture/design-pattern decision needs alternatives, guardrails, and an ADR reference (or `n/a` rationale); security review is read-mostly unless the plan grants tightly scoped remediation paths.
+- **Content-quality and artifact-tracking slips.** Content-quality review must remove generic/unsupported/repetitive prose, keep generated subagent prose lean (no long quality rules pasted everywhere), and link moved overflow detail from `AGENTS.md` or the output contract; always ask the tracking mode before writing project files; local-only project agents go in `.git/info/exclude`, never `.gitignore`.
+- **Frontmatter-schema confusion.** Don't copy VS Code `plan` prompt frontmatter (`agent: Plan`) into agent files — normalize to HandoffIR, then emit per-platform; don't put human-input tools in the wrong schema (no Copilot `ask_user` in custom-agent `tools:`, no literal OpenCode `permission.question`, no Codex TOML `request_user_input`, no unsupported memory fields).
 - **Silent self-updates that change config** — Phase -1 may fast-forward the skill checkout only; plugin/MCP/runtime config changes still need their normal approval gates.
 
 ## Output Contract
