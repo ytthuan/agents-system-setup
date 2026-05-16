@@ -2151,6 +2151,18 @@ def check_cwd_reconnaissance_policy() -> None:
             "privacy_redactions",
             "User confirmation prompt",
             "Skip recon",
+            # v1.2.0 purpose-first recon
+            "Purpose-aware scoring",
+            "Scoring rubric",
+            "headline_purpose",
+            "purpose_relevance",
+            "Exploring fallback",
+            "exploring",
+            # v1.2.0 safety-critical semantics (not just scaffolding)
+            "Never filter",
+            "`high` \u2192 `med` \u2192 `low` \u2192 `n-a`",
+            "normalize",
+            "Improve-mode caveat",
         ),
     )
     require_contains(
@@ -2160,6 +2172,10 @@ def check_cwd_reconnaissance_policy() -> None:
             "cwd-reconnaissance",
             "Reconnaissance Card",
             "Privacy guardrails",
+            # v1.2.0 purpose-first wiring in SKILL.md
+            "Capture Purpose",
+            "headline_purpose",
+            "purpose-aware",
         ),
     )
     require_contains(
@@ -2167,6 +2183,9 @@ def check_cwd_reconnaissance_policy() -> None:
         (
             "Recon pre-fill",
             "cwd reconnaissance card",
+            # v1.2.0 purpose-first interview wiring
+            "headline_purpose",
+            "Capture headline purpose",
         ),
     )
     require_contains(
@@ -2174,6 +2193,8 @@ def check_cwd_reconnaissance_policy() -> None:
         (
             "Recon:",
             "redactions=",
+            # v1.2.0 purpose line in contract
+            "Purpose:",
         ),
     )
     # Track regression-prevention for the specific secret-pattern names so
@@ -2191,6 +2212,76 @@ def check_cwd_reconnaissance_policy() -> None:
             "JWT triplet",
         ),
     )
+
+
+def check_purpose_before_footprint_in_phase_0() -> None:
+    """Assert that within Phase 0 of SKILL.md the headline purpose
+    sub-step appears before the footprint detection sub-step. The
+    section header itself ("Capture Purpose, Detect Footprint, Choose
+    Mode") lists both words for readability, so the header line is
+    excluded from the scan; only the body sub-steps are checked. This
+    guards hard rule #32 (purpose-first wizard, v1.2.0) against
+    accidental reordering during future edits.
+    """
+    skill_path = SKILL_ROOT / "SKILL.md"
+    if not skill_path.is_file():
+        err(f"{skill_path.relative_to(REPO).as_posix()}: SKILL.md is missing")
+        return
+    text = skill_path.read_text(encoding="utf-8")
+    lines = text.splitlines()
+    phase0_start = None
+    phase0_end = len(lines)
+    for idx, line in enumerate(lines):
+        if line.startswith("### Phase 0"):
+            phase0_start = idx
+        elif phase0_start is not None and line.startswith("### Phase "):
+            phase0_end = idx
+            break
+    if phase0_start is None:
+        err(f"{skill_path.relative_to(REPO).as_posix()}: missing '### Phase 0' section")
+        return
+    # Exclude the header line itself; only scan the body.
+    body_lines = lines[phase0_start + 1 : phase0_end]
+    body_lower = "\n".join(body_lines).lower()
+    purpose_at = body_lower.find("purpose")
+    footprint_at = body_lower.find("footprint")
+    if purpose_at == -1:
+        err(
+            f"{skill_path.relative_to(REPO).as_posix()}: Phase 0 body must mention 'purpose' "
+            "(hard rule #32 — purpose-first wizard)"
+        )
+        return
+    if footprint_at == -1:
+        warn(
+            f"{skill_path.relative_to(REPO).as_posix()}: Phase 0 body does not mention "
+            "'footprint'; verify the mode/detection step still exists"
+        )
+        return
+    if purpose_at >= footprint_at:
+        err(
+            f"{skill_path.relative_to(REPO).as_posix()}: Phase 0 body mentions 'footprint' "
+            "before 'purpose' (hard rule #32 requires purpose-first capture). "
+            "Move the headline_purpose ask above the footprint detection step."
+        )
+        return
+    # Additionally assert the exact sub-step ordering markers so the
+    # purpose-first sub-step cannot regress without tripping validation.
+    body_text = "\n".join(body_lines)
+    sub0_at = body_text.find("Sub-step 0 — Capture headline purpose")
+    sub1_at = body_text.find("Sub-step 1 — Detect footprint")
+    if sub0_at == -1 or sub1_at == -1:
+        err(
+            f"{skill_path.relative_to(REPO).as_posix()}: Phase 0 must keep the canonical "
+            "sub-step markers 'Sub-step 0 — Capture headline purpose' and "
+            "'Sub-step 1 — Detect footprint' (v1.2.0 hard rule #32)"
+        )
+        return
+    if sub0_at >= sub1_at:
+        err(
+            f"{skill_path.relative_to(REPO).as_posix()}: Phase 0 sub-step ordering is wrong; "
+            "'Sub-step 0 — Capture headline purpose' must precede "
+            "'Sub-step 1 — Detect footprint' (v1.2.0 hard rule #32)"
+        )
 
 
 def check_misplaced_artifacts_migration_policy() -> None:
@@ -3711,6 +3802,7 @@ def main() -> int:
     check_output_quality_policy()
     check_security_team_policy()
     check_cwd_reconnaissance_policy()
+    check_purpose_before_footprint_in_phase_0()
     check_misplaced_artifacts_migration_policy()
     check_mcp_approval_gate()
     check_central_mcp_approval_evidence()

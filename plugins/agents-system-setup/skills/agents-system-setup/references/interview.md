@@ -2,28 +2,56 @@
 
 Use the provider-native human-input tool for **every** question (Copilot CLI uses session `ask_user`; see [human input](./human-input.md)). One question per call. Multiple-choice when possible (the runtime adds a freeform option automatically — never include "Other" in choices).
 
-## 0. Opening prompt (detect first, then choose mode/platforms)
+## 0. Opening (purpose first, then mode/platforms)
 
-- Detect the current footprint before asking. Show a compact profile card:
-  detected project type, existing agent artifacts, recommended mode, and inferred
-  target runtime(s).
+### 0a. Capture headline purpose
+
+Before any directory scan or mode choice:
+
+- Q: "In one sentence, what are you trying to achieve with an agent system here?"
+- Freeform.
+- Offer the labeled alternative `"I'm exploring — let recon lead"` so
+  users without a clear intent can defer the purpose ask until after
+  the Phase 1 recon card has been rendered.
+- **Normalization rule:** record `headline_purpose = "exploring"`
+  **only** when the user selects that exact labeled choice. Vague
+  freeform answers (`"not sure"`, `"whatever"`, blank, short impatient
+  strings) are stored verbatim as weak headlines, not promoted to the
+  `exploring` sentinel.
+- Record `headline_purpose: string | "exploring"`. Phase 1 recon uses
+  this to score and rank signals — see
+  [cwd reconnaissance / Purpose-aware scoring](./cwd-reconnaissance.md#purpose-aware-scoring).
+
+### 0b. Detect footprint, then ask mode
+
+Show a compact profile card: detected project type, existing agent
+artifacts, the captured `headline_purpose`, recommended mode, and
+inferred target runtime(s).
+
 - Q: "I detected `<footprint>`. How should I proceed?"
 - Choices: `["Improve current setup (Recommended when artifacts exist)", "Init new setup", "Replicate / sync to another runtime", "Update managed blocks", "Cancel"]`
 - Then ask target runtimes only when the mode needs them:
   `["Copilot CLI only (Recommended for GitHub-centric teams)", "Claude Code only", "OpenCode only", "OpenAI Codex only (CLI + App artifacts)", "Gemini CLI only", "Copilot CLI + Claude Code", "All supported runtimes (Copilot + Claude Code + OpenCode + Codex + Gemini)"]`
 
-## 1. Purpose
-- Q: "In one sentence, what does this project do?"
-- Freeform.
-- **Recon pre-fill:** when the Phase 1 cwd reconnaissance card has a
-  `docs_signals.summary` or a strong `project_kind_signals` entry, render
-  the suggested purpose inline and let the user accept, edit, or replace.
+## 1. Purpose (confirm or revisit)
+
+- When `headline_purpose` is a real headline:
+  - Q: "Earlier you said: `<headline>`. Anything to add or correct?"
+  - Freeform. Accept blank to confirm.
+- When `headline_purpose == "exploring"`:
+  - Skip this question until after the Phase 1 cwd reconnaissance card
+    has been confirmed, then re-ask the original Q0a as a fresh
+    purpose ask: "Now that you've seen the project, what are you
+    trying to achieve?"
+- **Recon pre-fill / enrichment:** the Phase 1 cwd reconnaissance card
+  may surface a `docs_signals.summary` the user can incorporate; never
+  auto-replace the confirmed headline.
 
 ## 2. Mode follow-up
-- Q0 is the mode decision. Do not ask a second mode question during the normal
+- Q0b is the mode decision. Do not ask a second mode question during the normal
   flow.
 - Re-prompt only when detection or the initial answer is ambiguous, using the
-  full Q0 choice set:
+  full Q0b choice set:
   `["Improve current setup (Recommended when artifacts exist)", "Init new setup", "Replicate / sync to another runtime", "Update managed blocks", "Cancel"]`
 - Never offer overwrite. If the user wants a fresh setup near existing
   artifacts, treat it as additive init or route through update/improve.

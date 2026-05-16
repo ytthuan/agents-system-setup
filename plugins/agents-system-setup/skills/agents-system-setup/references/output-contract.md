@@ -5,6 +5,7 @@ Use this contract at the end of `init`, `update`, `improve`, and `replicate` flo
 ```text
 ✅ Mode/platforms: <mode> · <selected platforms only>
 ✅ Footprint: <pre-existing artifacts summary>
+✅ Purpose: <headline | exploring>
 ✅ Recon: <signals|n/a|skipped>; redactions=<count|none>
 ✅ Path migration: <none|moved=N copied=N skipped=N manual=N failed=N>
 ✅ Files: created=<n>, updated=<n with .bak>, platform breakdown=<compact>
