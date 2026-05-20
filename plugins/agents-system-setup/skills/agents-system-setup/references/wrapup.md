@@ -39,7 +39,7 @@ Every item below cites a vendor-official doc or a well-known curated catalog. Up
 
 5. **OpenTelemetry GenAI semantic conventions** — vendor-neutral tracing schema for LLM calls.
    - Source: <https://opentelemetry.io/docs/specs/semconv/gen-ai/>
-   - Action: add a `## Telemetry` section to `AGENTS.md` listing the env vars and span attributes the orchestrator/subagents should emit.
+   - Action: add a `## Telemetry` section to `AGENTS.md` listing the env vars and span attributes the host orchestrator and subagents should emit.
 6. **Claude Code hooks** — pre/post-tool hooks for logging, redaction, policy.
    - Source: <https://docs.claude.com/en/docs/claude-code/hooks>
    - Action (Claude target only): scaffold `.claude/hooks/README.md` with a no-op `PreToolUse` example.

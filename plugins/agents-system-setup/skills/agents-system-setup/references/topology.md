@@ -1,6 +1,8 @@
 # Subagent Topology Guide
 
-The orchestrator is **always** present. Subagent count scales with project scope (3 minimum, no fixed maximum — small projects ~3, large monorepos may legitimately need 20+).
+> **The orchestrator is the host CLI session reading `AGENTS.md`**, not a subagent file. `@orchestrator` is a routing alias for that host/root session (Copilot CLI / Claude Code / OpenCode / Codex / Gemini). No runtime emits a separate `orchestrator.agent.md`, `.claude/agents/orchestrator.md`, `.opencode/agents/orchestrator.md`, `.codex/agents/orchestrator.toml`, or `.gemini/agents/orchestrator.md`. Subagent files in the table below are for **specialized roles only**; orchestration responsibilities (planning, delegation, integration, approval gates) live in `AGENTS.md` › Orchestration Operating Model.
+
+Subagent count scales with project scope (3 minimum, no fixed maximum — small projects ~3, large monorepos may legitimately need 20+). The host orchestrator is always present (it is the host session); subagent file counts do not include it.
 
 ## Universal Subagents (consider for every project)
 
@@ -145,14 +147,14 @@ For every chosen subagent, derive a row in AGENTS.md › Directory Architecture:
 |---|---|---|---|
 | (from subagent's "Owned paths") | (subagent's responsibility) | `@<subagent-name>` | `owned` (or `additive-only` for docs/tests) |
 
-Add **always-present** rows regardless of project type:
+Add **always-present** rows regardless of project type. `@orchestrator` is the host CLI session reading `AGENTS.md` (no subagent file emitted); the remaining owners are real subagents.
 
 | Path glob | Purpose | Owner | Edit rule |
 |---|---|---|---|
-| `AGENTS.md`, `CLAUDE.md` | Agent project memory | `@orchestrator` | `owned` |
-| `.github/agents/**`, `.claude/agents/**`, `.opencode/agents/**`, `.codex/agents/**` | Agent definitions | `@orchestrator` | `owned` |
-| `.github/skills/**`, `.claude/skills/**`, `.opencode/skills/**` | Skill packages | `@orchestrator` | `additive-only` |
-| `.mcp.json`, `opencode.json` | MCP / runtime config | `@orchestrator` | `owned` (gated by approval) |
+| `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` | Agent project memory (host orchestrator + pointer files) | `@orchestrator` (host session) | `owned` |
+| `.github/agents/**`, `.claude/agents/**`, `.opencode/agents/**`, `.codex/agents/**`, `.gemini/agents/**` | Specialized subagent definitions (never an orchestrator file) | `@orchestrator` (host session) | `owned` |
+| `.github/skills/**`, `.claude/skills/**`, `.opencode/skills/**`, `.gemini/skills/**` | Skill packages | `@orchestrator` (host session) | `additive-only` |
+| `.mcp.json`, `opencode.json` | MCP / runtime config (incl. OpenCode root-session `permission.task` gate) | `@orchestrator` (host session) | `owned` (gated by approval) |
 | `.env*`, secret/config files | Secrets and local config | `@security-auditor` | `read-only` |
 | `docs/security/**`, `security-reports/**` | Security team findings, threat models, and approved audit artifacts | `@security-lead` / `@security-auditor` | `additive-only` unless the plan grants update ownership |
 | CI/release config (`.github/workflows/**`, release scripts) | Supply-chain and release controls | `@release-publisher` + `@security-auditor` | `shared` |

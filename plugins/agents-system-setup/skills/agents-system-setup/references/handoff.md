@@ -1,6 +1,6 @@
 # Plan Handoff Contract
 
-Use this contract whenever upstream planning output is handed to the generated orchestrator or subagents. It hardens handoff from planning surfaces into runtime-correct agent artifacts.
+Use this contract whenever upstream planning output is handed to the host orchestrator (the CLI session) or subagents. It hardens handoff from planning surfaces into runtime-correct agent artifacts.
 
 This contract is also the **Task Assignment / Prompt Contract** for
 orchestrator-to-subagent delegation. The machine-readable schema lives here; the
@@ -95,11 +95,11 @@ actions, learning overwrites, or security-sensitive changes.
 
 | Runtime | Where the handoff lives | Format rule |
 |---|---|---|
-| Copilot CLI | Markdown body in `.github/agents/<name>.agent.md` | YAML frontmatter must use `name`, `description`, optional `tools`, and optional `mcp-servers`; handoff fields stay in body sections. |
-| Claude Code | Markdown body in `.claude/agents/<name>.md` | YAML frontmatter must use Claude fields such as `name`, `description`, and comma-string `tools`; do not copy Copilot tool lists. |
-| OpenCode | Markdown body in `.opencode/agents/<name>.md` | Frontmatter has no `name`; filename is the agent name. Use `description`, `mode`, and `permission`; MCP stays in `opencode.json`. |
-| OpenAI Codex (CLI + App) | `developer_instructions` in `.codex/agents/<name>.toml`; orchestrator summary in `AGENTS.md` | TOML must include `name`, `description`, and `developer_instructions`. Specialized subagents are not Markdown headings in `AGENTS.md`. CLI-only instructions such as `/agent` are usage notes, not required App behavior. |
-| Gemini CLI | Markdown body in `.gemini/agents/<name>.md`; root-session summary in `GEMINI.md` pointing to `AGENTS.md` | YAML frontmatter must use `name`, `description`, optional `kind: local`, and snake_case `mcp_servers`. Handoff text tells subagents to return cross-agent work to the root session because Gemini subagents cannot recursively call subagents. |
+| Copilot CLI | **Orchestrator role: `AGENTS.md` › Orchestration Operating Model** (host CLI session). Specialized subagents: Markdown body in `.github/agents/<name>.agent.md` | Subagent YAML frontmatter must use `name`, `description`, optional `tools`, and optional `mcp-servers`; handoff fields stay in body sections. No `orchestrator.agent.md` file is emitted. |
+| Claude Code | **Orchestrator role: `AGENTS.md` › Orchestration Operating Model** (host Claude Code session via `CLAUDE.md` pointer). Specialized subagents: Markdown body in `.claude/agents/<name>.md` | Subagent YAML frontmatter must use Claude fields such as `name`, `description`, and comma-string `tools`; do not copy Copilot tool lists. No `.claude/agents/orchestrator.md` file is emitted. |
+| OpenCode | **Orchestrator role: `AGENTS.md` › Orchestration Operating Model** (host OpenCode root session, native `AGENTS.md` reader). Specialized subagents: Markdown body in `.opencode/agents/<name>.md` | Subagent frontmatter has no `name`; filename is the agent name. Use `description`, `mode: subagent`, and `permission`; MCP and the root-session `permission.task` subagent-gating stay in `opencode.json`. No `.opencode/agents/orchestrator.md` file is emitted. |
+| OpenAI Codex (CLI + App) | **Orchestrator role: `AGENTS.md` › Orchestration Operating Model** (host Codex session, native `AGENTS.md` reader). Specialized subagents: `developer_instructions` in `.codex/agents/<name>.toml` | TOML must include `name`, `description`, and `developer_instructions`. Specialized subagents are not Markdown headings in `AGENTS.md`. CLI-only instructions such as `/agent` are usage notes, not required App behavior. No `.codex/agents/orchestrator.toml` is emitted (Codex has always followed this pattern). |
+| Gemini CLI | **Orchestrator role: `AGENTS.md` › Orchestration Operating Model** (host Gemini session via `GEMINI.md` pointer). Specialized subagents: Markdown body in `.gemini/agents/<name>.md` | Subagent YAML frontmatter must use `name`, `description`, optional `kind: local`, and snake_case `mcp_servers`. Handoff text tells subagents to return cross-agent work to the host root session because Gemini subagents cannot recursively call subagents. No `.gemini/agents/orchestrator.md` file is emitted. |
 
 Skills are portable `SKILL.md` files; if a skill consumes handoff data, describe the HandoffIR fields in the skill body rather than inventing runtime-specific frontmatter.
 
@@ -119,7 +119,7 @@ another provider's frontmatter or TOML.
 
 ## Delegation packet (canonical schema)
 
-The orchestrator passes subagents a **Task Assignment**. Renderers fill the same fields in the same order. **This section is the single source of truth** — `references/context-optimization.md` and every orchestrator template must reference it instead of redefining it. The packet has two layers: a Required Minimum (always sent) and Expansion Blocks (sent when applicable).
+The host orchestrator passes subagents a **Task Assignment**. Renderers fill the same fields in the same order. **This section is the single source of truth** — `references/context-optimization.md` and every host-orchestrator section in `AGENTS.md` must reference it instead of redefining it. The packet has two layers: a Required Minimum (always sent) and Expansion Blocks (sent when applicable).
 
 ### Required minimum
 
@@ -151,7 +151,7 @@ recommendation, or output-contract prose. It is strongly recommended but not
 part of the required minimum for backward compatibility.
 
 Add `Task assignment quality: <ok | warn | fail; form=<short|full>; missing=<fields|none>; questions=<count>>`
-after `Content quality` when a generated orchestrator delegates to a subagent.
+after `Content quality` when the host orchestrator delegates to a subagent.
 It is recommended by default and required in generated reporting templates, but
 is not part of the twelve required-minimum fields for backward compatibility.
 
@@ -357,7 +357,7 @@ Before declaring done:
 6. For Codex, confirm shared artifacts (`AGENTS.md`, `.codex/agents/*.toml`, `.codex/config.toml`) do not require CLI-only commands to work in the App.
 7. For Gemini, confirm `GEMINI.md` points to canonical `AGENTS.md` and `.gemini/agents/*.md` subagents use loader-valid frontmatter.
 8. Confirm generated agent-system prose reports `Content quality` status/signals or `n/a`.
-9. Confirm generated orchestrators and subagents report `Task assignment quality` and preserve the recommended short-form/full-form semantics.
+9. Confirm the host orchestrator section and generated subagents report `Task assignment quality` and preserve the recommended short-form/full-form semantics.
 
 ## Anti-patterns
 

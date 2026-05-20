@@ -12,7 +12,7 @@ A multi-runtime plugin/skill package that **bootstraps**, **updates**, **improve
 ## What it generates
 
 - `AGENTS.md` at repo root with a **Read First** section, **Context Loading Policy**, **Directory Architecture**, **Agent Roster (with parallel-safety waves)**, **Capability Matrix**, **Security & Audit Matrix**, **Threat Model**, **Architecture / Design Pattern Decisions**, **ADR Index**, and **Quality Gates**.
-- **Orchestrator + N subagents** (3–50, sized to scope) emitted in the right format for every selected runtime, with a **fan-out clause** so parallel-safe subagents always run in one wave.
+- **Host-session Orchestration Operating Model + N specialized subagents** — the host CLI session (Copilot CLI, Claude Code, OpenCode, Codex CLI, Gemini CLI) reads the new `## Orchestration Operating Model` section in `AGENTS.md` and adopts the orchestrator role directly. No runtime emits an `orchestrator.agent.md` / `.claude/agents/orchestrator.md` / `.opencode/agents/orchestrator.md` / `.codex/agents/orchestrator.toml` / `.gemini/agents/orchestrator.md` subagent file. Specialized subagents (3–50, sized to scope) are emitted in each runtime's native format with a **fan-out clause** so parallel-safe subagents always run in one wave. `@orchestrator` remains a routing alias for the host session.
 - A **Plan Handoff Contract** that normalizes VS Code Plan agent output, Spec-Kit `/plan`, or user-written plans before emitting runtime-correct Copilot, Claude Code, OpenCode, Codex, or Gemini CLI artifacts.
 - **`AGENT-TEAMS.md`** for Claude Code projects when the roster benefits from peer-to-peer teammates (3+ independent concerns).
 - Project-scoped **skills** under each runtime's conventional path.
@@ -25,7 +25,7 @@ A multi-runtime plugin/skill package that **bootstraps**, **updates**, **improve
 - **Runtime update audit** — latest upstream drift is tracked in `plugins/agents-system-setup/skills/agents-system-setup/references/runtime-updates.md` for all supported runtimes and future candidates.
 - **Optional model overrides with rate-limit guidance** — model selection stays optional during the interview; per-runtime accepted formats, defaults, and source-linked rate-limit pointers live in `plugins/agents-system-setup/skills/agents-system-setup/references/models.md`.
 - **Sharper context engine** — generated `AGENTS.md` includes a Task-Type Routing Map, a context-freshness rule, and a single canonical Delegation Packet schema in `references/handoff.md` so subagents skip duplicated reads and load only what each task tag needs.
-- **Richer task assignments** — orchestrator → subagent handoffs use a canonical Task Assignment Contract with required minimum + opt-in expansion blocks (Goal & Definition of Done, Scope, File Inventory, Background, Reproduction, Constraints, Assumptions, Known Risks, Verification Protocol, Reporting Protocol, Coordination, Size & Timebox, Clarification Protocol). Subagent templates ship with an Acceptance Checklist and Reporting Template so handoffs are well-structured by default.
+- **Richer task assignments** — host-orchestrator → subagent handoffs use a canonical Task Assignment Contract with required minimum + opt-in expansion blocks (Goal & Definition of Done, Scope, File Inventory, Background, Reproduction, Constraints, Assumptions, Known Risks, Verification Protocol, Reporting Protocol, Coordination, Size & Timebox, Clarification Protocol). Subagent templates ship with an Acceptance Checklist and Reporting Template so handoffs are well-structured by default.
 - **Gemini CLI artifact support** — generated Gemini subagents use `.gemini/agents/*.md` or Gemini extension `agents/*.md`; no Gemini plugin install command is claimed.
 - Cross-OS scripts (`.sh` + `.ps1`), `.gitattributes` for line-ending safety.
 
@@ -50,7 +50,7 @@ copilot
 > /agents-system-setup
 ```
 
-Reads the root `plugin.json` and exposes the bundled skill as `/agents-system-setup`. Generated Copilot CLI agents apply a [Standard Tool Profile](./plugins/agents-system-setup/skills/agents-system-setup/references/platforms.md#copilot-cli-standard-tool-profiles) by default — `tools: [vscode, execute, read, agent, edit, search, todo]` for the orchestrator and edit-capable subagents, narrows to `[read, search]` for reviewers/auditors, and offers `runner` / `research` / `inherit` variants via interview Q9c.
+Reads the root `plugin.json` and exposes the bundled skill as `/agents-system-setup`. Generated Copilot CLI specialized subagents apply a [Standard Tool Profile](./plugins/agents-system-setup/skills/agents-system-setup/references/platforms.md#copilot-cli-standard-tool-profiles) by default — `tools: [vscode, execute, read, agent, edit, search, todo]` for edit-capable subagents, narrows to `[read, search]` for reviewers/auditors, and offers `runner` / `research` / `inherit` variants via interview Q9c. The orchestrator role lives in `AGENTS.md` (read by the host Copilot CLI session); no orchestrator subagent file is emitted.
 
 ### Claude Code
 
@@ -76,7 +76,7 @@ Reads `.codex-plugin/plugin.json` and the marketplace descriptor at `.agents/plu
 
 After installing via `/plugins`, invoke the bundled skill with `$agents-system-setup` in the Codex CLI prompt, or use `/skills` to list and select skills interactively.
 
-Generated Codex project artifacts are compatible with **OpenAI Codex CLI + App** surfaces that load repo artifacts: `AGENTS.md` contains project/orchestrator memory, `.codex/agents/*.toml` contains specialized subagents, and `.codex/config.toml` contains `[agents]` defaults. Plugin marketplace install and slash-command examples above are CLI-only; generated repo artifacts remain compatible with both CLI and App.
+Generated Codex project artifacts are compatible with **OpenAI Codex CLI + App** surfaces that load repo artifacts: `AGENTS.md` contains project memory plus the host-session **Orchestration Operating Model** (orchestrator role), `.codex/agents/*.toml` contains specialized subagents, and `.codex/config.toml` contains `[agents]` defaults. Plugin marketplace install and slash-command examples above are CLI-only; generated repo artifacts remain compatible with both CLI and App. No `.codex/agents/orchestrator.toml` is emitted (Codex has always followed this pattern; v1.3.0 normalizes Copilot/Claude/OpenCode/Gemini to it).
 
 ### OpenCode
 
@@ -144,7 +144,7 @@ exceptions so large rosters do not trigger one prompt per agent.
 
 ## Parallel subagents & Claude Code agent teams
 
-The generated orchestrator always fans out **parallel-safe subagents** in one wave (multiple `Task` calls in a single response), then awaits before the next wave. Parallel-safety is computed automatically from the Directory Architecture — see [parallelism reference](./plugins/agents-system-setup/skills/agents-system-setup/references/parallelism.md).
+The host CLI session orchestrator always fans out **parallel-safe subagents** in one wave (multiple `Task` calls in a single response), then awaits before the next wave. Parallel-safety is computed automatically from the Directory Architecture — see [parallelism reference](./plugins/agents-system-setup/skills/agents-system-setup/references/parallelism.md).
 
 For Claude Code, when 3+ subagents are independent and would benefit from peer-to-peer challenge, the generator additionally emits `AGENT-TEAMS.md` with the opt-in env var (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), settings snippet, suggested teammate roster, and a token-cost warning. Source: <https://docs.anthropic.com/en/docs/claude-code/agent-teams>.
 

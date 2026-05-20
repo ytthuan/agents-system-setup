@@ -110,15 +110,17 @@ enabled: true
 | `plugin_component_refs` | plugin skills/hooks/MCP/LSP refs ✅ | plugin skills/hooks refs, but plugin-shipped agents cannot rely on `hooks`, `mcpServers`, or `permissionMode` ⚠️ | OpenCode hooks/MCP refs via config ⚠️ | `.codex-plugin/plugin.json` `skills`, `mcpServers`, `apps`, assets ✅ | Gemini extension refs for MCP, commands, context, hooks, skills, subagents ⚠️ |
 | `surface_lossiness` | body/output contract ✅ | body/output contract ✅ | body/output contract ✅ | required for CLI-only vs App-visible behavior ✅ | required for non-recursive delegation, remote A2A import-only, and docs/schema `mcpServers`→`mcp_servers` normalization ✅ |
 | `scope: user` | `~/.copilot/agents/` | `~/.claude/agents/` | `~/.config/opencode/agents/` | `~/.codex/agents/<name>.toml` | `~/.gemini/agents/<name>.md` |
-| `scope: project` | `.github/agents/<name>.agent.md` | `.claude/agents/<name>.md` | `.opencode/agents/<name>.md` | `.codex/agents/<name>.toml` (orchestrator stays in `AGENTS.md`) | `.gemini/agents/<name>.md` |
+| `scope: project` | `.github/agents/<name>.agent.md` | `.claude/agents/<name>.md` | `.opencode/agents/<name>.md` | `.codex/agents/<name>.toml` (orchestrator role stays in `AGENTS.md`) | `.gemini/agents/<name>.md` (orchestrator role stays in `AGENTS.md`/`GEMINI.md`) |
 | `nicknames` | n/a — drop ❌ | n/a — drop ❌ | n/a — drop ❌ | TOML `nickname_candidates = ["Atlas", "Delta"]` ✅ (Codex-only IR field; presentation in CLI + App activity views) | map one display value to `display_name` ⚠️ |
 | `security_controls`, `audit_requirements`, `architecture_decisions`, `quality_gates`, `sensitive_paths` | body + `AGENTS.md` managed governance sections ✅ | body + `AGENTS.md` / `CLAUDE.md` memory ✅ | body + `AGENTS.md` / `opencode.json` notes ✅ | TOML `developer_instructions` + `AGENTS.md` managed governance sections ✅ | body + `GEMINI.md`/`AGENTS.md` governance summary ✅ |
 
 > Replication preserves explicit `model:` overrides only. When the source agent left `model:` blank, emit `model: inherit` (or omit it where the target runtime treats absence as inherit). Never invent ids — see [models](./models.md) for accepted formats per target.
 >
+> **Orchestrator role is RootRoleIR, not AgentIR.** When parsing a source runtime, any agent named `orchestrator` (or any file whose role is "host coordinator / planner / delegator with no owned implementation paths") is classified as `RootRoleIR` rather than `AgentIR`. Its content is merged into the target's `AGENTS.md` › Orchestration Operating Model — never emitted as a subagent file in the target. Runtime-specific frontmatter (e.g. OpenCode `mode: primary`, OpenCode `permission.task` block, Copilot `tools:` profile, Claude `tools:` comma-string) is dropped with a lossiness entry; the `permission.task` rules migrate to `opencode.json` for OpenCode targets. Verify round-trip by checking that no target emits a `*/orchestrator.*` agent file.
+>
 > **Task Assignment preservation:** replication preserves the full Task Assignment Contract structure ([handoff.md](./handoff.md#delegation-packet-canonical-schema)). Required-minimum fields are 1:1 across runtimes; expansion blocks (Goal & Definition of Done, Scope, Context Packet, Allowed Capabilities, Skills Referenced, Instructions / Workflow, Verification Protocol, Reporting Protocol, Stop / Escalation Conditions, etc.) must be carried into the target agent body. Codex TOML keeps the structure inside `developer_instructions`; never silently drop expansion blocks during replication. Surface any drop in the lossiness report and preserve the `Task assignment quality` reporting marker.
 >
-> **Memory & Learning preservation:** replication preserves the runtime-neutral Memory & Learning System ([learning-memory.md](./learning-memory.md)). Target runtimes may render the Learning Check in Markdown body or TOML `developer_instructions`, but they must keep the same storage profile, memory owner, no-secrets rule, and update policy: overwrite requires orchestrator approval.
+> **Memory & Learning preservation:** replication preserves the runtime-neutral Memory & Learning System ([learning-memory.md](./learning-memory.md)). Target runtimes may render the Learning Check in Markdown body or TOML `developer_instructions`, but they must keep the same storage profile, memory owner, no-secrets rule, and update policy: overwrite requires host-orchestrator approval (formerly "overwrite requires orchestrator approval" — same gate, the host CLI session is now the explicit orchestrator).
 
 ### Tool-name canonicalization
 
@@ -147,7 +149,7 @@ When emitting Copilot CLI from IR:
 
 ### Codex CLI + App compatibility rule
 
-When Codex is a target, replication emits shared Codex artifacts, not CLI-only behavior: `AGENTS.md` for project/orchestrator memory, `.codex/agents/<name>.toml` for specialized custom agents, and `.codex/config.toml` for `[agents]` defaults. CLI commands such as `/agent`, `/plugins`, and `codex exec` may appear in "Try it" notes, but the replicated TOML must work without relying on those commands as required App behavior.
+When Codex is a target, replication emits shared Codex artifacts, not CLI-only behavior: `AGENTS.md` for project memory and the host **Orchestration Operating Model** (orchestrator role), `.codex/agents/<name>.toml` for specialized custom agents, and `.codex/config.toml` for `[agents]` defaults. **Never emit `.codex/agents/orchestrator.toml`** — the orchestrator role is the host Codex session reading `AGENTS.md`. CLI commands such as `/agent`, `/plugins`, and `codex exec` may appear in "Try it" notes, but the replicated TOML must work without relying on those commands as required App behavior.
 
 ### Gemini CLI support rule
 
