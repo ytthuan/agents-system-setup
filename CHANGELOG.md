@@ -40,14 +40,6 @@ All notable changes to this plugin are documented here. Format: [Keep a Changelo
 - **Breaking behavior change for existing setups that emit `orchestrator.*.md`**: `improve` mode detects the file and presents the four migration choices above. The default is `Back up and delete` for unmodified files, `Back up + report custom additions for manual review` for files with custom content. Existing automation that invokes `@orchestrator` as a callable subagent (e.g., Claude `Agent(name="orchestrator")`) should be repointed to a specialized subagent role (or to the host session itself, since the host fulfills the orchestrator role naturally). `@orchestrator` remains a logical routing alias.
 - **OpenCode users**: the `permission.task` subagent-gating moves from `.opencode/agents/orchestrator.md` to `opencode.json` › `agent.<root>.permission.task`. The migration parses your existing block, preserves your specific allows/asks/entries, and renders the proposed snippet for review under a separate config approval gate. Decline the gate to record `opencode_task_gate: declined` and continue without permission-constrained fan-out.
 
-### Changed
-
-- _TBD_
-
-### Fixed
-
-- _TBD_
-
 ## [1.2.0] - 2026-05-16
 
 ### Added
