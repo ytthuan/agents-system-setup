@@ -1113,7 +1113,6 @@ def check_human_input_protocol() -> None:
         SKILL_ROOT / "references" / "replication.md",
         SKILL_ROOT / "references" / "interview.md",
         SKILL_ROOT / "references" / "runtime-updates.md",
-        SKILL_ROOT / "assets" / "orchestrator.agent.md.template",
         SKILL_ROOT / "assets" / "subagent.agent.md.template",
     ]
     for path, rel, line_no, line, _ in _iter_policy_lines(copilot_paths):
@@ -1136,7 +1135,6 @@ def check_human_input_protocol() -> None:
         SKILL_ROOT / "references" / "platforms.md",
         SKILL_ROOT / "references" / "agent-format.md",
         SKILL_ROOT / "references" / "runtime-updates.md",
-        SKILL_ROOT / "assets" / "orchestrator.claude.md.template",
         SKILL_ROOT / "assets" / "subagent.claude.md.template",
     ]
     _require_aggregate_marker("Claude human-input tooling", _aggregate_policy_text(claude_paths), "AskUserQuestion")
@@ -1171,7 +1169,6 @@ def check_human_input_protocol() -> None:
         SKILL_ROOT / "references" / "platforms.md",
         SKILL_ROOT / "references" / "agent-format.md",
         SKILL_ROOT / "references" / "runtime-updates.md",
-        SKILL_ROOT / "assets" / "orchestrator.opencode.md.template",
         SKILL_ROOT / "assets" / "subagent.opencode.md.template",
     ]
     for path, rel, line_no, line, in_fence in _iter_policy_lines(opencode_paths):
@@ -1297,7 +1294,6 @@ def check_governance_baseline() -> None:
     required_files = [
         SKILL_ROOT / "references" / "security-audit-architecture.md",
         SKILL_ROOT / "assets" / "AGENTS.md.template",
-        SKILL_ROOT / "assets" / "orchestrator.agent.md.template",
         SKILL_ROOT / "assets" / "subagent.agent.md.template",
         SKILL_ROOT / "assets" / "subagent.codex.toml.template",
     ]
@@ -1335,11 +1331,7 @@ def check_governance_baseline() -> None:
             "## ADR Index",
             "## Quality Gates",
             "{{SECURITY_AUDIT_MATRIX_ROWS}}",
-        ),
-    )
-    require_contains(
-        SKILL_ROOT / "assets" / "orchestrator.agent.md.template",
-        (
+            "## Orchestration Operating Model",
             "Security & Audit Matrix",
             "Threat Model",
             "Architecture & Design Pattern Decisions",
@@ -1488,25 +1480,11 @@ def check_mcp_approval_gate() -> None:
         ),
     )
     require_contains(
-        SKILL_ROOT / "assets" / "orchestrator.agent.md.template",
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
         (
             ".mcp.json",
-            "Route security-sensitive work",
-        ),
-    )
-    require_contains(
-        SKILL_ROOT / "assets" / "orchestrator.claude.md.template",
-        (
-            ".mcp.json",
-            "Route security-sensitive work",
-        ),
-    )
-    require_contains(
-        SKILL_ROOT / "assets" / "orchestrator.opencode.md.template",
-        (
             "opencode.json",
             "Route security-sensitive work",
-            "{{OPTIONAL_PERMISSION_TASK_BLOCK}}",
         ),
     )
     for rel in (
@@ -1757,21 +1735,16 @@ def check_requirements_triage_policy() -> None:
             "short-form intake brief",
         ),
     )
-    for rel in (
-        "orchestrator.agent.md.template",
-        "orchestrator.claude.md.template",
-        "orchestrator.opencode.md.template",
-    ):
-        require_contains(
-            SKILL_ROOT / "assets" / rel,
-            (
-                "Requirements Triage",
-                "@requirements-triage",
-                "triage: skipped",
-                "read-mostly and advisory",
-                "I own final decisions and approval gates",
-            ),
-        )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "Requirements Triage",
+            "@requirements-triage",
+            "triage: skipped",
+            "read-mostly and advisory",
+            "I own final decisions and approval gates",
+        ),
+    )
 
     topology = (SKILL_ROOT / "references" / "topology.md").read_text(encoding="utf-8")
     triage_lines = [line for line in topology.splitlines() if "requirements-triage" in line]
@@ -1850,21 +1823,16 @@ def check_output_quality_policy() -> None:
             "Before final output when generated agent-system prose changes",
         ),
     )
-    for rel in (
-        "orchestrator.agent.md.template",
-        "orchestrator.claude.md.template",
-        "orchestrator.opencode.md.template",
-    ):
-        require_contains(
-            SKILL_ROOT / "assets" / rel,
-            (
-                "Content Quality Review",
-                "@agent-quality-curator",
-                "Content quality: ok|warn|fail|n/a",
-                "read-only and advisory",
-                "I own final decisions and approval gates",
-            ),
-        )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "Content Quality Review",
+            "@agent-quality-curator",
+            "Content quality: ok|warn|fail|n/a",
+            "read-only and advisory",
+            "I own final decisions and approval gates",
+        ),
+    )
     for rel in (
         "subagent.agent.md.template",
         "subagent.claude.md.template",
@@ -2079,21 +2047,16 @@ def check_security_team_policy() -> None:
             "Security analysis",
         ),
     )
-    for rel in (
-        "orchestrator.agent.md.template",
-        "orchestrator.claude.md.template",
-        "orchestrator.opencode.md.template",
-    ):
-        require_contains(
-            SKILL_ROOT / "assets" / rel,
-            (
-                "Security Team Scope",
-                "Security Team Operating Model",
-                "authorization scope",
-                "proof gaps",
-                "read-mostly",
-            ),
-        )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "Security Team Scope",
+            "Security Team Operating Model",
+            "authorization scope",
+            "proof gaps",
+            "read-mostly",
+        ),
+    )
     for rel in (
         "subagent.agent.md.template",
         "subagent.claude.md.template",
@@ -2379,6 +2342,356 @@ def check_misplaced_artifacts_migration_policy() -> None:
     )
 
 
+def check_no_orchestrator_subagent_emission() -> None:
+    """v1.3.0: the orchestrator role lives in AGENTS.md › Orchestration
+    Operating Model and is read by the host CLI session. No runtime emits
+    an orchestrator subagent file. The skill, references, validator, and
+    misplaced-artifacts migration must all reflect this invariant.
+    """
+    # 1. The three orchestrator template files must NOT exist.
+    forbidden_templates = (
+        "orchestrator.agent.md.template",
+        "orchestrator.claude.md.template",
+        "orchestrator.opencode.md.template",
+    )
+    for name in forbidden_templates:
+        path = SKILL_ROOT / "assets" / name
+        if path.exists():
+            err(
+                f"{path.relative_to(REPO).as_posix()}: must not exist (v1.3.0 "
+                "removed orchestrator subagent templates; orchestration lives in "
+                "AGENTS.md › Orchestration Operating Model)"
+            )
+
+    # 2. SKILL.md must NOT reference orchestrator template files or
+    # orchestrator subagent file paths in any prescriptive context.
+    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    for needle in forbidden_templates:
+        if needle in skill:
+            err(
+                f"plugins/agents-system-setup/skills/agents-system-setup/SKILL.md: "
+                f"contains banned reference `{needle}` (v1.3.0 hard rule #33; "
+                "orchestrator lives in AGENTS.md)"
+            )
+
+    # 3. AGENTS.md.template must contain the new Orchestration Operating
+    # Model section with all consolidated markers from the deleted templates.
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "## Orchestration Operating Model",
+            "host CLI session",
+            "routing alias for that host/root session",
+            "When to delegate vs. act directly",
+            "### Hard Rules",
+            "### Context Load Order",
+            "### Lifecycle",
+            "### Orchestrator Assignment Format",
+            "### Wave Execution",
+            "### Memory & Learning",
+            "### Subagent Routing",
+            "### Out of Scope",
+            "Plan Handoff Contract",
+            "Security & Audit Matrix",
+            "Threat Model",
+            "Architecture & Design Pattern Decisions",
+            "MCP",
+            "Reflect & Learn",
+            "Learning Check",
+            "host-orchestrator and security-owner approval",
+            "Never store secrets or raw credentials",
+            "Content Quality Review",
+            "@agent-quality-curator",
+            "Security Team Scope",
+            "Security Team Operating Model",
+            "authorization scope",
+            "proof gaps",
+            "read-mostly",
+            "Requirements Triage",
+            "@requirements-triage",
+            "triage: skipped",
+            "read-mostly and advisory",
+            "I own final decisions and approval gates",
+            "read-only and advisory",
+            "Orchestrator Assignment Format",
+            "subtask slice",
+            "Allowed Capabilities",
+            "Skills Referenced",
+            "Stop / Escalation Conditions",
+            "Task assignment quality: ok | warn | fail",
+            "agents-system-setup:wave-execution",
+            "fan out",
+            "parallel-safe",
+            "wave",
+        ),
+    )
+
+    # 4. SKILL.md must contain hard rule #33 and the orchestrator anti-pattern.
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "The orchestrator is the host CLI session, not a subagent file",
+            "Never emit `orchestrator.agent.md`",
+            "OpenCode's `permission.task` gate moves to `opencode.json`",
+            "Emitting an `orchestrator` subagent file",
+            "Codex CLI has never emitted an orchestrator TOML",
+            "OpenCode root-session task gate",
+        ),
+    )
+
+    # 5. SKILL.md Phase 4 must say orchestrator content lives in AGENTS.md.
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "never emit as a subagent file",
+            "Orchestration Operating Model",
+            "subagent files are for specialized roles only",
+        ),
+    )
+
+    # 6. misplaced-artifacts-migration.md must document the orchestrator
+    # deprecation choices.
+    require_contains(
+        SKILL_ROOT / "references" / "misplaced-artifacts-migration.md",
+        (
+            "Deprecated orchestrator subagent files",
+            ".github/agents/orchestrator.agent.md",
+            ".claude/agents/orchestrator.md",
+            ".opencode/agents/orchestrator.md",
+            ".gemini/agents/orchestrator.md",
+            "Back up and delete (Recommended)",
+            "Keep but mark deprecated",
+            "Back up + report custom additions for manual review",
+            "Skip",
+            "orchestrator-deprecation-deleted",
+            "orchestrator-deprecation-marked",
+            "orchestrator-deprecation-reviewed",
+            "orchestrator-deprecation-skipped",
+            "has_custom_content",
+            "permission.task` migration",
+            "agents-system-setup:permission-task-approved",
+        ),
+    )
+
+    # 7. topology.md must clarify @orchestrator is the host session.
+    require_contains(
+        SKILL_ROOT / "references" / "topology.md",
+        (
+            "The orchestrator is the host CLI session",
+            "routing alias for that host/root session",
+            "No runtime emits a separate `orchestrator.agent.md`",
+            "Subagent files in the table below are for **specialized roles only**",
+        ),
+    )
+
+    # 8. handoff.md per-runtime handoff surfaces table must show
+    # orchestrator role lives in AGENTS.md for every runtime.
+    handoff_text = (SKILL_ROOT / "references" / "handoff.md").read_text(encoding="utf-8")
+    for runtime_marker in (
+        "Orchestrator role: `AGENTS.md` › Orchestration Operating Model",
+        "No `orchestrator.agent.md` file is emitted",
+        "No `.claude/agents/orchestrator.md` file is emitted",
+        "No `.opencode/agents/orchestrator.md` file is emitted",
+        "No `.gemini/agents/orchestrator.md` file is emitted",
+        "No `.codex/agents/orchestrator.toml` is emitted",
+    ):
+        if runtime_marker not in handoff_text:
+            err(
+                f"plugins/agents-system-setup/skills/agents-system-setup/references/handoff.md: "
+                f"missing v1.3.0 marker `{runtime_marker}`"
+            )
+
+    # 9. agent-format.md must mark AGENTS.md as canonical orchestrator
+    # location and route OpenCode permission.task to opencode.json.
+    require_contains(
+        SKILL_ROOT / "references" / "agent-format.md",
+        (
+            "Never emit a `.codex/agents/orchestrator.toml`",
+            "canonical pattern for every supported runtime as of v1.3.0",
+            "the root-session `permission.task` subagent-gating lives in `opencode.json`",
+        ),
+    )
+
+    # 10. replication.md must classify orchestrator as RootRoleIR.
+    require_contains(
+        SKILL_ROOT / "references" / "replication.md",
+        (
+            "Orchestrator role is RootRoleIR, not AgentIR",
+            "merged into the target's `AGENTS.md` › Orchestration Operating Model",
+            "no target emits a `*/orchestrator.*` agent file",
+            "Never emit `.codex/agents/orchestrator.toml`",
+        ),
+    )
+
+    # 11. runtime-updates.md must record the orchestrator elimination finding.
+    require_contains(
+        SKILL_ROOT / "references" / "runtime-updates.md",
+        (
+            "Orchestrator elimination",
+            "v1.3.0",
+            "host CLI session",
+        ),
+    )
+
+    # 12. Stale conceptual references: flag prescriptive wording that still
+    # implies an orchestrator file. The check is line-scoped and excludes
+    # negative/historical context (e.g., "never emit ...", "no longer ...").
+    stale_patterns = (
+        re.compile(r"\bemit\s+orchestrator(?:\s+(?:file|template|subagent))?\b", re.IGNORECASE),
+        re.compile(r"\borchestrator\s+(?:agent\s+)?file\b", re.IGNORECASE),
+        re.compile(r"\borchestrator\s*\+\s*N\s+subagents\b", re.IGNORECASE),
+        re.compile(r"\borchestrator\s*/\s*subagents\b", re.IGNORECASE),
+        re.compile(r"\borchestrator\s+templates?\b", re.IGNORECASE),
+        re.compile(r"\bgenerated\s+orchestrators?\b", re.IGNORECASE),
+    )
+    scan_paths = [
+        REPO / "README.md",
+        REPO / "DESIGN.md",
+        SKILL_ROOT / "SKILL.md",
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        SKILL_ROOT / "assets" / "GEMINI.md.template",
+        SKILL_ROOT / "assets" / "subagent.agent.md.template",
+        SKILL_ROOT / "assets" / "subagent.claude.md.template",
+        SKILL_ROOT / "assets" / "subagent.opencode.md.template",
+        SKILL_ROOT / "assets" / "subagent.gemini.md.template",
+        SKILL_ROOT / "assets" / "subagent.codex.toml.template",
+    ]
+    # Exclude CHANGELOG.md: historical entries are by design and must not
+    # be rewritten retroactively. The CHANGELOG-1.3.0 entry itself is
+    # written with the new terminology; older entries describe what each
+    # past release did at the time.
+    scan_paths.extend(sorted((SKILL_ROOT / "references").glob("*.md")))
+    for path in scan_paths:
+        if not path.is_file():
+            continue
+        rel = path.relative_to(REPO).as_posix()
+        for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+            for pat in stale_patterns:
+                if pat.search(line) and not _has_negative_context(line):
+                    err(
+                        f"{rel}:{line_no}: stale conceptual reference suggests "
+                        f"an orchestrator subagent file still exists: `{line.strip()[:120]}`"
+                    )
+
+
+def check_pointer_files_to_agents_md() -> None:
+    """When Claude Code or Gemini CLI are targets, the pointer files
+    (`CLAUDE.md`, `GEMINI.md`) must surface `AGENTS.md` so the host root
+    session reads the Orchestration Operating Model. This check verifies
+    the templates and link-helper scripts; per-project pointer files are
+    runtime-verified by the generated scripts at Phase 4.
+    """
+    # GEMINI.md.template must point at AGENTS.md.
+    require_contains(
+        SKILL_ROOT / "assets" / "GEMINI.md.template",
+        (
+            "AGENTS.md",
+        ),
+    )
+
+    # SKILL.md must reference the project-memory linking step for Claude
+    # (and document Gemini's pointer/sync copy).
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "Project-memory linking",
+            "link-project-memory.sh",
+            "link-project-memory.ps1",
+            "GEMINI.md",
+            "CLAUDE.md",
+        ),
+    )
+
+    # Linker scripts must exist when documented (CI smoke tests verify
+    # cross-OS execution; this is a presence check).
+    for rel in (
+        "plugins/agents-system-setup/skills/agents-system-setup/scripts/link-project-memory.sh",
+        "plugins/agents-system-setup/skills/agents-system-setup/scripts/link-project-memory.ps1",
+    ):
+        if not (REPO / rel).is_file():
+            err(f"{rel}: required project-memory linker script is missing")
+
+
+def check_opencode_root_task_gate() -> None:
+    """When OpenCode is among the selected runtimes, the host-root
+    `permission.task` gate must live in `opencode.json` (since v1.3.0 no
+    `orchestrator.opencode.md` is emitted). This check enforces:
+
+    1. SKILL.md describes the gate relocation with a separate config
+       approval gate (not the MCP gate).
+    2. `references/misplaced-artifacts-migration.md` documents extracting
+       and preserving existing user customizations rather than replacing
+       them with the generic template.
+    3. Any `opencode.json` file actually present in the repo (samples,
+       fixtures, or generated reference output) carries an explicit
+       `agent.<root>.permission.task` gate with `"*"` set to `"deny"` or
+       `"ask"`, never `"allow"`.
+    """
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "OpenCode root-session task gate",
+            "opencode.json",
+            "agent.<root>.permission.task",
+            "separate config approval gate",
+            "opencode_task_gate: declined",
+            "fan-out not permission-constrained",
+        ),
+    )
+
+    require_contains(
+        SKILL_ROOT / "references" / "misplaced-artifacts-migration.md",
+        (
+            "OpenCode `permission.task` migration",
+            "first parse and extract",
+            "Preserve",
+            "never replace user customizations",
+            "separate OpenCode config approval gate",
+            "agents-system-setup:permission-task-approved",
+        ),
+    )
+
+    # Inspect any opencode.json files in the repo (samples / fixtures).
+    # The plugin itself does not ship one, but if a future commit adds an
+    # OpenCode fixture, this gate catches an unsafe `"*": "allow"`.
+    for path in REPO.rglob("opencode.json"):
+        if ".git" in path.parts or "node_modules" in path.parts:
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            warn(f"{path.relative_to(REPO).as_posix()}: could not parse JSON ({exc}); skipping task-gate check")
+            continue
+        agent_map = data.get("agent") if isinstance(data, dict) else None
+        if not isinstance(agent_map, dict):
+            err(
+                f"{path.relative_to(REPO).as_posix()}: missing top-level `agent` map; "
+                "OpenCode root-session `permission.task` gate must be defined under "
+                "`agent.<root>.permission.task` (v1.3.0)"
+            )
+            continue
+        found_gate = False
+        for root_name, root_cfg in agent_map.items():
+            if not isinstance(root_cfg, dict):
+                continue
+            perm = root_cfg.get("permission") if isinstance(root_cfg.get("permission"), dict) else None
+            task = perm.get("task") if perm and isinstance(perm.get("task"), dict) else None
+            if not task:
+                continue
+            found_gate = True
+            star = task.get("*")
+            if star == "allow":
+                err(
+                    f"{path.relative_to(REPO).as_posix()}: `agent.{root_name}.permission.task[\"*\"]` "
+                    "must be `deny` or `ask`, never `allow` (host-orchestrator safety gate)"
+                )
+        if not found_gate:
+            err(
+                f"{path.relative_to(REPO).as_posix()}: missing `agent.<root>.permission.task` gate "
+                "(v1.3.0 host-orchestrator task gate is mandatory for OpenCode root agents)"
+            )
+
+
 def check_context_optimization() -> None:
     """The skill must stay compact-by-default and preserve progressive loading
     markers in generated templates.
@@ -2464,29 +2777,12 @@ def check_context_optimization() -> None:
         ),
     )
     require_contains(
-        SKILL_ROOT / "assets" / "orchestrator.agent.md.template",
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
         (
             "## Context Load Order",
-            "## Delegation Packet",
-            "AGENTS.md",
+            "## Orchestrator Assignment Format",
             "Plan Handoff Contract",
             "Context freshness: recent",
-        ),
-    )
-    require_contains(
-        SKILL_ROOT / "assets" / "orchestrator.claude.md.template",
-        (
-            "## Delegation Packet",
-            "AGENTS.md",
-            "Plan Handoff Contract",
-        ),
-    )
-    require_contains(
-        SKILL_ROOT / "assets" / "orchestrator.opencode.md.template",
-        (
-            "## Delegation Packet",
-            "AGENTS.md",
-            "Plan Handoff Contract",
         ),
     )
     require_contains(
@@ -2736,27 +3032,10 @@ def check_plan_handoff_policy() -> None:
         ),
     )
     require_contains(
-        SKILL_ROOT / "assets" / "orchestrator.agent.md.template",
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
         (
             "Plan Handoff Contract",
-            "AGENTS.md",
-        ),
-    )
-    require_contains(
-        SKILL_ROOT / "assets" / "orchestrator.claude.md.template",
-        (
-            "agents-system-setup:platform: claude-code",
-            "Plan Handoff Contract",
-            "AGENTS.md",
-        ),
-    )
-    require_contains(
-        SKILL_ROOT / "assets" / "orchestrator.opencode.md.template",
-        (
-            "agents-system-setup:platform: opencode",
-            "mode: primary",
-            "{{OPTIONAL_PERMISSION_TASK_BLOCK}}",
-            "AGENTS.md",
+            "## Orchestration Operating Model",
         ),
     )
     require_contains(
@@ -2879,9 +3158,6 @@ def check_prompt_handoff_quality_policy() -> None:
     for name in (
         "AGENTS.md.template",
         "GEMINI.md.template",
-        "orchestrator.agent.md.template",
-        "orchestrator.claude.md.template",
-        "orchestrator.opencode.md.template",
     ):
         require_contains(
             SKILL_ROOT / "assets" / name,
@@ -2939,22 +3215,17 @@ def check_prompt_handoff_quality_policy() -> None:
         ),
     )
 
-    for name in (
-        "orchestrator.agent.md.template",
-        "orchestrator.claude.md.template",
-        "orchestrator.opencode.md.template",
-    ):
-        require_contains(
-            SKILL_ROOT / "assets" / name,
-            (
-                "Orchestrator Assignment Format",
-                "subtask slice",
-                "Allowed Capabilities",
-                "Skills Referenced",
-                "Stop / Escalation Conditions",
-                "Task assignment quality: ok | warn | fail",
-            ),
-        )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "Orchestrator Assignment Format",
+            "subtask slice",
+            "Allowed Capabilities",
+            "Skills Referenced",
+            "Stop / Escalation Conditions",
+            "Task assignment quality: ok | warn | fail",
+        ),
+    )
 
     for name in (
         "subagent.agent.md.template",
@@ -3504,11 +3775,14 @@ def check_copilot_tool_profile() -> None:
             "tools: [read, search]",
         ),
     )
+    # Orchestrator role lives in AGENTS.md › Orchestration Operating Model;
+    # no separate orchestrator subagent file is emitted. The Standard Tool
+    # Profile is now applied to edit-capable specialized subagents only.
     require_contains(
-        SKILL_ROOT / "assets" / "orchestrator.agent.md.template",
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
         (
-            "tools: [vscode, execute, read, agent, edit, search, todo]",
-            "agents-system-setup:tools-profile: standard",
+            "## Orchestration Operating Model",
+            "host CLI session",
         ),
     )
     require_contains(
@@ -3561,15 +3835,9 @@ def check_copilot_tool_profile() -> None:
         ),
     )
 
-    # Warn-only: orchestrator.agent.md.template's tools list must contain `agent`
-    # (orchestrator needs to delegate). Subagent template's role-aware comment must
-    # NOT grant `agent` to read-only or runner profiles (least privilege).
-    orch_text = (SKILL_ROOT / "assets" / "orchestrator.agent.md.template").read_text(encoding="utf-8")
-    if "tools: [vscode, execute, read, agent, edit, search, todo]" not in orch_text:
-        err("orchestrator.agent.md.template: missing standard tools line "
-            "`tools: [vscode, execute, read, agent, edit, search, todo]`")
-    if ", agent," not in orch_text and "agent," not in orch_text and ", agent]" not in orch_text:
-        err("orchestrator.agent.md.template: orchestrator needs `agent` in its tools to delegate")
+    # v1.3.0: orchestrator.agent.md.template is removed; the host CLI session
+    # is the orchestrator and reads AGENTS.md directly. No tools-list check
+    # is needed for a file that no longer exists.
 
     for rel in (
         "references/agent-format.md",
@@ -3651,21 +3919,16 @@ def check_learning_memory_policy() -> None:
             "Do not store secrets or raw credentials",
         ),
     )
-    for rel in (
-        "orchestrator.agent.md.template",
-        "orchestrator.claude.md.template",
-        "orchestrator.opencode.md.template",
-    ):
-        require_contains(
-            SKILL_ROOT / "assets" / rel,
-            (
-                "Reflect & Learn",
-                "Learning Check",
-                "overwrite",
-                "Sensitive new learnings require orchestrator and security-owner approval",
-                "Never store secrets or raw credentials",
-            ),
-        )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "Reflect & Learn",
+            "Learning Check",
+            "overwrite",
+            "host-orchestrator and security-owner approval",
+            "Never store secrets or raw credentials",
+        ),
+    )
     for rel in (
         "subagent.agent.md.template",
         "subagent.claude.md.template",
@@ -3804,6 +4067,9 @@ def main() -> int:
     check_cwd_reconnaissance_policy()
     check_purpose_before_footprint_in_phase_0()
     check_misplaced_artifacts_migration_policy()
+    check_no_orchestrator_subagent_emission()
+    check_pointer_files_to_agents_md()
+    check_opencode_root_task_gate()
     check_mcp_approval_gate()
     check_central_mcp_approval_evidence()
     check_optional_placeholder_leaks()

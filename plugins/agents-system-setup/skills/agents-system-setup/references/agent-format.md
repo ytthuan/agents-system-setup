@@ -127,7 +127,7 @@ You are a <role>...
 >
 > Human input uses the `question` tool. Grant it with nested YAML (`permission: { question: allow }` or the block above), not a literal dotted key. OpenCode does not provide durable auto-learning beyond AGENTS.md, skills, compaction, and plugin patterns.
 >
-> `mode: primary` agents are directly selectable; `mode: subagent` agents are invoked by primary agents or manually with `@<agent-name>`. Use `permission.task` to constrain which subagents a primary or broad worker may spawn. Primary agents should use wildcard `deny`/`ask` plus named roster allows; if a primary intentionally has no named allows, render `# agents-system-setup:permission-task-roster: skipped` near the `task` block. Child sessions are navigated with OpenCode's `session_child_first`, `session_child_cycle`, `session_child_cycle_reverse`, and `session_parent` keybinds; keep those in usage notes, not frontmatter.
+> `mode: primary` agents are directly selectable; `mode: subagent` agents are invoked by primary agents or manually with `@<agent-name>`. Use `permission.task` to constrain which subagents a primary or broad worker may spawn. **For OpenCode targets, the root-session `permission.task` subagent-gating lives in `opencode.json` (e.g. `agent.<root>.permission.task`) since v1.3.0 — no `.opencode/agents/orchestrator.md` file is emitted.** The wildcard `deny`/`ask` plus named roster allows pattern still applies; if a root agent intentionally has no named allows, render `# agents-system-setup:permission-task-roster: skipped` near the `task` block. Child sessions are navigated with OpenCode's `session_child_first`, `session_child_cycle`, `session_child_cycle_reverse`, and `session_parent` keybinds; keep those in usage notes, not frontmatter.
 
 ## OpenAI Codex CLI + App — split layout: `AGENTS.md` + `.codex/agents/*.toml`
 
@@ -135,8 +135,8 @@ Source: https://developers.openai.com/codex/subagents · general AGENTS.md spec:
 
 Codex uses **two complementary shared artifact surfaces** that should stay compatible with both Codex CLI and Codex App wherever the App has access to the repo artifacts:
 
-1. **`AGENTS.md`** at the repo root — project memory + orchestrator instructions + Directory Architecture / Capability Matrix / Waves. The orchestrator MAY appear here as `## Orchestrator`.
-2. **`.codex/agents/<name>.toml`** (project) or **`~/.codex/agents/<name>.toml`** (user) — one TOML file per specialized subagent. Codex loads each as a session config layer; the CLI can switch threads with `/agent`.
+1. **`AGENTS.md`** at the repo root — project memory + **Orchestration Operating Model** (host CLI session orchestrator role) + Directory Architecture / Capability Matrix / Waves. **Never emit a `.codex/agents/orchestrator.toml`** — orchestration lives in `AGENTS.md`. This is the canonical pattern for every supported runtime as of v1.3.0; Copilot, Claude, OpenCode, and Gemini now follow Codex's lead.
+2. **`.codex/agents/<name>.toml`** (project) or **`~/.codex/agents/<name>.toml`** (user) — one TOML file per **specialized** subagent. Codex loads each as a session config layer; the CLI can switch threads with `/agent`.
 
 Keep **CLI-only** commands and workflows (`codex plugin marketplace add`, `/plugins`, `/agent`, `codex exec`, local approval overlays) in install or "Try it" notes. Do not make generated artifacts depend on those commands for Codex App behavior.
 

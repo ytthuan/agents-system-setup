@@ -267,6 +267,129 @@ Counts:
 
 When no misplaced artifacts are detected, report `Path migration: none`.
 
+## Deprecated orchestrator subagent files
+
+As of v1.3.0 the plugin no longer emits an `orchestrator` subagent file for
+any runtime. The Orchestration Operating Model lives in `AGENTS.md`
+and is read by the host CLI session. When improve/update detects an
+existing orchestrator subagent file, surface it as a first-class migration
+delta (similar to misplaced artifacts) before any Phase 5 write.
+
+### Detection signals
+
+Phase 1 footprint inspection scans for any of:
+
+- `.github/agents/orchestrator.agent.md` (Copilot CLI)
+- `.github/agents/orchestrator.md` (Copilot CLI docs-drift)
+- `.claude/agents/orchestrator.md` (Claude Code)
+- `.opencode/agents/orchestrator.md` (OpenCode — note `permission.task` migration)
+- `.codex/agents/orchestrator.toml` (Codex — should never exist, but detect)
+- `.gemini/agents/orchestrator.md` (Gemini CLI)
+
+Each match is recorded as `{path, runtime, size, mtime, has_custom_content}`.
+`has_custom_content` is `true` when the file's content meaningfully deviates
+from the v1.2.0 (now-deleted) orchestrator subagent baseline (heuristic: > 8 lines of body
+prose outside the managed block, or any sections not in the template).
+
+### Migration choices (per detected file)
+
+For every detected orchestrator subagent file the host orchestrator asks the
+user via the provider-native human-input surface:
+
+> "Found `<path>` (`<runtime>`). The Orchestration Operating Model now lives
+> in `AGENTS.md` (v1.3.0). How should I handle this file?"
+> Choices:
+> 1. `Back up and delete (Recommended)`
+> 2. `Keep but mark deprecated`
+> 3. `Back up + report custom additions for manual review`
+> 4. `Skip`
+
+#### 1. Back up and delete
+
+1. Back the source up to
+   `.agents-system-setup/.bak/<ts>-<migration_id>/orchestrator-deprecation/<source-rel>`
+   per the [Backup directory naming](#backup-directory-naming) rule.
+2. Compute the portable digest.
+3. `rm` the source.
+4. For OpenCode: render the `permission.task` rules that were in the deleted
+   file as a suggested `opencode.json` › `agent.<root>.permission.task` block
+   in the output contract. **Do not auto-write** `opencode.json` here —
+   the user reviews and merges it under the existing approval gate.
+5. Append `{action: "orchestrator-deprecation-deleted", ...}` to
+   `.agents-system-setup/migration.jsonl`.
+
+#### 2. Keep but mark deprecated
+
+1. Apply the source-type-safe deprecation marker rule:
+   - Markdown files: append `<!-- DEPRECATED: orchestration moved into AGENTS.md › Orchestration Operating Model (v1.3.0). This file may be safely deleted. -->`.
+   - TOML files: append `# DEPRECATED: orchestration moved into AGENTS.md › Orchestration Operating Model (v1.3.0). This file may be safely deleted.`.
+2. Append `{action: "orchestrator-deprecation-marked", ...}` to
+   `.agents-system-setup/migration.jsonl`.
+
+#### 3. Back up + report custom additions for manual review
+
+This is the safe choice when `has_custom_content` is true.
+
+1. Back up the source as in choice 1.
+2. Compute the diff between the source and the closest v1.2.0 orchestrator
+   template baseline (Copilot/Claude/OpenCode). Render a concise diff (or
+   the full source body if the diff is large) in the output contract under
+   `Custom orchestrator content to review:` so the user can manually move
+   the custom additions into `AGENTS.md` › Orchestration Operating Model.
+3. Append `<!-- DEPRECATED: see Custom orchestrator content in output contract for manual migration. -->` to the source.
+4. Append `{action: "orchestrator-deprecation-reviewed", custom_summary: "<diff_or_body_len>", ...}` to
+   `.agents-system-setup/migration.jsonl`.
+5. **Never auto-merge** custom prose into `AGENTS.md`; user owns the merge.
+
+#### 4. Skip
+
+1. Append `{action: "orchestrator-deprecation-skipped", ...}` to
+   `.agents-system-setup/migration.jsonl`.
+2. Surface a warning in the output contract: "Deprecated orchestrator
+   subagent file `<path>` left in place. Future replication / improve runs
+   will re-prompt."
+
+### OpenCode `permission.task` migration
+
+When deleting `.opencode/agents/orchestrator.md`, **first parse and extract**
+the existing `permission.task` frontmatter from the source file. Preserve
+the user's customizations (specific allows, `ask` overrides, named roster
+entries) and render them into the proposed `opencode.json` snippet —
+**never replace user customizations with the generic template** unless
+the source has no parseable `permission.task` block at all.
+
+Render the extracted snippet (or fall through to the template below when
+no source block exists) for the user to review under a **separate
+OpenCode config approval gate** (not the MCP approval gate; the MCP gate
+is reserved for MCP servers). Ask once before writing; on decline, record
+`opencode_task_gate: declined` and report degraded-mode warning in the
+output contract.
+
+Generic template (used only when no source `permission.task` exists):
+
+```jsonc
+{
+  "agent": {
+    "<root-agent-name>": {
+      "permission": {
+        "task": {
+          "*": "deny",
+          "<allowed-subagent-1>": "allow",
+          "<allowed-subagent-2>": "allow"
+        }
+      }
+    }
+  }
+}
+```
+
+Render the snippet under the separate OpenCode config approval gate
+(verbatim, with the `agents-system-setup:permission-task-approved`
+marker). Treat as a config write requiring user confirmation; no silent
+merge into `opencode.json`. If the source contained unparseable or
+unsafe entries (e.g., `"*": "allow"`), flag them for manual review and
+do NOT include them in the proposed snippet.
+
 ## Anti-patterns
 
 - Auto-rewriting Claude/Gemini `settings.json` to convert hooks. Always
@@ -280,3 +403,14 @@ When no misplaced artifacts are detected, report `Path migration: none`.
 - Bundling all migrations into a single `Apply all` button — each
   artifact gets its own `ask_user` so users can defer or skip
   individually.
+- **Auto-deleting an orchestrator subagent file with custom content.**
+  Default to `Back up + report custom additions for manual review` when
+  `has_custom_content` is true; never auto-merge custom prose into
+  `AGENTS.md`.
+- **Auto-writing `opencode.json` › `agent.<root>.permission.task` during
+  orchestrator-deprecation migration.** Render the snippet under the
+  separate OpenCode config approval gate and ask before writing.
+- **Replacing user customizations in the OpenCode `permission.task`
+  block** with the generic template. Parse the source `permission.task`
+  first; preserve allows, asks, and named entries unless they are
+  unsafe (e.g., wildcard `allow`).

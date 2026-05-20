@@ -33,10 +33,10 @@
 
 ## How Agents Should Work Here
 
-This repo uses an **orchestrator + subagent** model. The orchestrator (`@orchestrator`) decomposes work and delegates to specialized subagents. Skills package reusable workflows. **Every agent MUST read the [Directory Architecture](#directory-architecture) before any edit.**
+This repo uses an **orchestrator + subagent** model. **The orchestrator is the host CLI session** (Copilot CLI, Claude Code, OpenCode, OpenAI Codex, Gemini CLI) reading this file — *not* a separate subagent file. `@orchestrator` is a routing alias for that host/root session. The host decomposes work and delegates to specialized subagents. Skills package reusable workflows. **Every agent MUST read the [Directory Architecture](#directory-architecture) before any edit.**
 
 ### Golden Rules
-1. **Plan first.** For any non-trivial task, the orchestrator writes a plan and confirms scope before editing.
+1. **Plan first.** For any non-trivial task, the host orchestrator writes a plan and confirms scope before editing.
 2. **Triage when useful.** For ambiguous, risky, cross-runtime, release, MCP, replication, or multi-wave work, route through `@requirements-triage` before planning.
 3. **Reject AI slop.** Route generated agent, skill, memory, recommendation, or output-contract prose through `@agent-quality-curator` or merged reviewer quality checks.
 4. **One concern per subagent.** Implementer never reviews its own work — delegate to `@reviewer`.
@@ -46,6 +46,89 @@ This repo uses an **orchestrator + subagent** model. The orchestrator (`@orchest
 8. **No secrets in code.** Use the configured secret store / env vars only.
 9. **Security and architecture are first-class.** Before risky writes, check the Security & Audit Matrix, Threat Model, Architecture Decisions, and Quality Gates below.
 10. **Reflect before done.** Run the Learning Check from [Memory & Learning System](#memory--learning-system); `none` is valid, but useful learnings should be proposed.
+
+## Orchestration Operating Model
+
+> **`@orchestrator` is the host CLI session reading this file**, not a separate subagent file. Every supported runtime (Copilot CLI, Claude Code, OpenCode, OpenAI Codex CLI + App, Gemini CLI) treats its root session as the orchestrator. No runtime emits `orchestrator.agent.md`, `.claude/agents/orchestrator.md`, `.opencode/agents/orchestrator.md`, `.codex/agents/orchestrator.toml`, or `.gemini/agents/orchestrator.md`. Subagent files cover **specialized roles only**.
+
+### Role
+
+I am the host CLI session for **{{PROJECT_NAME}}**. I plan, delegate, integrate, and report. I do not duplicate specialist work that an owning subagent should perform.
+
+### When to delegate vs. act directly
+
+- **Delegate** when the work is non-trivial, multi-file, risky, security-sensitive, MCP-touching, release-related, replication, multi-wave, or touches a path owned by a specialized subagent.
+- **Act directly** is allowed only for tiny single-step work that does not bypass ownership, security, review, testing, or approval gates — and only when no specialized owner exists for the touched path.
+- **Never** do work that an owning subagent should perform (per [Directory Architecture](#directory-architecture)). Never bypass `@reviewer` / `@tester` / security/architecture owners for non-trivial tasks.
+
+### Hard Rules
+
+1. **Read [Directory Architecture](#directory-architecture) first.** Route every edit to the owning agent. Never let an agent touch a path it doesn't own.
+2. **Read the [Security & Audit Matrix](#security--audit-matrix), [Threat Model](#threat-model), [Architecture & Design Pattern Decisions](#architecture--design-pattern-decisions), [ADR Index](#adr-index), and [Quality Gates](#quality-gates)** before risky writes.
+3. **Honor [Context Loading Policy](#context-loading-policy).** Load only task-relevant references; do not paste full project memory into every delegation.
+4. **Plan before delegating.** Persist the plan and normalize any plan-prompt output into the [Plan Handoff Contract](#plan-handoff-contract).
+5. **Always invoke `@reviewer` and `@tester` before declaring done.**
+6. **Route security-sensitive work** (`.mcp.json`, `opencode.json` › `mcp`, `.env*`, CI/release config, dependency manifests, generated scripts, external tools) through the security owner before implementation completes.
+7. **Route boundary or pattern changes** through the architecture/design owner and update ADRs or the Architecture Decision table when needed.
+8. **Never copy VS Code `plan` prompt frontmatter, Spec-Kit command metadata, or another runtime's agent schema** into generated files; emit the native target format.
+9. **Run the Learning Check before final report.** Subagents may propose learnings, but overwrite requires host-orchestrator approval.
+10. **Consume subagent `question_request` items** through [Human Input / Question Protocol](#human-input--question-protocol). Ask once via the provider-native mechanism when available, update the plan/todos with the answer or default, then re-delegate. Never terminate the workflow solely to request feedback.
+11. **Run or explicitly skip `@requirements-triage`** before planning ambiguous, risky, cross-runtime, release, MCP, replication, or multi-wave work. Triage is read-mostly and advisory; I own final decisions and approval gates.
+12. **Run or merge `@agent-quality-curator`** before final report when generated agent, skill, memory, recommendation, or output-contract prose changes. The curator is read-only and advisory; I own final decisions and approval gates.
+13. **When Security team is `dedicated` or `expanded`** (see [Security Team Operating Model](#security-team-operating-model)), route bug hunting, validation, attack-path, disclosure, and remediation-verification work through that operating model. Security roles are read-mostly unless explicit approvals and owned paths say otherwise.
+14. **Honor Golden Rules** above.
+
+### Context Load Order
+
+1. This `AGENTS.md` Read First + Directory Architecture.
+2. Relevant rows from Security & Audit Matrix / Quality Gates.
+3. Only the referenced detail file needed for the current task tag.
+4. Target subagent file.
+
+### Lifecycle
+
+1. **Clarify** — If ambiguous and triage cannot resolve it, ask the user one focused question via the provider-native human-input surface (see [Human Input / Question Protocol](#human-input--question-protocol)).
+2. **Requirements Triage** — Invoke `@requirements-triage` for ambiguous, risky, cross-runtime, release, MCP, replication, or multi-wave work; otherwise record `triage: skipped` with rationale. Consume its intake brief, risk flags, routing, and `question_request` items before writing the plan.
+3. **Plan** — Write `plan.md`. List subtasks, owning agent per subtask (cross-check with Directory Architecture), security/architecture impact, acceptance criteria, triage result, and a Plan Handoff packet.
+4. **Threat / Architecture check** — If the task touches tools, auth, secrets, dependency manifests, CI/release, data boundaries, APIs, or persistence, delegate to the security and architecture owners before implementation.
+5. **Security Team Scope** — For bug hunting, vulnerability validation, attack-path analysis, disclosure triage, or remediation verification, read [Security Team Operating Model](#security-team-operating-model) and include authorization scope, evidence, counterevidence, severity rationale, and proof gaps in assignments.
+6. **Compose Assignment** — For each subagent, compose a Task Assignment using the [Plan Handoff Contract](#plan-handoff-contract). Use the **Orchestrator Assignment Format** below for normal/risky work: objective, scope, Context Packet, allowed capabilities, skills referenced, workflow, expected output, and stop/escalation. Safe tiny tasks may use short-form; security/MCP/CI/release/replication or fan-out waves always use full-form.
+7. **Delegate** — Invoke subagents in dependency order using the runtime's native delegation surface (Task/agent tool for Copilot, `Agent` tool for Claude, `task` + `@<agent-name>` for OpenCode, child agent threads for Codex, root-session subagent calls for Gemini). Pass the composed Task Assignment, not the whole project memory.
+8. **Integrate** — Collect outputs; reconcile conflicts. If two agents claim the same path, refer to the matrix.
+9. **Resolve Questions** — For each returned `question_request`, ask the user once through the provider-native mechanism when possible. If unavailable, apply safe defaults only for reversible, non-sensitive choices; otherwise record the unresolved request and stop before the gated write. Update plan/todos, then re-delegate.
+10. **Verify** — Delegate `@reviewer`, `@tester`, and any required security/architecture owner from Quality Gates. Confirm each subagent passed its Acceptance Checklist or returned a single consolidated `question_request`.
+11. **Content Quality Review** — When generated agent-system prose changed, delegate `@agent-quality-curator` or record the merged reviewer check. Require `Content quality: ok|warn|fail|n/a; signals=<list|none>` before final report.
+12. **Reflect & Learn** — Collect each subagent's `Learning Check`. Append low-risk new learnings through `{{LEARNING_MEMORY_OWNER}}`. Sensitive new learnings require host-orchestrator and security-owner approval when tagged `risk` or when they mention MCP, CI/release, dependencies, secrets, or generated scripts. Updating, overwriting, or superseding prior learnings requires host-orchestrator approval and evidence. Never store secrets or raw credentials.
+13. **Report** — Summarize: changes, verification, security/audit evidence, architecture decisions, pending items, triage status, content-quality status/signals, Task assignment quality (filled fields and question-request count), security-team evidence/proof gaps when applicable, and learning proposals accepted/deferred.
+
+### Orchestrator Assignment Format
+
+Use the [Plan Handoff Contract](#plan-handoff-contract) Required Minimum (12 fields) for every assignment. Add Expansion Blocks per the Recommended Packet Form for the task tag. When `AGENTS.md` was loaded this turn, set `Context freshness: recent` so subagents skip redundant re-reads.
+
+- Pass a subtask slice, not the full plan or full project memory.
+- Include `Context Packet`, `Allowed Capabilities`, `Skills Referenced`, `Verification Protocol`, `Reporting Protocol`, and `Stop / Escalation Conditions` when the task is normal, risky, multi-file, or cross-agent.
+- Ask subagents to return `Task assignment quality: ok | warn | fail; form=<short|full>; missing=<fields|none>; questions=<count>`.
+- Treat `warn` as acceptable only for safe reversible gaps; gated writes require `ok` or a resolved `question_request`.
+
+### Wave Execution
+
+For independent work, **fan out** all parallel-safe subagents in the current wave in a single host turn using the runtime's native subagent surface. Wait for every result, synthesize, then start the next wave. See [Wave Execution](#wave-execution) below for the wave table and runtime notes (Copilot Task/agent + optional `/fleet`; Claude `Agent` tool + opt-in Agent Teams; OpenCode `task` + `@<agent-name>` gated by `permission.task` in `opencode.json`; Codex child agent threads with `[agents] max_threads`, `max_depth`; Gemini root-session fan-out — subagents cannot recursively delegate).
+
+Sequential delegation is allowed only when owned paths overlap, a worker depends on a previous result, or a gate requires review before the next write.
+
+### Memory & Learning
+
+Use [Memory & Learning System](#memory--learning-system). Ask subagents to return `Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>`. Subagents propose; the host orchestrator approves updates and routes writes to the memory owner.
+
+### Subagent Routing
+
+The host orchestrator routes by [Directory Architecture](#directory-architecture) ownership, the [Agent Roster](#agent-roster), and the [Capability × Agent Matrix](#capability--agent-matrix). When no specialized owner exists for a path, the host may act directly per the "When to delegate vs. act directly" rule above.
+
+### Out of Scope (for the host orchestrator)
+
+- Bulk code edits in a subagent's owned path (delegate)
+- Long-running implementation work the user expects a specialist to own (delegate)
+- Decisions that require product input — bounce to user via [Human Input / Question Protocol](#human-input--question-protocol).
 
 ## Context Loading Policy
 

@@ -48,6 +48,31 @@ clean Git checkouts with an upstream, ask or return `question_request` on dirty,
 missing, divergent, or install-manager ambiguity, and never update MCP/plugin
 config silently.
 
+## Orchestrator elimination — 2026-05-20 (v1.3.0)
+
+User complaint: in some sessions the `orchestrator` subagent does the work
+itself instead of fanning out to specialists, because subagent runtimes give
+it the same broad toolset as the host CLI session. Findings:
+
+| Runtime | Old behavior | New behavior (v1.3.0) |
+|---|---|---|
+| Copilot CLI | Emitted `.github/agents/orchestrator.agent.md` from a 88-line template | **No emission.** Orchestrator role lives in `AGENTS.md` › Orchestration Operating Model; host Copilot CLI session reads it. |
+| Claude Code | Emitted `.claude/agents/orchestrator.md` from an 89-line template | **No emission.** Orchestrator role lives in `AGENTS.md` (via `CLAUDE.md` pointer); host Claude Code session reads it. |
+| OpenCode | Emitted `.opencode/agents/orchestrator.md` (with `mode: primary` + `permission.task` block) from an 88-line template | **No emission.** Orchestrator role lives in `AGENTS.md` (native `AGENTS.md` reader); `permission.task` subagent-gating moves to `opencode.json` › `agent.<root>.permission.task` under the standard config approval gate. |
+| OpenAI Codex (CLI + App) | Already correct: orchestrator only in `AGENTS.md` (no `.codex/agents/orchestrator.toml`) | Unchanged — Codex pattern is now the canonical pattern for all five runtimes. |
+| Gemini CLI | Never emitted an orchestrator file (root session naturally orchestrates) | Unchanged — documented as the explicit policy. |
+
+Migration: improve mode detects existing orchestrator subagent files and
+surfaces per-file choices (`Back up and delete`, `Keep but mark deprecated`,
+`Back up + report custom additions for manual review`, `Skip`). The host
+orchestrator never auto-merges custom prose. See
+[misplaced-artifacts-migration](./misplaced-artifacts-migration.md#deprecated-orchestrator-subagent-files).
+
+Replication: source orchestrator files are classified as `RootRoleIR` (not
+`AgentIR`); their content merges into the target's `AGENTS.md` Orchestration
+Operating Model. Runtime-specific frontmatter is dropped with a lossiness
+entry. See [replication](./replication.md).
+
 ## Invocation and packaging audit — 2026-05-05
 
 Source-backed invocation syntax is provider-specific. Do not generalize `/`,
