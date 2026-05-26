@@ -2,6 +2,44 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [1.4.0] - 2026-05-26
+
+### Added
+
+- **New `upgrade` mode** for version-aware migration of existing agent systems to the current plugin's principles. Triggers: `/agents-system-setup upgrade`, `agents-system-setup upgrade`, `/setup-copilot-agents upgrade`, `$agents-system-setup upgrade` (Codex), or any host-runtime equivalent. Reads `.agents-system-setup/generated.json` (authoritative) or per-file `agents-system-setup:generated-by` stamps, compares against current `plugin.json`, walks the per-version delta playbook in order, asks once before each migration, backs up before each rewrite, preserves user customizations outside managed blocks. Non-destructive and reversible via `.bak`. Surfaced as first-class Phase 1 mode choice when stale stamps are detected.
+- **Version stamping for every generated artifact.** Every emitted `AGENTS.md`, subagent file (`.github/agents/*.agent.md`, `.claude/agents/*.md`, `.opencode/agents/*.md`, `.gemini/agents/*.md`, `.codex/agents/*.toml`), and skill (`*/skills/*/SKILL.md`) carries an `agents-system-setup:generated-by: vX.Y.Z` marker — HTML comment for Markdown, `#` comment for TOML. Renderer substitutes `{{PLUGIN_VERSION}}` from `plugin.json` and optional `{{GENERATED_AT}}` ISO-8601 timestamp.
+- **Central manifest `.agents-system-setup/generated.json`** as authoritative source of truth, written atomically after every `init`/`update`/`improve`/`upgrade`/`replicate` run. Schema includes `plugin_version`, `last_run`, and per-artifact records (`path`, `stamp_version`, `stamp_at`, `kind`, `platform`, `checksum`).
+- **Per-version migration playbook table** in `references/misplaced-artifacts-migration.md` › **Version Stamp Detection & Migration Playbook**. Documents `pre-stamp → v1.3.0`, `v1.2.0 → v1.3.0`, and `v1.3.0 → v1.4.0` delta requirements. `upgrade` mode walks the table in order; improve mode treats version drift as a first-class delta.
+- **Hard rule #34** — Generated artifacts carry a `generated-by` version stamp + central manifest. Improve / upgrade modes read stamps and apply per-version deltas. Never hand-edit a stamp.
+- **References/handoff.md → canonical Host Orchestrator Lifecycle, Wave Execution Playbook, Memory & Learning Coordination, Out of Scope** sections. AGENTS.md.template links here instead of duplicating; subagents load on demand.
+- **`references/misplaced-artifacts-migration.md` migration safety rules** (always backup, diff custom content first, preserve user content outside managed block, update stamp atomically with content, manifest updated last, pre-stamp detection is conservative) and stamp anti-patterns (no hand-editing, no committing manifest without opt-in, no skipping intermediate version deltas).
+
+### Changed
+
+- **`AGENTS.md.template` › `## Orchestration Operating Model` slimmed from ~83 lines to ~37 lines.** Preserves inline: Role and Delegation Stance, 7 Core Hard Rules (covering Directory Architecture, security/architecture gates, `@reviewer`/`@tester`/security-owner routing with `.mcp.json` / `opencode.json` enumerated, `@requirements-triage` (read-mostly advisory) and `@agent-quality-curator` (read-only advisory) split, plan handoff normalization, schema isolation, question_request consumption, learning check, "never store secrets" guardrail), Required Minimum 12-field summary (full list inline so orchestrator never delegates without the safety contract), malformed-assignment behavior, Subagent Routing. **Moves out** to `references/handoff.md`: 13-step Host Orchestrator Lifecycle prose, Wave Execution playbook details, Memory & Learning coordination procedure, Out of Scope list. Net: Codex/Gemini subagents (which auto-load `AGENTS.md`) see significantly less context bloat without losing safety invariants.
+- **Subagent template Acceptance Checklist trimmed from 14 → 6 items** across all 4 Markdown templates (`subagent.agent.md.template`, `subagent.claude.md.template`, `subagent.opencode.md.template`, `subagent.gemini.md.template`). Preserved receiver-side defenses per rubber-duck critique: (1) all 12 required-minimum fields present; (2) `File Inventory.to_modify` intersects only Owned paths; (3) `Required approvals` lists every approval or `none`; (4) full-form required for MCP/secrets/CI/release/dependency/generated-script/fan-out/security-write/replication/release tasks; (5) Security-team tasks include authorization/validation/counterevidence/severity/proof-gap fields; (6) no inventing missing skills/tools/MCP/approvals/files. Removed: Context freshness wording check, Read-only path exclusion, Verification Protocol exactness, Reporting Protocol exact match, Constraints/Risks gate mention, Coordination wave-siblings format, Content Quality named-check, Context Packet scope wording, Allowed Capabilities/Skills Referenced runtime-neutrality, Expected output specificity (all covered by general "well-formed assignment" check from item 1).
+- **Model selection is now strictly opt-in.** Interview Q9b is no longer asked by default. The opt-in gate only triggers when the user has spontaneously named a model (e.g., "use Sonnet 4.5", "gpt-5-mini") in the brief or prior turns, explicitly asked for BYOK/multi-model routing/cost-perf tuning, or signalled awareness another way. Default `model_overrides_policy = skipped` emits no `model:` lines anywhere. Hard rule #22 updated. Phase 8 wrap-up may surface model overrides as post-generation optional add-on — never as a required step.
+- **Codex skill support documentation corrected** in `references/platforms.md`. Previously contradictory across `platforms.md` ("not supported natively"), `runtime-updates.md` (`$skill-name`/`/skills`), and `skill-format.md`. Now consistent: Codex DOES support skills at `.codex/skills/<name>/SKILL.md` (project) or `~/.codex/skills/<name>/SKILL.md` (user); activates via Codex skill loader; selectable with `$skill-name` (CLI) and browsable with `/skills`; Codex App surfaces skills via its skill UI.
+- **`misplaced-artifacts-migration.md` portable skill default** now includes Codex as a target (was: "Codex skills stay described in `AGENTS.md`"; now: "one target per runtime that supports skills natively, including Codex which loads `.codex/skills/<name>/SKILL.md`").
+- **`scripts/_validate.py`**: relaxed Codex `@<plugin-name>` stale-phrase check to honor negative context ("no", "not", "never", "without", "don't", "do not", "avoid", "nonexistent"), matching the existing OpenCode pattern.
+
+### Validation
+
+- All ~17 validator orphan checks resolved after AGENTS.md.template trim (phrases that moved to `handoff.md` are now checked there: `security/audit evidence`, `proof gaps`, `host-orchestrator and security-owner approval`). Subagent template checks dropped phrases that were trimmed from Acceptance Checklist (`Context freshness is explicit`, `Expected output`).
+- `SKILL.md` stays at exactly 500/500 hard cap after trimming the orchestrator-emission narrative paragraph in Phase 4, merging the "Gemini emits at .gemini/agents/" duplicate sentence with the artifact list, and compressing hard rules #22, #33, #34.
+- `bash scripts/validate.sh` clean.
+- `npx --yes markdownlint-cli2 "**/*.md" "!node_modules" "!.git"` clean (pending final run).
+
+### Migration notes
+
+For users upgrading from v1.3.0:
+
+1. Existing AGENTS.md generated by v1.3.0 has a ~83-line Orchestration Operating Model section. Use the new `upgrade` mode to migrate it to the slim v1.4.0 shape (~37 lines). The upgrade reads `agents-system-setup:generated-by: v1.3.0` (or `pre-stamp` if absent), backs up, diffs for custom content, asks for approval before replacing, and adds the version stamp + central manifest in the same pass.
+2. Existing subagent files generated by v1.3.0 have a 14-item Acceptance Checklist. The `upgrade` mode replaces it with the trimmed 6-item version that preserves all rubber-duck-validated receiver-side defenses.
+3. Pre-stamp systems (`v1.2.0` or earlier without stamps) are detected by absence of `agents-system-setup:generated-by` markers. The upgrade walks `pre-stamp → v1.3.0 → v1.4.0` deltas in order.
+4. User customizations outside `<!-- agents-system-setup:managed:start -->` / `:end` markers are always preserved.
+5. Model override lines (`model: ...`) in existing agents are preserved as-is; the model-selection change only affects how the interview asks the question, not generated artifacts.
+
 ## [1.3.0] - 2026-05-20
 
 ### Removed

@@ -345,6 +345,52 @@ Handoff status: accepted | completed | blocked | returned-to-orchestrator
 Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>
 ```
 
+## Host Orchestrator Lifecycle
+
+These thirteen steps live here so `AGENTS.md` can stay compact while still grounding host-session behavior. The host CLI session runs this lifecycle every time it owns a non-trivial task; subagents do not run it themselves.
+
+1. **Clarify** — If ambiguous and triage cannot resolve it, ask the user one focused question via the provider-native human-input surface (see `AGENTS.md` › Human Input / Question Protocol).
+2. **Requirements Triage** — Invoke `@requirements-triage` for ambiguous, risky, cross-runtime, release, MCP, replication, or multi-wave work; otherwise record `triage: skipped` with rationale. Consume the intake brief, risk flags, routing, and `question_request` items before writing the plan.
+3. **Plan** — Write `plan.md`. List subtasks, owning agent per subtask (cross-check Directory Architecture), security/architecture impact, acceptance criteria, triage result, and a Plan Handoff packet.
+4. **Threat / Architecture check** — If the task touches tools, auth, secrets, dependency manifests, CI/release, data boundaries, APIs, or persistence, delegate to the security and architecture owners before implementation.
+5. **Security Team Scope** — For bug hunting, vulnerability validation, attack-path analysis, disclosure triage, or remediation verification, read `AGENTS.md` › Security Team Operating Model and include authorization scope, evidence, counterevidence, severity rationale, and proof gaps in assignments.
+6. **Compose Assignment** — Compose a Task Assignment using the Required Minimum 12 fields above. Use full-form for normal/risky work (Context Packet, Allowed Capabilities, Skills Referenced, Workflow, Expected output, Stop/Escalation). Safe tiny tasks may use short-form; security/MCP/CI/release/replication or fan-out waves always use full-form.
+7. **Delegate** — Invoke subagents in dependency order using the runtime's native delegation surface (Task/agent tool for Copilot, `Agent` tool for Claude, `task` + `@<agent-name>` for OpenCode, child agent threads for Codex, root-session subagent calls for Gemini). Pass the composed Task Assignment, not the whole project memory.
+8. **Integrate** — Collect outputs; reconcile conflicts. If two agents claim the same path, refer to the Directory Architecture.
+9. **Resolve Questions** — For each returned `question_request`, ask the user once through the provider-native mechanism when possible. If unavailable, apply safe defaults only for reversible, non-sensitive choices; otherwise record the unresolved request and stop before the gated write. Update plan/todos, then re-delegate.
+10. **Verify** — Delegate `@reviewer`, `@tester`, and any required security/architecture owner from Quality Gates. Confirm each subagent passed its Acceptance Checklist or returned a single consolidated `question_request`.
+11. **Content Quality Review** — When generated agent-system prose changed, delegate `@agent-quality-curator` or record the merged reviewer check. Require `Content quality: ok|warn|fail|n/a; signals=<list|none>` before final report.
+12. **Reflect & Learn** — Collect each subagent's `Learning Check`. Append low-risk new learnings through the memory owner. Sensitive new learnings (tagged `risk` or touching MCP, CI/release, dependencies, secrets, or generated scripts) require host-orchestrator and security-owner approval. Updating, overwriting, or superseding prior learnings requires host-orchestrator approval and evidence. Never store secrets or raw credentials.
+13. **Report** — Summarize: changes, verification, security/audit evidence, architecture decisions, pending items, triage status, content-quality status/signals, Task assignment quality (filled fields and question-request count), security-team evidence/proof gaps when applicable, and learning proposals accepted/deferred.
+
+## Wave Execution Playbook
+
+For independent work, the host orchestrator **fans out** all parallel-safe subagents in the current wave in a single host turn using the runtime's native subagent surface. It waits for every result, synthesizes, then starts the next wave. Sequential delegation is allowed only when owned paths overlap, a worker depends on a previous result, or a gate requires review before the next write.
+
+Runtime notes:
+
+- **Copilot CLI** — Task/agent tool fan-out; optional `/fleet` for independent batches (UX, not required).
+- **Claude Code** — `Agent` tool calls (multiple in one assistant turn for parallel-safe subagents); experimental Agent Teams when opted in.
+- **OpenCode** — `task` permission + `@<agent-name>` routing, gated by `permission.task` in `opencode.json`.
+- **OpenAI Codex (CLI + App)** — child agent threads; `.codex/config.toml` `[agents] max_threads` caps concurrency, `max_depth = 1` is the safe default to avoid recursive fan-out.
+- **Gemini CLI** — root-session fan-out only; Gemini subagents cannot recursively call other subagents, so the root session owns all wave coordination.
+
+## Memory & Learning Coordination
+
+Subagents return `Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>` as part of their reporting template. The host orchestrator:
+
+1. Collects every subagent's Learning Check before final report.
+2. Approves and writes low-risk new learnings through the configured memory owner (see `AGENTS.md` › Memory & Learning System).
+3. Routes sensitive proposals (tagged `risk` or touching MCP, CI/release, dependencies, secrets, generated scripts) through host-orchestrator and security-owner approval.
+4. Treats updates / overwrites / supersedes of prior learnings as requiring host approval and evidence — never silent merges.
+5. Never stores secrets or raw credentials; learnings summarize and point to evidence instead of pasting raw logs.
+
+## Out of Scope (for the host orchestrator)
+
+- Bulk code edits in a subagent's owned path → delegate.
+- Long-running implementation work the user expects a specialist to own → delegate.
+- Decisions that require product input → bounce to user via `AGENTS.md` › Human Input / Question Protocol.
+
 ## Verification
 
 Before declaring done:
