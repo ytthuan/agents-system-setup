@@ -1335,6 +1335,11 @@ def check_governance_baseline() -> None:
             "Security & Audit Matrix",
             "Threat Model",
             "Architecture & Design Pattern Decisions",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "handoff.md",
+        (
             "security/audit evidence",
         ),
     )
@@ -2053,8 +2058,13 @@ def check_security_team_policy() -> None:
             "Security Team Scope",
             "Security Team Operating Model",
             "authorization scope",
-            "proof gaps",
             "read-mostly",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "handoff.md",
+        (
+            "proof gaps",
         ),
     )
     for rel in (
@@ -2382,42 +2392,26 @@ def check_no_orchestrator_subagent_emission() -> None:
             "## Orchestration Operating Model",
             "host CLI session",
             "routing alias for that host/root session",
-            "When to delegate vs. act directly",
-            "### Hard Rules",
-            "### Context Load Order",
-            "### Lifecycle",
-            "### Orchestrator Assignment Format",
-            "### Wave Execution",
-            "### Memory & Learning",
+            "### Role and Delegation Stance",
+            "### Core Hard Rules",
+            "### Required Minimum for Every Task Assignment",
             "### Subagent Routing",
-            "### Out of Scope",
             "Plan Handoff Contract",
             "Security & Audit Matrix",
             "Threat Model",
             "Architecture & Design Pattern Decisions",
             "MCP",
             "Reflect & Learn",
-            "Learning Check",
-            "host-orchestrator and security-owner approval",
-            "Never store secrets or raw credentials",
             "Content Quality Review",
             "@agent-quality-curator",
             "Security Team Scope",
             "Security Team Operating Model",
             "authorization scope",
-            "proof gaps",
-            "read-mostly",
             "Requirements Triage",
             "@requirements-triage",
             "triage: skipped",
-            "read-mostly and advisory",
             "I own final decisions and approval gates",
-            "read-only and advisory",
-            "Orchestrator Assignment Format",
             "subtask slice",
-            "Allowed Capabilities",
-            "Skills Referenced",
-            "Stop / Escalation Conditions",
             "Task assignment quality: ok | warn | fail",
             "agents-system-setup:wave-execution",
             "fan out",
@@ -2779,8 +2773,7 @@ def check_context_optimization() -> None:
     require_contains(
         SKILL_ROOT / "assets" / "AGENTS.md.template",
         (
-            "## Context Load Order",
-            "## Orchestrator Assignment Format",
+            "Required Minimum for Every Task Assignment",
             "Plan Handoff Contract",
             "Context freshness: recent",
         ),
@@ -3218,11 +3211,8 @@ def check_prompt_handoff_quality_policy() -> None:
     require_contains(
         SKILL_ROOT / "assets" / "AGENTS.md.template",
         (
-            "Orchestrator Assignment Format",
+            "Required Minimum for Every Task Assignment",
             "subtask slice",
-            "Allowed Capabilities",
-            "Skills Referenced",
-            "Stop / Escalation Conditions",
             "Task assignment quality: ok | warn | fail",
         ),
     )
@@ -3245,8 +3235,6 @@ def check_prompt_handoff_quality_policy() -> None:
                 "{{HANDOFF_TRIAGE_STATUS}}",
                 "{{HANDOFF_CONTENT_QUALITY_STATUS}}",
                 "{{HANDOFF_CONTEXT_FRESHNESS}}",
-                "`Context freshness` is explicit",
-                "Expected output",
             ),
         )
         text = path.read_text(encoding="utf-8")
@@ -3714,11 +3702,17 @@ def check_runtime_invocation_policy() -> None:
                     "or `/skills` for bundled skills"
                 )
             if "@<plugin-name>" in line:
-                err(
-                    f"{rel}:{line_no}: stale Codex plugin invocation example "
-                    "`@<plugin-name>`; describe typing `@` to choose a plugin "
-                    "and `$skill-name` or `/skills` for skills"
+                negative_context = re.search(
+                    r"\b(no|not|never|without|don't|do not|avoid|nonexistent|does not|there is no)\b",
+                    line,
+                    re.IGNORECASE,
                 )
+                if not negative_context:
+                    err(
+                        f"{rel}:{line_no}: stale Codex plugin invocation example "
+                        "`@<plugin-name>`; describe typing `@` to choose a plugin "
+                        "and `$skill-name` or `/skills` for skills"
+                    )
             if "opencode plugin install" in line:
                 negative_context = re.search(
                     r"\b(no|not|without|nonexistent|does not exist|there is no)\b",
@@ -3925,8 +3919,13 @@ def check_learning_memory_policy() -> None:
             "Reflect & Learn",
             "Learning Check",
             "overwrite",
-            "host-orchestrator and security-owner approval",
             "Never store secrets or raw credentials",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "handoff.md",
+        (
+            "host-orchestrator and security-owner approval",
         ),
     )
     for rel in (

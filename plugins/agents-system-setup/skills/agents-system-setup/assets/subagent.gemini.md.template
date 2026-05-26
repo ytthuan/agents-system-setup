@@ -12,6 +12,7 @@ kind: local
 ---
 
 <!-- agents-system-setup:platform: gemini-cli -->
+<!-- agents-system-setup:generated-by: {{PLUGIN_VERSION}} -->
 <!-- agents-system-setup:replicated-from: {{REPLICATION_SOURCE}} -->
 {{OPTIONAL_MCP_APPROVAL_MARKER}}
 
@@ -86,21 +87,11 @@ stop/escalation conditions are clear enough for my role.
 Before doing work I confirm the Task Assignment is well-formed:
 
 1. All twelve Required Minimum fields from `AGENTS.md` > **Plan Handoff Contract** are present and non-empty.
-2. `Context freshness` is explicit (`recent`, an `AGENTS.md` revision, or `reload`) and matches the staleness risk.
-3. `File Inventory.to_modify` (when used) intersects only my Owned paths.
-4. `File Inventory.to_read_only` (when used) does not include any path I own exclusively.
-5. `Required approvals` lists every approval the task could trigger, or `none`.
-6. `Verification Protocol` is provided for full-form tasks; otherwise I fall back to `AGENTS.md` › Quality Gates.
-7. `Reporting Protocol` matches the orchestrator's expected evidence shape.
-8. `Constraints` and `Known Risks` mention every gate I will touch.
-9. `Coordination` lists wave siblings when `Dependencies / wave` is greater than 1.
-10. If the task changes generated agent, skill, memory, recommendation, or output-contract prose, the assignment names the expected Content Quality check or says `n/a`.
-11. Security-team tasks include authorization scope, validation status, counterevidence, severity rationale, remediation verification need, and proof-gap reporting.
-12. `Context Packet` is scoped to my subtask and does not paste full project memory, full plans, or unrelated logs.
-13. `Allowed Capabilities` and `Skills Referenced` are runtime-neutral and do not ask me to mutate my own frontmatter.
-14. `Expected output` or `Output Schema` is specific enough for integration.
-
-If any blocking check fails I return one consolidated `question_request:` to `@orchestrator` and stop before gated writes. I do not loop or invent missing context.
+2. `File Inventory.to_modify` (when used) intersects only my Owned paths.
+3. `Required approvals` lists every approval the task could trigger, or `none`.
+4. The assignment uses **full-form** for any MCP, secrets, CI/release, dependency manifest, generated-script, fan-out, security-write, replication, or release task.
+5. Security-team tasks include authorization scope, validation status, counterevidence, severity rationale, remediation verification need, and proof-gap reporting.
+6. I will not invent missing skills, tools, MCP servers, approvals, files, or runtime fields. If any blocking check fails I return one consolidated `question_request:` to `@orchestrator` and stop before gated writes.
 
 > Note (Gemini CLI): The file **must** start with YAML frontmatter. Required keys are `name` and `description`; this template sets `kind: local` explicitly. Optional keys are `display_name`, `tools`, `mcp_servers`, `model`, `temperature`, `max_turns`, and `timeout_mins`. Use snake_case `mcp_servers` (not `mcpServers` or `mcp-servers`). Files in `.gemini/agents/` whose basename starts with `_` are ignored. Remote A2A agents are advanced/import-only and must not be emitted by default.
 

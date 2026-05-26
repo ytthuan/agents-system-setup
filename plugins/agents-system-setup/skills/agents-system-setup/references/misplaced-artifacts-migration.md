@@ -190,9 +190,9 @@ Different artifact types behave differently across runtimes:
 
 - **Skills are portable.** When the user has multiple runtimes selected,
   default to `Copy to all selected supported runtimes` (one target per
-  runtime that supports skills natively; Codex skills stay described in
-  `AGENTS.md`). One ledger entry per target with the same `source` and
-  shared `migration_id`.
+  runtime that supports skills natively, including Codex which loads
+  `.codex/skills/<name>/SKILL.md`). One ledger entry per target with the
+  same `source` and shared `migration_id`.
 - **Agents, hooks, commands, plugins, prompts are not portable.** Their
   schema differs per runtime. Ask the user via `ask_user` which target
   runtime to migrate to (one per artifact) and emit one ledger entry.
@@ -414,3 +414,112 @@ do NOT include them in the proposed snippet.
   block** with the generic template. Parse the source `permission.task`
   first; preserve allows, asks, and named entries unless they are
   unsafe (e.g., wildcard `allow`).
+
+## Version Stamp Detection & Migration Playbook
+
+Every artifact emitted by this plugin carries a `generated-by` stamp so
+`improve` mode can detect stale content and apply per-version migrations
+without guessing.
+
+### Stamp format
+
+| Artifact | Stamp surface | Example |
+|---|---|---|
+| `AGENTS.md` | HTML comment after `<!-- agents-system-setup:managed:start -->` | `<!-- agents-system-setup:generated-by: v1.4.0 -->` |
+| `.github/agents/*.agent.md` | HTML comment after platform marker | `<!-- agents-system-setup:generated-by: v1.4.0 -->` |
+| `.claude/agents/*.md` | HTML comment after platform marker | `<!-- agents-system-setup:generated-by: v1.4.0 -->` |
+| `.opencode/agents/*.md` | HTML comment after platform marker | `<!-- agents-system-setup:generated-by: v1.4.0 -->` |
+| `.gemini/agents/*.md` | HTML comment after platform marker | `<!-- agents-system-setup:generated-by: v1.4.0 -->` |
+| `.codex/agents/*.toml` | TOML `#` comment in header block | `# agents-system-setup:generated-by: v1.4.0` |
+| Skills (`*/skills/*/SKILL.md`) | HTML comment after frontmatter | `<!-- agents-system-setup:generated-by: v1.4.0 -->` |
+
+A second optional marker `agents-system-setup:generated-at: <ISO-8601>` records when
+the artifact was emitted. Both markers are substituted by the renderer from
+`plugin.json` (`{{PLUGIN_VERSION}}` → `version` field; `{{GENERATED_AT}}` →
+emission timestamp).
+
+### Central manifest `.agents-system-setup/generated.json`
+
+Authoritative source-of-truth in case per-file stamps are accidentally edited
+away. Written atomically after every `init` / `update` / `improve` / `replicate`
+run.
+
+```json
+{
+  "schema": 1,
+  "plugin_version": "1.4.0",
+  "last_run": {
+    "at": "2026-05-26T08:00:00Z",
+    "mode": "init|update|improve|replicate",
+    "host_runtime": "copilot-cli|claude-code|opencode|codex-cli|gemini-cli"
+  },
+  "artifacts": [
+    {
+      "path": "AGENTS.md",
+      "stamp_version": "1.4.0",
+      "stamp_at": "2026-05-26T08:00:00Z",
+      "kind": "agents-md|subagent|skill|mcp-config|hooks|other",
+      "platform": "host|copilot-cli|claude-code|opencode|codex-cli|gemini-cli",
+      "checksum": "sha256:<hex>"
+    }
+  ]
+}
+```
+
+The manifest is operational state only — never inside any `agents/` directory and
+never tracked by git unless the user explicitly opts in via the artifact tracking
+question.
+
+### Detection signals (improve mode)
+
+1. Read `.agents-system-setup/generated.json` if present; treat `plugin_version`
+   as authoritative.
+2. Otherwise, scan every generated artifact for the inline stamp and take the
+   highest version found.
+3. If neither manifest nor stamp is present, treat as `pre-stamp` and assume
+   `v1.3.0` (the last version before stamping was introduced).
+4. Compare detected version against the current plugin version from
+   `plugin.json`. If the detected version is older, run the migration playbook
+   below.
+
+### Per-version migration playbook
+
+Each row describes the **minimum content delta** for a major/minor bump. The
+playbook is additive — running `improve` from `v1.2.0` to `v1.4.0` applies the
+`v1.2.0 → v1.3.0` row, then the `v1.3.0 → v1.4.0` row, in order.
+
+| From → To | Required deltas |
+|---|---|
+| `pre-stamp → v1.3.0` | Add `<!-- agents-system-setup:generated-by: ... -->` marker to every artifact; emit `.agents-system-setup/generated.json`. |
+| `v1.2.0 → v1.3.0` | Delete `orchestrator.agent.md` / `.claude/agents/orchestrator.md` / `.opencode/agents/orchestrator.md` / `.gemini/agents/orchestrator.md`; consolidate Orchestration Operating Model into `AGENTS.md`; relocate OpenCode `permission.task` to `opencode.json` with extract-and-preserve. (See [Deprecated orchestrator subagent files](#deprecated-orchestrator-subagent-files) above.) |
+| `v1.3.0 → v1.4.0` | Trim AGENTS.md › Orchestration Operating Model from ~83 to ~37 lines (preserve inline Required Minimum 12-field summary and malformed-assignment behavior); trim subagent Acceptance Checklist from 14 → 6 items (preserve receiver-side defenses: required-min, owned-paths intersection, approvals, full-form gate, security-team fields, no-invent rule); add `generated-by` stamps; emit central manifest. |
+
+### Migration safety rules
+
+- **Always backup before editing.** `cp <file> <file>.bak` before any in-place
+  rewrite of a generated artifact.
+- **Diff custom content first.** Compare the existing managed block against the
+  stock template from the detected version. If any non-template prose lives
+  inside the managed block, surface a `custom orchestration / handoff additions
+  found, review required` report and require explicit user approval before
+  replacement.
+- **Preserve user content outside the managed block.** The plugin never edits
+  content outside `<!-- agents-system-setup:managed:start -->` / `:end` markers.
+- **Update the stamp atomically with content.** Never write a new stamp without
+  also writing the corresponding content delta.
+- **Manifest is updated last.** Write artifact changes first, verify, then
+  rewrite `.agents-system-setup/generated.json` atomically (write-temp + rename).
+- **Pre-stamp detection is conservative.** When no stamp or manifest exists,
+  assume the most recent legacy version (`v1.3.0`) and prompt the user to
+  confirm before applying any migration.
+
+### Stamp anti-patterns
+
+- Hand-editing a `generated-by` stamp — the plugin uses it as ground truth; manual
+  edits desynchronize the manifest and the artifact.
+- Committing `.agents-system-setup/generated.json` to git without the user's
+  explicit opt-in via the artifact tracking question.
+- Skipping the per-version delta for an intermediate version when running
+  `improve` across two majors — always apply each version's delta in order.
+- Writing the manifest before the artifact deltas — leaves the manifest
+  claiming a state that does not exist on disk.

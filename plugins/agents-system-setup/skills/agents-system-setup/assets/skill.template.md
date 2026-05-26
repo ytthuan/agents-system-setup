@@ -3,6 +3,9 @@ name: {{SKILL_NAME}}
 description: '{{WHAT_AND_WHEN}}. USE FOR: {{TRIGGERS}}. DO NOT USE FOR: {{ANTI_TRIGGERS}}.'
 ---
 
+<!-- agents-system-setup:generated-by: {{PLUGIN_VERSION}} -->
+<!-- agents-system-setup:generated-at: {{GENERATED_AT}} -->
+
 # {{SKILL_DISPLAY_NAME}}
 
 ## When to Use

@@ -7,7 +7,7 @@
 [![Cross-OS](https://img.shields.io/badge/cross--os-linux%20%7C%20macos%20%7C%20windows-blue)](.github/workflows/ci.yml)
 [![Runtimes](https://img.shields.io/badge/runtimes-Copilot%20CLI%20%7C%20Claude%20Code%20%7C%20Codex%20%7C%20OpenCode%20%7C%20Gemini-purple)](#install--per-runtime)
 
-A multi-runtime plugin/skill package that **bootstraps**, **updates**, **improves**, or **replicates** a complete multi-agent system across five supported runtimes: **GitHub Copilot CLI**, **Claude Code**, **OpenCode**, **OpenAI Codex (CLI + App)**, and **Gemini CLI** artifact layouts — from a single skill, with a Canonical IR for bidirectional replication, parallel-aware orchestration, mandatory security/audit/architecture governance, and compact-by-default context output baked in.
+- A multi-runtime plugin/skill package that **bootstraps**, **updates**, **improves**, **upgrades**, or **replicates** a complete multi-agent system across five supported runtimes: **GitHub Copilot CLI**, **Claude Code**, **OpenCode**, **OpenAI Codex (CLI + App)**, and **Gemini CLI** artifact layouts — from a single skill, with a Canonical IR for bidirectional replication, parallel-aware orchestration, mandatory security/audit/architecture governance, version-stamped artifacts, and compact-by-default context output baked in.
 
 ## What it generates
 
@@ -23,7 +23,8 @@ A multi-runtime plugin/skill package that **bootstraps**, **updates**, **improve
 - **Artifact tracking choice** — generated systems can be team-shared in git, local-only via `.git/info/exclude`, or written to personal/global runtime paths.
 - **Memory & Learning System** — generated agents can load curated learnings, run a before-finish Learning Check, and propose durable project lessons without silently overwriting past memory.
 - **Runtime update audit** — latest upstream drift is tracked in `plugins/agents-system-setup/skills/agents-system-setup/references/runtime-updates.md` for all supported runtimes and future candidates.
-- **Optional model overrides with rate-limit guidance** — model selection stays optional during the interview; per-runtime accepted formats, defaults, and source-linked rate-limit pointers live in `plugins/agents-system-setup/skills/agents-system-setup/references/models.md`.
+- **Optional model overrides — opt-in only.** The interview never asks about model selection by default; the question only surfaces when the user has spontaneously named a model or asked for BYOK/multi-model/cost-perf tuning. Per-runtime accepted formats, defaults, and source-linked rate-limit pointers live in `plugins/agents-system-setup/skills/agents-system-setup/references/models.md`.
+- **Version-stamped artifacts + central manifest.** Every generated `AGENTS.md`, subagent, and skill carries an `agents-system-setup:generated-by: vX.Y.Z` marker; `.agents-system-setup/generated.json` records the authoritative version. `upgrade` mode reads stamps and walks the per-version delta playbook to migrate old systems to the current principles non-destructively.
 - **Sharper context engine** — generated `AGENTS.md` includes a Task-Type Routing Map, a context-freshness rule, and a single canonical Delegation Packet schema in `references/handoff.md` so subagents skip duplicated reads and load only what each task tag needs.
 - **Richer task assignments** — host-orchestrator → subagent handoffs use a canonical Task Assignment Contract with required minimum + opt-in expansion blocks (Goal & Definition of Done, Scope, File Inventory, Background, Reproduction, Constraints, Assumptions, Known Risks, Verification Protocol, Reporting Protocol, Coordination, Size & Timebox, Clarification Protocol). Subagent templates ship with an Acceptance Checklist and Reporting Template so handoffs are well-structured by default.
 - **Gemini CLI artifact support** — generated Gemini subagents use `.gemini/agents/*.md` or Gemini extension `agents/*.md`; no Gemini plugin install command is claimed.
@@ -36,6 +37,7 @@ A multi-runtime plugin/skill package that **bootstraps**, **updates**, **improve
 | `init` | Brand-new repo, no agent artifacts |
 | `update` | Existing artifacts, regenerate managed blocks non-destructively |
 | `improve` | Audit existing system → propose checklist of targeted fixes → opt-in apply |
+| `upgrade` | Version-aware migration of an existing agent system to the current plugin's principles (reads `agents-system-setup:generated-by` stamps + `.agents-system-setup/generated.json`, walks per-version delta playbook). Trigger: `/agents-system-setup upgrade` or `agents-system-setup upgrade` |
 | `replicate` | Port agents/skills/MCP from one runtime to another (Copilot ↔ Claude ↔ OpenCode ↔ OpenAI Codex ↔ Gemini CLI) via Canonical IR |
 
 ## Install — per runtime

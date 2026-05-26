@@ -117,13 +117,46 @@ this answer alone.
 ## 9b. Advanced agent behavior
 
 Ask these choices together after topology so users compare the tradeoffs in one
-place. Skip runtime-specific questions when that runtime is not selected.
+place. Skip runtime-specific questions when that runtime is not selected. **By
+default, do not ask the Per-Agent Model Override policy** — assume `model:` lines
+are omitted everywhere unless the user opts in (see below).
 
-### Per-Agent Model Override policy (optional)
+### Per-Agent Model Override policy (optional opt-in only)
+
+**Default: skip this question entirely.** Record
+`model_overrides_policy = skipped` and emit no `model:` lines in any generated
+agent. Platform defaults are intentional: they avoid rate-limit fragility,
+preserve portability, and let users upgrade models without regenerating.
+
+Ask the opt-in question only when **at least one** signal indicates the user is
+aware of and wants model overrides:
+
+- The user spontaneously named a model (e.g. "use Sonnet 4.5", "gpt-5-mini",
+  "haiku for review agents") in the brief, prior turns, or any earlier
+  interview answer.
+- The user explicitly asked for model overrides, BYOK, multi-model routing,
+  cost/perf tuning, or per-role model selection.
+- The user picked a runtime where model selection is unusually impactful
+  (e.g. they mentioned BYOK on Copilot CLI) and asked about tuning.
+
+When any signal is present, ask the meta gate first:
+
+- Q: "You mentioned models — want to configure per-agent model overrides? Most
+  setups should skip and use platform defaults."
+- Choices: `["Skip — use platform defaults (Recommended)", "Yes — show me override options"]`
+- On `Skip`, record `model_overrides_policy = skipped` and stop.
+- On `Yes`, then ask the scope question below.
+
+Scope question (only after the user opts in):
 
 - Q: "How should agent model overrides work? Defaults avoid rate-limit and portability issues."
-- Choices: `["No overrides — use platform defaults (Recommended)", "One model for all agents", "By role/profile", "Exceptions only"]`
-- If not `No overrides`, load [models](./models.md) and prompt only for the chosen scope. Do not loop over every agent unless the user explicitly picks per-agent exceptions. Warn when a supplied id does not match the documented runtime format.
+- Choices: `["One model for all agents", "By role/profile", "Exceptions only"]`
+- Load [models](./models.md) and prompt only for the chosen scope. Do not loop
+  over every agent unless the user explicitly picks per-agent exceptions. Warn
+  when a supplied id does not match the documented runtime format.
+
+If the question was not asked, the wrap-up phase may surface model overrides as
+an optional add-on — never as a required step.
 
 ### 9c. Copilot CLI Tool Profile (only if Copilot CLI is selected)
 
