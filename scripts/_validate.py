@@ -2686,6 +2686,53 @@ def check_opencode_root_task_gate() -> None:
             )
 
 
+def check_opencode_root_skill_gate() -> None:
+    """When OpenCode is selected and the plugin emits host-loaded skills
+    (`task-handoff`, `code-change-build-gate`), the host root agent in
+    `opencode.json` must also have a `permission.skill` gate. Without it,
+    the host cannot load the skill and `Skills Referenced: task-handoff
+    loaded=true` packet evidence is false.
+
+    This check enforces SKILL.md and CHANGELOG describe the gate; the
+    OpenCode JSON inspector reuses the same star-value safety check as
+    the task gate (allow is unsafe by default).
+    """
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "OpenCode root-session skill gate",
+            "permission.skill",
+            "Skills Referenced: task-handoff loaded=true",
+            "opencode_skill_gate: declined",
+            "inline fail-closed minimum",
+        ),
+    )
+
+    for path in REPO.rglob("opencode.json"):
+        if ".git" in path.parts or "node_modules" in path.parts:
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        agent_map = data.get("agent") if isinstance(data, dict) else None
+        if not isinstance(agent_map, dict):
+            continue
+        for root_name, root_cfg in agent_map.items():
+            if not isinstance(root_cfg, dict):
+                continue
+            perm = root_cfg.get("permission") if isinstance(root_cfg.get("permission"), dict) else None
+            skill = perm.get("skill") if perm and isinstance(perm.get("skill"), dict) else None
+            if not skill:
+                continue
+            star = skill.get("*")
+            if star == "allow":
+                err(
+                    f"{path.relative_to(REPO).as_posix()}: `agent.{root_name}.permission.skill[\"*\"]` "
+                    "must be `deny` or `ask`, never `allow` (host-loaded skill safety gate)"
+                )
+
+
 def check_context_optimization() -> None:
     """The skill must stay compact-by-default and preserve progressive loading
     markers in generated templates.
@@ -4042,6 +4089,315 @@ def check_learning_memory_policy() -> None:
                 warn(f"{md.relative_to(REPO).as_posix()}: memory/log Markdown inside runtime agents directory may be parsed as an agent")
 
 
+def check_instruction_memory_audit_policy() -> None:
+    """Keep project memory canonical, adapters thin, and reusable workflows in skills."""
+    require_contains(
+        SKILL_ROOT / "references" / "instruction-memory-audit.md",
+        (
+            "Instruction Memory Audit",
+            "Artifact classification",
+            "Canonical project memory",
+            "Runtime adapter",
+            "Skill workflow",
+            "Path-scoped rule",
+            "adapter-drift",
+            "duplicate-policy",
+            "skill-candidate",
+            "path-scoped-candidate",
+            "Instruction memory audit: ok|warn|fail|n/a",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "instruction-memory-audit",
+            "CLAUDE.md",
+            "GEMINI.md",
+            "Instruction Memory Audit",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "## Instruction Memory Audit",
+            "{{INSTRUCTION_MEMORY_AUDIT_STATUS}}",
+            "{{INSTRUCTION_MEMORY_AUDIT_SIGNALS}}",
+            "CLAUDE.md` adapter: import, symlink, or copy",
+            "adapter symlinks/copies are expected and not conflicts",
+            "instruction-memory-audit",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "platforms.md",
+        (
+            "Instruction memory adapter rule",
+            "canonical cross-runtime",
+            "runtime adapter",
+            "not duplicate-policy findings",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "context-optimization.md",
+        (
+            "Runtime memory adapters",
+            "Instruction Memory Audit",
+            "instruction-memory-audit",
+            "adapter drift",
+        ),
+    )
+
+
+def check_upgrade_mismatch_detection_policy() -> None:
+    """Upgrade mode runs version-stamp playbook + structural mismatch/deprecation diff."""
+    migration_ref = SKILL_ROOT / "references" / "misplaced-artifacts-migration.md"
+    require_contains(
+        migration_ref,
+        (
+            "v1.4.0 → v1.5.0",
+            "task-handoff",
+            "code-change-build-gate",
+            "build-runner",
+            "change-bug-hunter",
+            "change-validator",
+            "Build Gate (SDLC)",
+            "Mismatch & Deprecation Detection (upgrade mode)",
+            "stale-stamp",
+            "missing-section",
+            "missing-skill",
+            "missing-role",
+            "deprecated-artifact",
+            "stale-prose",
+            "unsupported-runtime-field",
+            "adapter-drift",
+            "missing-overflow-link",
+            "Upgrade procedure",
+            "Mismatch report shape",
+            "migration-backup",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "mismatch--deprecation-detection-upgrade-mode",
+            "structural diff",
+            "missing sections/skills/roles",
+            "deprecated artifacts",
+            "migration-backup",
+        ),
+    )
+
+
+def check_sdlc_build_gate_policy() -> None:
+    """Ensure SDLC Build Gate is wired across reference, templates, AGENTS.md, SKILL.md, and topology."""
+    require_contains(
+        SKILL_ROOT / "references" / "sdlc-build-gate.md",
+        (
+            "SDLC Build Gate",
+            "Diff bucket model",
+            "max(size_bucket, criticality_bucket)",
+            "Criticality bucket",
+            "Auth / authz / session middleware",
+            "Crypto / signing / token handling",
+            "Public API / exported symbols / ABI",
+            "Schema / migration / database model",
+            "Dependency manifest / lockfile",
+            "Feature flag / config default",
+            "Permission / policy / IaC",
+            "Gate matrix",
+            "build-runner",
+            "change-bug-hunter",
+            "change-validator",
+            "Mutual-exclusion routing",
+            "evidence integrator",
+            "fail-closed",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "build-gate-matrix.snippet.md",
+        (
+            "agents-system-setup:build-gate-matrix:start",
+            "agents-system-setup:build-gate-matrix:end",
+            "{{BUILD_GATE_STRICTNESS}}",
+            "Diff buckets",
+            "Required gates per bucket",
+            "change-bug-hunter",
+            "change-validator",
+            "Wave assignment",
+        ),
+    )
+    skill_path = (
+        SKILL_ROOT
+        / "assets"
+        / "skills"
+        / "code-change-build-gate.skill.md.template"
+    )
+    require_contains(
+        skill_path,
+        (
+            "name: code-change-build-gate",
+            "agents-system-setup:skill-kind: sdlc-build-gate",
+            "max(size_bucket, criticality_bucket)",
+            "build-runner",
+            "change-bug-hunter",
+            "change-validator",
+            "Mutual-exclusion routing",
+            "Strictness modifier",
+            "Build gate: bucket=",
+            ".codex/skills/code-change-build-gate/SKILL.md",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "## Build Gate (SDLC)",
+            "{{BUILD_GATE_STRICTNESS}}",
+            "{{BUILD_GATE_MATRIX}}",
+            "{{BUILD_GATE_REFERENCE}}",
+            "code-change-build-gate",
+            "change-bug-hunter",
+            "change-validator",
+            "max(size_bucket, criticality_bucket)",
+            "n/a — non-software project | user skipped",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "Build Gate (SDLC)",
+            "build_gate_strictness",
+            "sdlc-build-gate",
+            "code-change-build-gate",
+            "build-gate-matrix",
+            "max(size_bucket, criticality_bucket)",
+            "change-bug-hunter",
+            "change-validator",
+            "merge `change-validator` into `@reviewer`",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "topology.md",
+        (
+            "Software-Dev Universal Subagents (Build Gate)",
+            "build-runner",
+            "change-bug-hunter",
+            "change-validator",
+            "evidence integrator",
+            "mutual-exclusion",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "interview.md",
+        (
+            "9d. SDLC Build Gate",
+            "build_gate_strictness",
+            "Standard (Recommended)",
+            "Strict",
+            "Light",
+            "Skip",
+        ),
+    )
+
+
+def check_task_handoff_skill_policy() -> None:
+    """Ensure the host-side task-handoff skill is emitted and referenced as the source of truth."""
+    skill_path = (
+        SKILL_ROOT
+        / "assets"
+        / "skills"
+        / "task-handoff.skill.md.template"
+    )
+    require_contains(
+        skill_path,
+        (
+            "name: task-handoff",
+            "agents-system-setup:skill-kind: host-handoff",
+            "Host-only composition",
+            "12 required-minimum fields",
+            "Skills Referenced: task-handoff loaded=true",
+            "subagents are executors",
+            "fail-closed",
+            ".codex/skills/task-handoff/SKILL.md",
+            "Acceptance Checklist",
+            "Reporting Template",
+            "Build gate:",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "task-handoff",
+            "host-side source of truth",
+            "Skills Referenced: task-handoff loaded=true",
+            "Subagents never re-delegate through this skill",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "{{TASK_HANDOFF_SKILL_PATHS}}",
+            "Use the `task-handoff` skill",
+            "Skills Referenced: task-handoff loaded=true",
+            "executors",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "handoff.md",
+        (
+            "task-handoff",
+            "host-side `task-handoff` skill",
+            "Skills Referenced: task-handoff loaded=true",
+            "Subagents are executors",
+            "return-to-orchestrator",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "platforms.md",
+        (
+            "Skill auto-load and pointer-fallback rule",
+            "task-handoff",
+            "code-change-build-gate",
+            "Skills Referenced: task-handoff loaded=true",
+            "pointer-only is acceptable",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "context-optimization.md",
+        (
+            "code-change-build-gate",
+            "task-handoff",
+            "host-only",
+        ),
+    )
+    # Every subagent template (Markdown + Codex TOML) must keep an inline
+    # Reporting Template guard with the new Build gate line and a task-handoff
+    # source-of-truth pointer.
+    for template_name in (
+        "subagent.agent.md.template",
+        "subagent.claude.md.template",
+        "subagent.opencode.md.template",
+        "subagent.gemini.md.template",
+    ):
+        require_contains(
+            SKILL_ROOT / "assets" / template_name,
+            (
+                "task-handoff",
+                "fail-closed minimum",
+                "Build gate: n/a | bucket=",
+                "return-to-orchestrator",
+            ),
+        )
+    require_contains(
+        SKILL_ROOT / "assets" / "subagent.codex.toml.template",
+        (
+            "task-handoff",
+            ".codex/skills/task-handoff/SKILL.md",
+            "Never use the skill to delegate to another subagent",
+            "Build gate:",
+            "code-change-build-gate",
+        ),
+    )
+
+
 # ---------- main ----------
 
 def main() -> int:
@@ -4069,6 +4425,7 @@ def main() -> int:
     check_no_orchestrator_subagent_emission()
     check_pointer_files_to_agents_md()
     check_opencode_root_task_gate()
+    check_opencode_root_skill_gate()
     check_mcp_approval_gate()
     check_central_mcp_approval_evidence()
     check_optional_placeholder_leaks()
@@ -4083,6 +4440,10 @@ def main() -> int:
     check_runtime_invocation_policy()
     check_copilot_tool_profile()
     check_learning_memory_policy()
+    check_instruction_memory_audit_policy()
+    check_sdlc_build_gate_policy()
+    check_task_handoff_skill_policy()
+    check_upgrade_mismatch_detection_policy()
 
     if WARNINGS:
         print("\nWARNINGS:")

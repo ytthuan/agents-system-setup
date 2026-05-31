@@ -1,0 +1,181 @@
+---
+name: code-change-build-gate
+description: 'Use when a software-development project makes a code change that needs the SDLC quality gate (build, unit test, e2e test, code review, change bug hunt, validation). USE FOR: computing the diff bucket, picking required gates, gathering per-gate evidence, integrating into the change-validator report. DO NOT USE FOR: documentation-only projects, security-team-only projects, or non-software-dev work.'
+---
+
+<!-- agents-system-setup:generated-by: {{PLUGIN_VERSION}} -->
+<!-- agents-system-setup:generated-at: {{GENERATED_AT}} -->
+<!-- agents-system-setup:skill-kind: sdlc-build-gate -->
+
+# Code-Change Build Gate (SDLC)
+
+## When to Use
+
+- The project is `software-dev` (classified in Phase 1.7 by the
+  agents-system-setup plugin) and Q9d strictness is `Standard`, `Strict`, or
+  `Light` (not `Skip`).
+- The host orchestrator is about to declare a code change done.
+- A subagent needs to know which gates apply to its diff and what evidence
+  to emit.
+
+## Do Not Use
+
+- For documentation-only, content, or security-team-only projects.
+- For replacing the **compact Build Gate matrix in `AGENTS.md`** — that
+  matrix is the fail-closed enforcement surface; this skill is the
+  expanded procedure.
+- For bypassing reviewer/tester/security authority. `@change-validator`
+  integrates evidence; it does not override correctness verdicts.
+
+## Hard Rules
+
+1. **Compute bucket as `max(size_bucket, criticality_bucket)`.** Size never
+   overrides criticality. A one-line change to auth middleware is L or XL.
+2. **The matrix is fail-closed.** Missing evidence for a required gate
+   blocks `@change-validator` sign-off; do not waive a `✅` gate.
+3. **`🟡` gates may be waived** only with rationale recorded in the plan
+   and the validator's integration report.
+4. **Reuse existing roles before adding new ones.** `tester` →
+   unit-test gate, `playwright-e2e` / runtime equivalent → e2e gate,
+   `reviewer` → code-review gate.
+5. **`change-bug-hunter` and `vulnerability-researcher` are not duplicates.**
+   Apply the mutual-exclusion routing rule below when both exist.
+6. **No silent gate.** Every required gate emits evidence in its owner's
+   Reporting Template; `@change-validator` aggregates.
+
+## Procedure
+
+### 1. Compute the diff bucket
+
+Use `max(size_bucket, criticality_bucket)`.
+
+**Size bucket**
+
+| Bucket | Files changed | Lines changed |
+|---|---|---|
+| XS | 1 | ≤ 10 |
+| S | ≤ 3 | ≤ 50 |
+| M | ≤ 10 | ≤ 200 |
+| L | ≤ 25 | ≤ 500 |
+| XL | > 25 or no upper bound | > 500 |
+
+Whitespace-only, generated-file-only, and lockfile-bump-only changes drop
+one size bucket (but never below XS).
+
+**Criticality bucket** — minimum bucket if any surface is touched:
+
+| Surface | Examples | Minimum |
+|---|---|---|
+| Auth / authz / session middleware | login, RBAC, token issuance | L |
+| Crypto / signing / token handling | KMS, JWT keys, hashing | L |
+| Public API / exported symbols / ABI | public `index.*`, OpenAPI surface | L |
+| Schema / migration / database model | `schema.sql`, ORM models | L |
+| Dependency manifest / lockfile | `package.json`, `Cargo.lock` | M |
+| Feature flag / config default | flag rollout, default-on | M |
+| Serialization / deserialization | wire format, protobuf | M |
+| Permission / policy / IaC | Terraform, K8s RBAC, IAM | L |
+| Billing / payments / privacy / telemetry | invoicing, PII, consent | L |
+| CI / release / signing / provenance | release workflows, signing | L |
+| Auth-adjacent middleware | rate limit, CSRF, CORS | M |
+| Recovery / backup / data retention | retention scripts | L |
+
+Two or more `M`-markers together → escalate to `L`. Two or more `L`-markers
+together (or one `L` plus a security-team scope) → escalate to `XL`.
+
+### 2. Pick required gates
+
+| Bucket | Build | Unit | E2E | Review | Bug hunt | Validation |
+|---|---|---|---|---|---|---|
+| XS | ✅ | 🟡 | n/a | ✅ | n/a | ✅ |
+| S | ✅ | ✅ | 🟡 (affected paths) | ✅ | 🟡 (diff scan) | ✅ |
+| M | ✅ | ✅ | ✅ (affected paths) | ✅ | ✅ | ✅ |
+| L | ✅ | ✅ | ✅ (full suite for affected modules) | ✅ (+ security owner if security-L) | ✅ | ✅ (+ architecture if boundary touched) |
+| XL | ✅ | ✅ | ✅ (full suite) | ✅ (architecture + security mandatory) | ✅ (deep hunt; security team if dedicated) | ✅ (formal sign-off; release/CI hooks verified) |
+
+### 3. Compose the delegation packet
+
+For each required gate, the host uses `task-handoff` to compose an
+assignment with:
+
+- task tag `code-change-build-gate`
+- the computed bucket
+- the specific gate this subagent owns
+- the evidence schema below
+- `Skills Referenced: task-handoff loaded=true`
+
+### 4. Gather evidence per gate
+
+| Gate | Owner | Evidence shape |
+|---|---|---|
+| Build | `@build-runner` | command, exit status, build artifact paths, log summary |
+| Unit test | `@tester` or language-specific runner | command, pass/fail counts, coverage delta (if available), failing test names |
+| E2E test | `@playwright-e2e` or runtime equivalent | command, scenarios run, pass/fail, screenshots/traces stored path |
+| Code review | `@reviewer` | reviewed file paths, signed-off-by, blocking comments resolved or waived |
+| Change bug hunt | `@change-bug-hunter` | scanned paths, candidate count, suspicion list, severity, evidence links |
+| Validation | `@change-validator` | aggregated gate status, required-approval status, residual risk note |
+
+### 5. Apply the routing rule (when applicable) — Mutual-exclusion routing
+
+When `vulnerability-researcher` exists (security-team setups):
+
+| Scenario | Route to |
+|---|---|
+| Diff-scoped regression, logic, integration, lightweight security sniff | `@change-bug-hunter` |
+| Program-scoped threat-driven research | `@vulnerability-researcher` |
+| Suspicion on a diff with dedicated security team | `@change-bug-hunter` summarizes; `@vulnerability-researcher` owns deeper analysis |
+| Bug-bounty / disclosure / coordinated triage | `@bug-bounty-triage` or `@security-lead` |
+
+### 6. Wave assignment
+
+- Build → Unit Test (sequential per language toolchain).
+- E2E · Review · Change bug hunt (parallel wave once build/unit pass).
+- Change Validation (final wave, `waits_for` every preceding gate).
+
+### 7. Strictness modifier
+
+| Strictness | Effect on procedure |
+|---|---|
+| Standard | Use the matrix above as written. |
+| Strict | Promote every `🟡` to `✅`. XL requires two reviewer approvals and an explicit release-validator sign-off. |
+| Light | Merge `@change-validator` into `@reviewer`. XS keeps only build + review. M demotes e2e to `🟡`. |
+| Skip | Do not run the gate; the plugin should not have emitted this skill. |
+
+## Anti-patterns
+
+- Treating size buckets as the only signal — criticality always wins.
+- Letting `@change-validator` override reviewer/tester correctness verdicts.
+- Letting `@change-bug-hunter` duplicate full threat-model analysis when a
+  security team is present.
+- Running the gate only when the user explicitly invokes the skill (the
+  matrix is also inlined in `AGENTS.md` for fail-closed enforcement).
+- Marking a `✅` gate as `waived` (only `🟡` is waivable, with rationale).
+- Skipping evidence emission "because the gate trivially passed" — every
+  required gate emits at least a one-line `Build gate:` summary in the
+  Reporting Template.
+
+## Output Contract
+
+Subagents that own a build-gate role include in their Reporting Template:
+
+```text
+Build gate: bucket=<XS|S|M|L|XL>; gate=<build|unit|e2e|review|bug-hunt|validation>; status=<pass|fail|waived>; evidence=<summary>
+```
+
+`@change-validator` aggregates and emits:
+
+```text
+Build gate (validation): bucket=<XS|S|M|L|XL>; strictness=<standard|strict|light>; required=<list>; passed=<list>; waived=<list+rationale|none>; residual_risk=<summary|none>; sign-off=<accept|block>; integration_report=<path|inline>
+```
+
+## Verification
+
+- The host orchestrator confirms `Build gate (validation): sign-off=accept`
+  before declaring the change done.
+- `AGENTS.md` › Build Gate (SDLC) section + this skill agree on the matrix;
+  if they drift, the AGENTS.md inline matrix wins (it is the fail-closed
+  surface).
+- Codex (CLI + App) loads this skill at
+  `.codex/skills/code-change-build-gate/SKILL.md` via the skill loader
+  (`$code-change-build-gate` or `/skills`). Other runtimes use their
+  per-runtime skills path; the AGENTS.md inline matrix is the always-on
+  source of truth.

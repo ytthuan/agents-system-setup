@@ -32,7 +32,7 @@ user selected in Phase 0. Use this table as the canonical mapping:
 | Artifact | Copilot CLI | Claude Code | OpenCode | OpenAI Codex | Gemini CLI | Notes |
 |---|---|---|---|---|---|---|
 | Agents | `.github/agents/<name>.agent.md` | `.claude/agents/<name>.md` | `.opencode/agents/<name>.md` | `.codex/agents/<name>.toml` | `.gemini/agents/<name>.md` | File-based |
-| Skills | `.github/skills/<name>/SKILL.md` | `.claude/skills/<name>/SKILL.md` | `.opencode/skills/<name>/SKILL.md` | n/a — describe in `AGENTS.md` | `.gemini/skills/<name>/SKILL.md` | File-based folder |
+| Skills | `.github/skills/<name>/SKILL.md` | `.claude/skills/<name>/SKILL.md` | `.opencode/skills/<name>/SKILL.md` (loaded via `skill` tool, gated by `permission.skill`) | `.codex/skills/<name>/SKILL.md` (project) or `~/.codex/skills/<name>/SKILL.md` (user); activates via Codex skill loader | `.gemini/skills/<name>/SKILL.md` | File-based folder |
 | Hooks | `.github/hooks/*.json` | `.claude/settings.json` › `"hooks"` (config-embedded) | `.opencode/hooks/` | not supported | `.gemini/settings.json` › `"hooks"` (config-embedded) | Mixed |
 | Commands | plugin `commands/<cmd>.md` under plugin root | `.claude/commands/<cmd>.md` | `.opencode/commands/<name>.md` | not a standard surface | extension-bundled `commands/*.md` only | File-based |
 | Prompts | `.github/prompts/<name>.prompt.md` (VS Code Chat surface) | not standard | not standard | not standard | not standard | File-based |
@@ -493,6 +493,129 @@ playbook is additive — running `improve` from `v1.2.0` to `v1.4.0` applies the
 | `pre-stamp → v1.3.0` | Add `<!-- agents-system-setup:generated-by: ... -->` marker to every artifact; emit `.agents-system-setup/generated.json`. |
 | `v1.2.0 → v1.3.0` | Delete `orchestrator.agent.md` / `.claude/agents/orchestrator.md` / `.opencode/agents/orchestrator.md` / `.gemini/agents/orchestrator.md`; consolidate Orchestration Operating Model into `AGENTS.md`; relocate OpenCode `permission.task` to `opencode.json` with extract-and-preserve. (See [Deprecated orchestrator subagent files](#deprecated-orchestrator-subagent-files) above.) |
 | `v1.3.0 → v1.4.0` | Trim AGENTS.md › Orchestration Operating Model from ~83 to ~37 lines (preserve inline Required Minimum 12-field summary and malformed-assignment behavior); trim subagent Acceptance Checklist from 14 → 6 items (preserve receiver-side defenses: required-min, owned-paths intersection, approvals, full-form gate, security-team fields, no-invent rule); add `generated-by` stamps; emit central manifest. |
+| `v1.4.0 → v1.5.0` | See [v1.4.0 → v1.5.0 details](#v140--v150-migration-details) below — the row was extracted because it spans multiple coordinated emissions across skills, AGENTS.md sections, roster roles, and all 5 subagent templates. |
+
+### v1.4.0 → v1.5.0 migration details
+
+When the detected version is `v1.4.0` (or any pre-stamp `v1.4.0`-shaped
+artifact), apply these deltas in order:
+
+1. **`task-handoff` skill emission.** Emit
+   `task-handoff` skill at every selected runtime's skills path including
+   Codex at `.codex/skills/task-handoff/SKILL.md`.
+2. **Build Gate (SDLC) — software-dev projects only.** Ask interview Q9d
+   Build Gate strictness. If not `Skip`:
+   - Emit the `code-change-build-gate` skill at every runtime's skills path.
+   - Render `## Build Gate (SDLC)` in `AGENTS.md` with the matrix snippet.
+   - Add `build-runner`, `change-bug-hunter`, `change-validator` to the
+     roster. Merge `change-validator` into `@reviewer` for `Light`.
+
+   For non-software-dev projects or strictness `Skip`, render the section
+   as `Build Gate (SDLC): n/a — non-software project or user skipped`.
+3. **Instruction Memory Audit section.** Add `## Instruction Memory Audit`
+   to `AGENTS.md` with the standard placeholders.
+4. **Subagent template patches.** Patch every subagent template
+   (Markdown for Copilot/Claude/OpenCode/Gemini and TOML for Codex) to
+   include the `task-handoff` source-of-truth pointer at the top of
+   Acceptance Checklist and Reporting Template sections. Preserve the
+   existing inline content as the fail-closed minimum and add the new
+   `Build gate:` line in the Reporting Template.
+5. **Orchestration Operating Model update.** Update `AGENTS.md` so the host
+   CLI session loads `task-handoff` and passes
+   `Skills Referenced: task-handoff loaded=true` in delegation packets.
+6. **Codex skills documentation fix.** Replace any stale wording such as
+   "Codex → no native skills" in generated `AGENTS.md` or skills tables.
+   Codex supports `.codex/skills/<name>/SKILL.md` (project) or
+   `~/.codex/skills/<name>/SKILL.md` (user).
+
+## Mismatch & Deprecation Detection (upgrade mode)
+
+The version-stamp playbook above handles the **content delta** between known
+versions. `upgrade` mode also runs a **structural diff** against the current
+plugin's expected output, so deprecated artifacts and missing/stale prose are
+caught even when version stamps are absent, edited, or correct but the file
+content has drifted. The audit runs after Phase 1 footprint detection and
+before any write.
+
+### Detection signals
+
+| Signal | What it catches | Detection rule |
+|---|---|---|
+| `stale-stamp` | Old version stamp | Per-file stamp or central manifest `plugin_version` < current `plugin.json` `version`. |
+| `missing-section` | Required `AGENTS.md` section absent | Required sections by current version: `Plan Handoff Contract`, `Context Loading Policy`, `Instruction Memory Audit`, `Memory & Learning System`, `Task-Type Routing Map`, `Security & Audit Matrix`, `Threat Model`, `Architecture & Design Pattern Decisions`, `ADR Index`, `Quality Gates`, plus `Build Gate (SDLC)` for software-dev or its `n/a` rationale. Match section headings literally (the exact `&`, not `/`). |
+| `missing-skill` | Required skill not emitted | `task-handoff` skill missing at any selected runtime's skills path (Codex included); `code-change-build-gate` skill missing for software-dev projects with strictness != `skipped`. |
+| `missing-role` | Required roster role missing | For software-dev with strictness != `skipped`: `build-runner`, `change-bug-hunter`, `change-validator` (or `change-validator merged into @reviewer` for `Light`). |
+| `deprecated-artifact` | File should no longer exist | `orchestrator.agent.md`, `.claude/agents/orchestrator.md`, `.opencode/agents/orchestrator.md`, `.gemini/agents/orchestrator.md`, `.codex/agents/orchestrator.toml`, anything under `.agents-system-setup/{agents,skills,hooks,commands,prompts,plugins}/`. |
+| `stale-prose` | Generated prose contradicts current plugin truth | "Codex → no native skills" in AGENTS.md skills table, `permission.task` block in an OpenCode subagent file (must be in `opencode.json`), subagent templates missing the `task-handoff` pointer, subagent Reporting Template missing the `Build gate:` line. |
+| `unsupported-runtime-field` | Field that the runtime never loaded | Codex agent TOML `memory` or `request_user_input`, Gemini `mcpServers` (must be `mcp_servers`), Copilot custom-agent `tools:` containing `ask_user`, OpenCode `mcp-servers:` in agent frontmatter. |
+| `adapter-drift` | `CLAUDE.md` / `GEMINI.md` no longer mirrors `AGENTS.md` | Hash mismatch when adapter was originally a copy; resolve via [instruction-memory-audit](./instruction-memory-audit.md). |
+| `missing-overflow-link` | Long section moved to references with no pointer | `AGENTS.md` references a moved section by name but the Overflow Details link is missing. |
+
+### Upgrade procedure
+
+1. **Detect.** Walk every generated artifact and emit one report row per
+   signal. Group by file and severity (`required`, `recommended`,
+   `informational`).
+2. **Classify.** Tag each signal as `delete`, `add`, `patch`, or `replace`.
+   `delete` is reserved for deprecated artifacts; `add` for missing
+   sections/skills/roles; `patch` for stale prose where the existing prose
+   can be safely amended in place; `replace` for whole-block rewrites.
+3. **Propose.** Render a compact upgrade card to the user with the per-file
+   plan, citing the version playbook row(s) that justify each delta. Wait
+   for `ask_user` approval. Approval is per-group (all `delete`s together,
+   all `add`s together, etc.) — the user may decline individual groups.
+4. **Backup.** `cp <file> <file>.bak` for every artifact about to be touched.
+   For directories that will be removed, copy contents into
+   `.agents-system-setup/migration-backup/<timestamp>/`.
+5. **Apply.** Execute approved deltas in order: `delete` → `add` → `patch`
+   → `replace`. Preserve user-authored content outside managed blocks at
+   all times.
+6. **Ledger.** Append one JSONL entry to `.agents-system-setup/migration.jsonl`
+   per touched artifact (old version, new version, signal, classification,
+   backup path, decision).
+7. **Manifest.** Update `.agents-system-setup/generated.json` atomically
+   after all artifact writes succeed (write-temp + rename).
+8. **Verify.** Re-run the structural diff. Remaining signals must be either
+   `informational` or explicitly deferred with a recorded rationale.
+
+### Mismatch report shape
+
+```text
+Upgrade mismatch report — detected v1.3.0, current v1.5.0
+
+[REQUIRED · delete]
+  - .github/agents/orchestrator.agent.md (deprecated-artifact, v1.3.0 playbook)
+  - .claude/agents/orchestrator.md (deprecated-artifact, v1.3.0 playbook)
+
+[REQUIRED · add]
+  - .github/skills/task-handoff/SKILL.md (missing-skill, v1.5.0 playbook)
+  - .codex/skills/task-handoff/SKILL.md (missing-skill, v1.5.0 playbook)
+  - AGENTS.md › ## Build Gate (SDLC) (missing-section, v1.5.0 playbook, software-dev)
+  - AGENTS.md › ## Instruction Memory Audit (missing-section, v1.5.0 playbook)
+  - Roster: build-runner, change-bug-hunter, change-validator (missing-role, v1.5.0 playbook, software-dev)
+
+[RECOMMENDED · patch]
+  - .github/agents/reviewer.agent.md (stale-prose: task-handoff pointer missing, v1.5.0 playbook)
+  - AGENTS.md skills table (stale-prose: "Codex → no native skills", v1.5.0 playbook)
+
+[INFORMATIONAL]
+  - CLAUDE.md (adapter-drift: hash differs from AGENTS.md; review via instruction-memory-audit)
+
+Approve groups: [REQUIRED · delete] [REQUIRED · add] [RECOMMENDED · patch]
+```
+
+### Anti-patterns
+
+- Applying upgrade deltas without showing the mismatch report to the user.
+- Treating `informational` signals as actionable without explicit user
+  approval (especially `adapter-drift` — `CLAUDE.md` / `GEMINI.md` are
+  expected to be copies/symlinks).
+- Skipping the per-version playbook in favor of jumping to the latest
+  expected state — intermediate version deltas may have to handle data
+  shapes the current code no longer produces.
+- Deleting deprecated artifacts without backup. Always copy to
+  `.agents-system-setup/migration-backup/<timestamp>/` first.
+- Updating the manifest before all artifact writes succeed.
 
 ### Migration safety rules
 

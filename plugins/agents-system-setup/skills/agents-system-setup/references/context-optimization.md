@@ -19,6 +19,7 @@ If the user is unsure, choose `Balanced`.
 | Artifact | Purpose | Context rule |
 |---|---|---|
 | `AGENTS.md` | Canonical routing and policy index | One-screen "Read First"; compact matrices; link overflow details. |
+| Runtime memory adapters | `CLAUDE.md`, `GEMINI.md`, and similar provider memory pointers | Import/symlink/copy canonical `AGENTS.md`; keep only provider-specific overrides inline. |
 | Runtime agent files | Role-specific execution instructions | Include role, owned/read-only paths, triggers, security boundary, output contract. Avoid repeating full project policy. |
 | Requirements triage output | Intake brief before planning | Keep inline in the plan as a compact scope/risk/routing seed; do not duplicate full repo memory. |
 | Content quality review | Anti-slop signal check before final output | Keep only status/signals inline; link `content-quality.md` for taxonomy and fixes. |
@@ -58,6 +59,7 @@ Keep inline:
 - Requirements triage status and latest intake evidence.
 - Content-quality status, curator mode, and signals.
 - Memory & Learning System summary, including Learning Check and memory owner.
+- Instruction Memory Audit summary for improve/upgrade or memory rewrites.
 
 Move or link when large:
 - Full marketplace candidate research.
@@ -139,10 +141,13 @@ Map common task tags to the references each agent should load (or skip), and to 
 | `disclosure-triage` | Security Team Operating Model, authorization/scope, report details | `security-team.md`, OWASP disclosure/CISA CVD references when needed | Source files not needed to determine scope or reproduction | full-form |
 | `mcp-write` | MCP approval gate (Phase 3.5), Security & Audit Matrix | `plugin-discovery.md` MCP rendering | Architecture Decisions detail | full-form |
 | `replication` | `replication.md`, `handoff.md`, `output-contract.md` | `models.md` for explicit overrides | Project-specific quality gate detail | full-form |
+| `code-change-build-gate` | `AGENTS.md` › Build Gate (SDLC) inline matrix, `sdlc-build-gate.md`, owning gate role's Reporting Template | runtime-specific build/test runner refs, security-team routing when both `change-bug-hunter` and `vulnerability-researcher` exist | Full marketplace research, unrelated subagent rosters | full-form |
+| `task-handoff` (host only) | `task-handoff` skill body, `handoff.md`, current task tag's expansion blocks | runtime-specific delegation surfaces | Subagent-side prose unless composing for a specific subagent | host-only; emitted skill, not a delegation tag |
 | `release` | Quality Gates, manifests, version sync rules | `runtime-updates.md` for upstream drift | Long architecture rationale | full-form |
 | `docs-only` | `AGENTS.md` Read First | Quality Gates only if doc CI exists | Security/MCP gates unless docs touch credentials | short-form |
 | `bug-fix` | `AGENTS.md` Read First, Directory Architecture, owning agent boundary | Quality Gates row, repro logs, related ADRs | Long marketplace research | full-form (Reproduction block required) |
 | `learning-check` | `AGENTS.md` Memory & Learning System, Learning Index | `learning-memory.md` for update/supersede policy | Full operational ledger, unrelated learnings | short-form |
+| `instruction-memory-audit` | `AGENTS.md` Instruction Memory Audit, Context Loading Policy | `instruction-memory-audit.md`, runtime adapter files, skills, path-scoped rules | Source implementation files unless needed for path-scope evidence | short-form findings |
 
 The map is guidance, not a hard schema. Agents may load more references when the task warrants it; they must not skip load rows that include a hard gate, and they must not downgrade the recommended form for security/MCP/release tasks.
 
@@ -165,6 +170,7 @@ Renderers must keep section headings (so validators and humans can find them) an
 - Treating `<details>` blocks as context optimization; models still read the text.
 - Moving security/audit/architecture gates into a file that `AGENTS.md` does not link.
 - Repeating the same policy paragraph in every subagent.
+- Treating expected `CLAUDE.md` / `GEMINI.md` adapter pointers as conflicts instead of classifying adapter drift first.
 - Adding anti-slop bloat instead of a compact `Content quality` status and linked signal taxonomy.
 - Loading `prompt-guidelines.md` in every runtime subagent instead of using the
   embedded Assignment Intake.

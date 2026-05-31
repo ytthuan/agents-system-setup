@@ -6,6 +6,22 @@ This contract is also the **Task Assignment / Prompt Contract** for
 orchestrator-to-subagent delegation. The machine-readable schema lives here; the
 prompt-authoring guide lives in [prompt guidelines](./prompt-guidelines.md).
 
+> **Generated systems also receive a host-side `task-handoff` skill.** When
+> the plugin emits an agent system, it generates a portable `task-handoff`
+> skill at each selected runtime's skills path
+> (`.github/skills/task-handoff/SKILL.md`,
+> `.claude/skills/task-handoff/SKILL.md`,
+> `.opencode/skills/task-handoff/SKILL.md`,
+> `.codex/skills/task-handoff/SKILL.md`,
+> `.gemini/skills/task-handoff/SKILL.md`). The skill body is the
+> consumer-side reference for the Acceptance Checklist and Reporting
+> Template that subagent templates point to. The host CLI session (the
+> orchestrator role) loads it before composing delegation packets and passes
+> `Skills Referenced: task-handoff loaded=true` in the packet so subagents
+> can rely on the pointer. **Subagents are executors** and do not re-delegate
+> through this skill; if scope exceeds their owned paths, they
+> `return-to-orchestrator`.
+
 ## Source prompt
 
 VS Code Insiders ships a `plan.prompt.md` prompt with this shape:
