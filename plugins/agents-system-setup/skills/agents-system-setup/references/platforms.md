@@ -18,15 +18,41 @@ This skill targets five agent runtimes. The user picks one or more in **Phase 0*
 |---|---|---|---|---|---|
 | Agents | Emit `.github/agents/<name>.agent.md`; also recognize `.github/agents/<name>.md` as an upstream docs drift/import signal | `.claude/agents/<name>.md` | Markdown default: `.opencode/agents/<name>.md`; JSON import/update surface: `opencode.json` top-level `agent` | orchestrator + project rules in `AGENTS.md`; **specialized subagents in `.codex/agents/<name>.toml`** (project) or `~/.codex/agents/` (user) | `.gemini/agents/<name>.md` (project local subagent) or `~/.gemini/agents/<name>.md` (user); extension `agents/*.md` is import/package surface |
 | Skills | `.github/skills/<name>/SKILL.md` | `.claude/skills/<name>/SKILL.md` | `.opencode/skills/<name>/SKILL.md`; keep separate from commands; gated by `permission.skill` | `.codex/skills/<name>/SKILL.md` (project) or `~/.codex/skills/<name>/SKILL.md` (user); activates via Codex skill loader, selectable with `$skill-name` and browsable with `/skills` (CLI); Codex App also surfaces skills via its skill UI; do not document `@<plugin-name>` as bundled skill invocation | `.gemini/skills/<name>/SKILL.md` (project) or `~/.gemini/skills/<name>/SKILL.md` (user); `.agents/skills/<name>/SKILL.md` also recognized; extension-packaged skills also supported; activation is model-side via skill loading; managed with `/skills`; no `$skill` or `/<skill>` invocation |
+
+### Skill auto-load and pointer-fallback rule
+
+`task-handoff` and `code-change-build-gate` are emitted at every selected
+runtime's skills path, including Codex. Auto-load semantics differ:
+
+| Runtime | Skill auto-load behavior | Subagent template policy |
+|---|---|---|
+| Copilot CLI | Skills surface via slash discovery; not guaranteed to be in subagent context | Keep compact inline Acceptance + Reporting (not just 12-field guard); skill is the expanded procedure |
+| Claude Code | Project skills available via `/skills`; loaded on demand | Keep compact inline Acceptance + Reporting; skill is the expanded procedure |
+| OpenCode | Skills are loaded through the `skill` tool, gated by `permission.skill` | Keep compact inline Acceptance + Reporting; skill is the expanded procedure |
+| OpenAI Codex (CLI + App) | Skill loader auto-activates; selectable via `$skill-name` / `/skills` | TOML `developer_instructions` keeps the 12-field guard + one-line skill pointer; pointer-only is acceptable because the skill loader is reliable |
+| Gemini CLI | Activation is model-side via skill loading; no guarantee subagent context loads the skill | Keep compact inline Acceptance + Reporting; skill is the expanded procedure |
+
+**Rule:** for runtimes where skill auto-load is not guaranteed, subagent
+templates must keep a compact inline Acceptance Checklist + Reporting
+Template (condensed form), not only the 12-field guard. The host CLI
+session passes `Skills Referenced: task-handoff loaded=true` in the
+delegation packet so subagents can decide whether to rely on the skill or
+the inline minimum. For Codex, the skill loader is reliable enough that
+pointer-only is acceptable.
 | MCP servers | `.mcp.json` (root) | `.mcp.json` (root, shared with Copilot) | `opencode.json` › `"mcp": { ... }` | `.mcp.json` (root, shared) | per-agent `mcp_servers:` in `.gemini/agents/*.md`; extension manifests use `mcpServers`; all MCP writes are approval-gated |
 | Hooks | `.github/hooks/*.json` | `.claude/settings.json` › `"hooks"` | `.opencode/hooks/` | not supported | native `settings.json` hooks at project / user / system scope; extension `hooks/hooks.json` when packaging; not extension-only |
 | Commands | plugin `commands/<cmd>.md` under plugin root | plugin `commands/<cmd>.md` supported for slash commands (not legacy); project commands at `.claude/commands/<cmd>.md` | `.opencode/commands/<name>.md` or `command` config key; invoked as `/<name>`; `$ARGUMENTS`/`$1` are body placeholders, not invocation syntax; keep separate from skills | not a standard surface | Gemini extensions can bundle `commands/*.md`; no native project command surface |
 | Human input | Session `ask_user`; disabled by `--no-ask-user`; not a custom-agent `tools:` alias | `AskUserQuestion` tool; include in restrictive `tools:` only for ask-capable agents | `question` tool, granted with nested `permission: { question: allow }` | `request_user_input` in Plan mode only; no TOML field | `ask_user` tool; valid in `tools:` allowlists for interactive agents |
-| Project memory | `AGENTS.md` (root) | `CLAUDE.md` (symlink → `AGENTS.md` on macOS/Linux; copy on Windows) | `AGENTS.md` (native) | `AGENTS.md` (native — primary consumer in Codex CLI + App artifact flows) | `GEMINI.md` is Gemini's native context file; keep it a compact pointer/sync copy of canonical `AGENTS.md` when Gemini is selected |
+| Project memory | `AGENTS.md` (root, canonical project memory) | `CLAUDE.md` runtime adapter: import/symlink/copy canonical `AGENTS.md`, plus Claude-only overrides | `AGENTS.md` (native) | `AGENTS.md` (native — primary consumer in Codex CLI + App artifact flows) | `GEMINI.md` runtime adapter: compact pointer/sync copy of canonical `AGENTS.md` when Gemini is selected |
 | Personal memory | `~/.copilot/AGENTS.md` | `~/.claude/CLAUDE.md` | `~/.config/opencode/AGENTS.md` | `~/.codex/AGENTS.md` | `~/.gemini/GEMINI.md` plus `~/.gemini/agents/` |
 | Native durable learning | Copilot Memory public preview: transparent server-side durable repo memory; plugin-managed learning remains complementary | `memory` set to `user`, `project`, or `local` for project/user/session agents; plugin agents support memory but not `hooks`, `mcpServers`, or `permissionMode` | No durable auto-learning beyond AGENTS.md, skills, compaction, and plugin patterns | Memories feature via `[features] memories = true` and `~/.codex/memories/`; off by default/region-limited; do not emit `memory` in agent TOML | `save_memory`, `GEMINI.md`, `/memory`, and experimental `autoMemory`; skills use `activate_skill` |
 
 > **Operational state directory.** Never write `agents/`, `skills/`, `hooks/`, `commands/`, `prompts/`, or `plugins/` subtrees inside `.agents-system-setup/`. Runtimes do not load artifacts from there; existing misroutes go through [misplaced-artifacts-migration](./misplaced-artifacts-migration.md).
+>
+> **Instruction memory adapter rule.** `AGENTS.md` is the canonical cross-runtime
+> memory. `CLAUDE.md`, `GEMINI.md`, and similar provider files are runtime
+> adapters, so expected imports/symlinks/copies are not duplicate-policy findings
+> unless they drift or contradict `AGENTS.md`.
 
 ## Agent Frontmatter — per platform
 

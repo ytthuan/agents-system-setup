@@ -26,6 +26,29 @@ Each row also names the **owned paths** that feed into AGENTS.md › Directory A
 | `architecture-reviewer` | Preserve boundaries, ADRs, quality attributes, and design-pattern rationale | read-only + docs write if ADRs approved | `docs/adr/**`, architecture docs |
 | `design-pattern-reviewer` | Check implementation against selected patterns and anti-patterns | read-only | *(none — read-only)* |
 
+## Software-Dev Universal Subagents (Build Gate)
+
+These three roles are added when Phase 1.7 classifies the project as
+`software-dev` AND Q9d Build Gate strictness is not `Skip`. They follow the
+SDLC quality bar from [SDLC build gate](./sdlc-build-gate.md).
+
+| Subagent | Responsibility | Tool restrictions | Owned paths (Directory Architecture) |
+|---|---|---|---|
+| `build-runner` | Execute build commands; report status, artifact paths, log summary | read + execute build/formatter commands declared in plan | *(none — runs commands, may write build artifacts under generated dirs only)* |
+| `change-bug-hunter` | Diff-scoped logic, regression, integration sniff + lightweight security check | read-only + bounded local search | *(none — read-only)* |
+| `change-validator` | Aggregate gate evidence; emit final pre-merge integration report; enforce required approvals | read-only + aggregate | *(none — read-only; integrates evidence emitted by gate owners)* |
+
+`change-validator` is an **evidence integrator**, not a correctness
+authority. `@reviewer`, `@tester`, and security/architecture owners remain
+authoritative on their gates. When Q9d strictness is `Light`,
+`change-validator` merges into `@reviewer` and is not emitted as a separate
+subagent.
+
+`change-bug-hunter` and `vulnerability-researcher` follow the
+mutual-exclusion routing rule documented in
+[sdlc-build-gate.md](./sdlc-build-gate.md#mutual-exclusion-routing-change-bug-hunter-vs-vulnerability-researcher).
+Do not duplicate scope.
+
 ## Per-Project-Type Recommendations
 
 ### Documentation site (mkdocs/docusaurus/astro)

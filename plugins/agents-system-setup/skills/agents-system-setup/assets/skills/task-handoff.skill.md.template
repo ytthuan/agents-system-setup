@@ -1,0 +1,198 @@
+---
+name: task-handoff
+description: 'Use when the host CLI session (orchestrator role) composes a delegation packet for a subagent. USE FOR: host-side packet composition, Acceptance Checklist reference, Reporting Template reference, packet-form selection per task tag. DO NOT USE FOR: subagent-to-subagent delegation (subagents are executors and return to the host instead).'
+---
+
+<!-- agents-system-setup:generated-by: {{PLUGIN_VERSION}} -->
+<!-- agents-system-setup:generated-at: {{GENERATED_AT}} -->
+<!-- agents-system-setup:skill-kind: host-handoff -->
+
+# Task Handoff (host-side)
+
+## When to Use
+
+- The **host CLI session** (the orchestrator role reading `AGENTS.md`) is
+  about to delegate a subtask to a specialized subagent.
+- You need to verify a delegation packet covers the 12 Required Minimum
+  fields plus the right expansion blocks for the task tag.
+- A subagent needs the canonical Acceptance Checklist or Reporting Template
+  (consumer side) — the skill body is the source of truth that
+  subagent templates point to.
+
+## Do Not Use
+
+- For subagent-to-subagent delegation. Subagents are **executors**; if a
+  subtask exceeds their owned paths, they `return-to-orchestrator` and the
+  host composes the next assignment.
+- For replacing the inline 12-field fail-closed guard in subagent templates.
+  The guard stays inline so subagents can reject malformed assignments even
+  when this skill is not loaded.
+
+## Hard Rules
+
+1. **Host-only composition.** Only the host CLI session composes packets
+   using this skill. Subagents consume packets; they do not author them.
+2. **Required Minimum 12 fields, every assignment** (the 12 required-minimum fields).
+   `Task`, `Source plan`, `Owned paths`, `Read-only paths`, `Relevant gates`,
+   `Constraints`, `Dependencies / wave`, `Required approvals`, `Runtime format
+   target`, `Expected output`, `Context freshness`, `Lossiness`.
+3. **Pass loaded-skill evidence.** When the host has loaded this skill for
+   the current turn, include `Skills Referenced: task-handoff loaded=true`
+   in the packet so subagents know they may rely on pointer-only templates.
+4. **Fail-closed.** If any Required Minimum field is missing, the subagent
+   returns one consolidated `question_request` and stops before any gated
+   write. Do not pressure it forward.
+5. **No subagent re-delegation through this skill.** Subagents return to
+   the host when scope exceeds their owned paths.
+
+## Procedure (host side)
+
+1. **Pick the task tag** from `AGENTS.md` › Task-Type Routing Map
+   (`code-edit`, `security-write`, `bug-hunting`, `mcp-write`, `release`,
+   `docs-only`, `bug-fix`, `replication`, `instruction-memory-audit`,
+   `code-change-build-gate`, etc.).
+2. **Pick the packet form** from the Recommended Packet Form table below.
+3. **Fill the Required Minimum 12 fields** from your current plan and the
+   Directory Architecture. Set `Context freshness: recent` when `AGENTS.md`
+   was loaded this turn.
+4. **Add expansion blocks** for the picked task tag (Goal & Definition of
+   Done, Scope, Context Packet, File Inventory, Verification Protocol,
+   Reporting Protocol, Stop / Escalation Conditions, etc.).
+5. **Pass loaded-skill evidence.** Include `Skills Referenced: task-handoff
+   loaded=true` so the subagent template can rely on the pointer.
+6. **Delegate** through the runtime-native surface (Copilot Task/agent,
+   Claude `Agent` tool, OpenCode `task` + `@<agent>`, Codex child agent
+   thread, Gemini root-session subagent call).
+
+## Recommended Packet Form
+
+| Task tag | Recommended form | Required expansion blocks beyond Required Minimum |
+|---|---|---|
+| `read-only-research` | short-form | Context Packet when sources are preselected |
+| `content-quality-review` | short-form | Reporting Protocol |
+| `code-edit` (≤ 2 files, no gates) | short-form | Context Packet when prior decisions matter |
+| `code-edit` (> 2 files or shared boundary) | full-form | Goal & DoD · Scope · Context Packet · File Inventory · Workflow · Verification · Reporting |
+| `code-change-build-gate` | full-form | Diff bucket · Required gates · Evidence schema · Routing · Wave · Reporting |
+| `security-write` | full-form | Goal & DoD · Scope · Context Packet · File Inventory · Allowed Capabilities · Known Risks · Verification · Reporting · Clarification · Stop / Escalation |
+| `bug-hunting` | full-form | Goal & DoD · Scope · Security Analysis · Context Packet · File Inventory · Allowed Capabilities · Known Risks · Reporting · Stop / Escalation |
+| `mcp-write` | full-form | Goal & DoD · Scope · File Inventory · Allowed Capabilities · Known Risks · Reporting · Clarification · Stop / Escalation |
+| `replication` | full-form | Goal & DoD · Scope · Context Packet · File Inventory · Verification · Reporting · Coordination |
+| `release` | full-form | Goal & DoD · Verification · Reporting · Known Risks · Stop / Escalation |
+| `docs-only` | short-form | Reporting Protocol when docs CI exists |
+| `bug-fix` | full-form | Goal & DoD · Reproduction · Context Packet · Verification · Reporting |
+| `instruction-memory-audit` | short-form | Findings list (direct-conflict, adapter-drift, duplicate-policy, skill-candidate, path-scoped-candidate, stale-generated-block) |
+
+Use full-form whenever the task touches MCP, secrets, CI/release, dependency
+manifests, generated scripts, ADRs, fan-out waves, or the Build Gate — even
+if the table above suggests short-form.
+
+## Acceptance Checklist (consumer side — subagent runs this before work)
+
+1. All 12 Required Minimum fields are present and non-empty.
+2. `Context freshness` is explicit (`recent`, an `AGENTS.md` revision, or
+   `reload`).
+3. `File Inventory.to_modify` (when used) intersects only the subagent's
+   Owned paths.
+4. `File Inventory.to_read_only` (when used) does not include any path the
+   subagent owns exclusively.
+5. `Required approvals` lists every approval the task could trigger, or
+   `none`.
+6. `Verification Protocol` is provided for full-form tasks; otherwise the
+   subagent falls back to `AGENTS.md` › Quality Gates.
+7. `Reporting Protocol` matches the host's expected evidence shape.
+8. `Constraints` and `Known Risks` mention every gate the subagent will
+   touch.
+9. `Coordination` lists wave siblings when `Dependencies / wave > 1`.
+10. If the task changes generated agent, skill, memory, recommendation, or
+    output-contract prose, the assignment names the expected Content
+    Quality check or says `n/a`.
+11. `Context Packet` is scoped to the subtask and does not paste full
+    project memory.
+12. `Allowed Capabilities` and `Skills Referenced` are runtime-neutral and
+    do not ask the subagent to invent skills or mutate its own frontmatter.
+13. Security-team tasks include authorization scope, affected asset, validation
+    status, counterevidence, severity rationale, remediation verification
+    need, and proof-gap reporting.
+14. Build-gate tasks include the computed diff bucket, the required gates,
+    and the evidence schema for the gate the subagent owns.
+
+If a blocking check fails, return one consolidated `question_request` and
+stop before the gated write.
+
+## Reporting Template (consumer side — subagent emits)
+
+```text
+Outcome: <one sentence>
+Files changed: <list with relative paths>
+Evidence:
+  - <test output>
+  - <diff summary>
+  - <other evidence per Reporting Protocol>
+Gates touched: <list with status>
+Task assignment quality: ok | warn | fail; form=<short|full>; missing=<fields|none>; questions=<count>
+Content quality: ok | warn | fail | n/a; signals=<list|none>
+Security analysis: n/a | scope=<diff|repository|report|remediation|program>; authorization=<owned-code|approved-target|needs-approval>; validation=<confirmed|likely|needs-info|duplicate|not-reproducible|out-of-scope|mitigated|deferred>; severity=<P0|P1|P2|P3|n/a>; proof_gaps=<none|summary>
+Build gate: n/a | bucket=<XS|S|M|L|XL>; gate=<build|unit|e2e|review|bug-hunt|validation>; status=<pass|fail|waived>; evidence=<summary>
+Risks / escalations: <list or "none">
+Question requests: none | <id>
+Handoff status: accepted | completed | blocked | returned-to-orchestrator
+Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>
+```
+
+## Question Requests (consumer side fallback)
+
+When a subagent cannot ask the human directly, it returns:
+
+```yaml
+question_request:
+  id: <stable-kebab-id>
+  asked_by: <subagent-name>
+  reason: <why the answer is needed>
+  question: <one concise question>
+  choices: [<optional-choice-1>, <optional-choice-2>]
+  default: <safe default or "none">
+  urgency: blocking | nonblocking
+  if_unanswered: skip | use_default | stop_before_write
+  context:
+    - <fact the orchestrator should show>
+```
+
+The host consumes the `question_request` through `AGENTS.md` › Human Input /
+Question Protocol.
+
+## Anti-patterns
+
+- Subagent loads this skill to delegate to another subagent (it is host-only;
+  subagents are executors).
+- Host delegates without filling the Required Minimum 12 fields and relies on
+  the subagent guard to catch it (slow, error-prone — fill the packet).
+- Packet copies full `AGENTS.md` body into `Context Packet` (use a scoped
+  slice; set `Context freshness: recent` when applicable).
+- Subagent fakes Reporting Template fields it did not actually compute
+  (return `Handoff status: blocked` with rationale instead).
+- Subagent suppresses a `question_request` to avoid stopping work on a gated
+  write (this re-enables the silent-write risk the gate exists to prevent).
+
+## Output Contract
+
+The host records `Task assignment quality: ok | warn | fail; form=<short|full>;
+missing=<fields|none>; questions=<count>` in the integration report. The
+subagent emits the Reporting Template above as its turn output.
+
+## Codex note
+
+Codex (CLI + App) loads this skill at `.codex/skills/task-handoff/SKILL.md`
+and activates it via the skill loader (`$task-handoff` or `/skills`). The
+Codex subagent TOML `developer_instructions` includes a one-line pointer to
+this skill plus the 12-field fail-closed guard so subagents reject malformed
+assignments even when the skill is not pre-loaded.
+
+## Per-runtime delegation surfaces (host side reference)
+
+| Runtime | Native delegation surface |
+|---|---|
+| Copilot CLI | Task / agent tool fan-out (optional `/fleet` for independent batches) |
+| Claude Code | `Agent` tool calls (multiple in one assistant turn for parallel-safe siblings) |
+| OpenCode | `task` permission + `@<agent-name>` routing, gated by `permission.task` in `opencode.json` |
+| OpenAI Codex (CLI + App) | child agent threads; `.codex/config.toml` `[agents] max_threads` caps concurrency; `max_depth = 1` is the safe default |
+| Gemini CLI | root-session fan-out only; Gemini subagents cannot recursively call other subagents |

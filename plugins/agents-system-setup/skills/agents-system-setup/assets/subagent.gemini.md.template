@@ -84,6 +84,13 @@ stop/escalation conditions are clear enough for my role.
 
 ## Acceptance Checklist
 
+> **Source of truth:** the `task-handoff` skill (`.gemini/skills/task-handoff/SKILL.md`).
+> When the host passed `Skills Referenced: task-handoff loaded=true`, defer
+> to the skill body for the canonical checklist. The inline list below is
+> the **fail-closed minimum**. Gemini subagents cannot recursively
+> delegate, so if scope exceeds my owned paths I `return-to-orchestrator`
+> instead of using this skill or calling another subagent.
+
 Before doing work I confirm the Task Assignment is well-formed:
 
 1. All twelve Required Minimum fields from `AGENTS.md` > **Plan Handoff Contract** are present and non-empty.
@@ -145,6 +152,11 @@ Before final response I check whether this task produced a durable learning:
 
 ## Reporting Template
 
+> **Source of truth:** the `task-handoff` skill (`.gemini/skills/task-handoff/SKILL.md`).
+> The block below is the **fail-closed minimum** I emit even when the skill
+> is not loaded. When I own a build-gate role I also include the
+> `Build gate:` line per the skill body.
+
 I emit results in this stable shape so the orchestrator can integrate without re-deriving:
 
 ```text
@@ -158,6 +170,7 @@ Gates touched: <list with status>
 Task assignment quality: ok | warn | fail; form=<short|full>; missing=<fields|none>; questions=<count>
 Content quality: ok | warn | fail | n/a; signals=<list|none>
 Security analysis: n/a | scope=<diff|repository|report|remediation|program>; authorization=<owned-code|approved-target|needs-approval>; validation=<confirmed|likely|needs-info|duplicate|not-reproducible|out-of-scope|mitigated|deferred>; severity=<P0|P1|P2|P3|n/a>; proof_gaps=<none|summary>
+Build gate: n/a | bucket=<XS|S|M|L|XL>; gate=<build|unit|e2e|review|bug-hunt|validation>; status=<pass|fail|waived>; evidence=<summary>
 Risks / escalations: <list or "none">
 Question requests: none | <id>
 Handoff status: accepted | completed | blocked | returned-to-orchestrator

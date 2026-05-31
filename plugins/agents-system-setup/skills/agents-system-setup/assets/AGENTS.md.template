@@ -1,6 +1,6 @@
 # {{PROJECT_NAME}}
 
-> Agents guide — see https://agents.md/ for the spec. This file is the canonical agent memory and is also surfaced to **Claude Code** (via `CLAUDE.md` symlink), **OpenCode** (native `AGENTS.md` support), **OpenAI Codex** (CLI + App project memory when repo artifacts are available), and **Gemini CLI** (via compact `GEMINI.md` pointer/sync copy).
+> Agents guide — see https://agents.md/ for the spec. This file is the canonical agent memory and is also surfaced to **Claude Code** (via `CLAUDE.md` adapter: import, symlink, or copy), **OpenCode** (native `AGENTS.md` support), **OpenAI Codex** (CLI + App project memory when repo artifacts are available), and **Gemini CLI** (via compact `GEMINI.md` pointer/sync copy).
 
 <!-- agents-system-setup:managed:start -->
 <!-- agents-system-setup:generated-by: {{PLUGIN_VERSION}} -->
@@ -32,8 +32,10 @@
 6. Check [Self-Update Preflight](#self-update-preflight) before setup or generated-artifact refresh.
 7. If `Security team` is `dedicated` or `expanded`, use [Security Team Operating Model](#security-team-operating-model) before bug hunting, validation, attack-path, disclosure, or remediation-verification work.
 8. Load [Memory & Learning System](#memory--learning-system) entries relevant to the task; do not load the full ledger by default.
-9. Load overflow details only when the task needs them: {{DETAIL_REFERENCES}}.
-10. Respect artifact tracking: {{ARTIFACT_TRACKING_NOTES}}.
+9. Run [Instruction Memory Audit](#instruction-memory-audit) before rewriting project memory or moving instructions into skills/rules.
+10. Load overflow details only when the task needs them: {{DETAIL_REFERENCES}}.
+11. Run the [Build Gate (SDLC)](#build-gate-sdlc) on every code change when the project is software-dev (skip with explicit `n/a` rationale otherwise).
+12. Respect artifact tracking: {{ARTIFACT_TRACKING_NOTES}}.
 
 ## How Agents Should Work Here
 
@@ -75,7 +77,14 @@ I am the host CLI session for **{{PROJECT_NAME}}**. I plan, delegate, integrate,
 
 ### Required Minimum for Every Task Assignment
 
-Always send subagents the **12 required-minimum fields** from [Plan Handoff Contract](#plan-handoff-contract). For quick reference, they are: `Task`, `Source plan`, `Owned paths`, `Read-only paths`, `Relevant gates`, `Constraints`, `Dependencies / wave`, `Required approvals`, `Runtime format target`, `Expected output`, `Context freshness`, `Lossiness`. Add expansion blocks per the task tag (full-form for MCP / secrets / CI / release / security / replication / fan-out work).
+Always send subagents the **12 required-minimum fields** from [Plan Handoff Contract](#plan-handoff-contract). For quick reference, they are: `Task`, `Source plan`, `Owned paths`, `Read-only paths`, `Relevant gates`, `Constraints`, `Dependencies / wave`, `Required approvals`, `Runtime format target`, `Expected output`, `Context freshness`, `Lossiness`. Add expansion blocks per the task tag (full-form for MCP / secrets / CI / release / security / replication / Build Gate / fan-out work).
+
+> **Use the `task-handoff` skill when composing packets.** The host CLI session
+> loads the generated `task-handoff` skill (`{{TASK_HANDOFF_SKILL_PATHS}}`)
+> before delegating, then passes `Skills Referenced: task-handoff loaded=true`
+> in the packet so subagents can rely on the pointer. Subagents are
+> **executors**: they consume packets, they do not re-delegate through the
+> skill. If scope exceeds their owned paths, they `return-to-orchestrator`.
 
 Ask subagents to return `Task assignment quality: ok | warn | fail; form=<short|full>; missing=<fields|none>; questions=<count>`. **Treat `warn` as acceptable only for safe reversible gaps; gated writes require `ok` or a resolved `question_request`.** If the assignment is malformed, the subagent will return one consolidated `question_request` and stop before the gated write — re-issue a corrected assignment, do not pressure it forward.
 
@@ -91,7 +100,7 @@ Route by [Directory Architecture](#directory-architecture) ownership, the [Agent
 
 - **Profile:** {{CONTEXT_PROFILE}}.
 - **Keep inline:** routing, ownership, security/audit controls, architecture decisions, quality gates.
-- **Load on demand:** full marketplace research, full platform schemas, detailed threat rationale, long ADRs/examples.
+- **Load on demand:** instruction-memory audit detail, full marketplace research, full platform schemas, detailed threat rationale, long ADRs/examples.
 - **Overflow details:** {{DETAIL_REFERENCES}}
 - **Rule:** if a detail is moved out of this file, link it here so agents can find it.
 - **Project recon snapshot (if captured, ≤5 lines):** {{RECON_SNAPSHOT}}
@@ -155,6 +164,7 @@ Use this table to decide which references each agent loads beyond `AGENTS.md` Re
 | `docs-only` | Read First | Quality Gates only if doc CI exists | Security/MCP gates unless docs touch credentials | short-form |
 | `bug-fix` | Read First, Directory Architecture, owning agent boundary | Quality Gates row, repro logs, related ADRs | Long marketplace research | full-form (Reproduction block required) |
 | `learning-check` | Memory & Learning System, Learning Index | Detailed learning entry when category/path matches | Full operational ledger, unrelated learnings | short-form |
+| `instruction-memory-audit` | Instruction Memory Audit, Context Loading Policy, Directory Architecture | Runtime adapter files, skills, path-scoped rules, generated manifest | Source implementation files unless needed for path-scope evidence | short-form findings |
 
 ### Context Freshness
 
@@ -181,6 +191,32 @@ If `AGENTS.md` was already loaded this turn, prefer `Context freshness: recent` 
 - **Output marker:** `Content quality: ok|warn|fail|n/a; curator=<separate|merged|skipped>; signals=<list|none>`.
 - **Boundaries:** read-only by default; no broad write, MCP config, runtime config, release metadata, or final approval ownership.
 - **Skip rule:** use `n/a` only when no generated agent-system prose changed; otherwise record merged/skipped rationale.
+
+## Instruction Memory Audit
+
+- **Status:** {{INSTRUCTION_MEMORY_AUDIT_STATUS}}  <!-- ok | warn | fail | n/a -->
+- **Owner:** {{INSTRUCTION_MEMORY_AUDIT_OWNER}}  <!-- @orchestrator | @agent-quality-curator | @reviewer -->
+- **Reference:** {{INSTRUCTION_MEMORY_AUDIT_REFERENCE}}
+- **Use when:** improve/upgrade, project-memory rewrite, runtime adapter normalization, or moving long procedures into skills/path-scoped rules.
+- **Signals:** {{INSTRUCTION_MEMORY_AUDIT_SIGNALS}}  <!-- direct-conflict, adapter-drift, duplicate-policy, skill-candidate, path-scoped-candidate, stale-generated-block, unsupported-runtime-field, missing-overflow-link, or none -->
+- **Classification:** `AGENTS.md` is canonical project memory; `CLAUDE.md`/`GEMINI.md` are runtime adapters; long reusable workflows belong in skills or references.
+- **Output marker:** `Instruction memory audit: ok|warn|fail|n/a; signals=<list|none>; migrations=<count>`.
+- **Boundary:** read-only until a selected delta is approved; adapter symlinks/copies are expected and not conflicts.
+
+## Build Gate (SDLC)
+
+- **Strictness:** {{BUILD_GATE_STRICTNESS}}  <!-- standard | strict | light | skipped | n/a -->
+- **Reference:** {{BUILD_GATE_REFERENCE}}
+- **Skill (host-loaded):** `code-change-build-gate` at the selected runtime's skills path (`{{BUILD_GATE_SKILL_PATHS}}`).
+- **Use when:** any code change in a software-development project. Compute the bucket as `max(size_bucket, criticality_bucket)`; criticality always wins.
+- **Routing:** `@build-runner` (build) · {{UNIT_TEST_OWNER}} (unit) · {{E2E_OWNER}} (e2e) · `@reviewer` (review) · `@change-bug-hunter` (change-scoped bug hunt) · {{CHANGE_VALIDATOR_OWNER}} (validation).
+- **Bug-hunt routing:** when `@vulnerability-researcher` exists, route program-scoped threat research to it; `@change-bug-hunter` stays diff-scoped. See [SDLC build gate](https://github.com/ytthuan/agents-system-setup/blob/main/plugins/agents-system-setup/skills/agents-system-setup/references/sdlc-build-gate.md#mutual-exclusion-routing-change-bug-hunter-vs-vulnerability-researcher).
+- **Output marker:** `Build gate (validation): bucket=<XS|S|M|L|XL>; strictness=<...>; required=<list>; passed=<list>; waived=<list+rationale|none>; residual_risk=<summary|none>; sign-off=<accept|block>`.
+- **Boundary:** `@change-validator` is an evidence integrator, not a correctness authority; reviewer/tester/security owners remain authoritative on their gates.
+
+{{BUILD_GATE_MATRIX}}
+
+> When the project is **not software-dev** or the user picked `Skip`, this section renders `Build Gate (SDLC): n/a — non-software project | user skipped` and the Build Gate roles/skill are not emitted.
 
 ## Directory Architecture
 

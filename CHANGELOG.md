@@ -2,6 +2,47 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [1.5.0] - 2026-05-31
+
+### Added
+
+- Instruction Memory Audit policy for `improve` / `upgrade`: classifies `AGENTS.md` as canonical project memory, `CLAUDE.md` / `GEMINI.md` as runtime adapters, and long reusable procedures as skill/reference/path-scoped-rule candidates before proposing migrations.
+- **SDLC Build Gate** for software-dev projects. New `references/sdlc-build-gate.md` defines diff bucketing as `max(size_bucket, criticality_bucket)` (criticality always wins; auth, crypto, public API, schema, IaC, billing, CI/release force `L`/`XL`), the gate matrix (build · unit · e2e · review · change-bug-hunt · validation), the evidence schema, and mutual-exclusion routing between `change-bug-hunter` and `vulnerability-researcher`. Auto-opt-out for software-dev projects via interview Q9d strictness (`Standard | Strict | Light | Skip`). Non-software-dev projects render `Build Gate (SDLC): n/a — non-software project`.
+- New specialized subagents `build-runner`, `change-bug-hunter` (diff-scoped, read-only), and `change-validator` (evidence integrator, not correctness authority). `change-validator` merges into `@reviewer` for `Light` strictness.
+- New skill template `assets/skills/code-change-build-gate.skill.md.template` emitted at every selected runtime's skills path including Codex (`.codex/skills/code-change-build-gate/SKILL.md` activated via Codex skill loader).
+- New `assets/build-gate-matrix.snippet.md` drop-in rendered into `AGENTS.md` › `## Build Gate (SDLC)` as the fail-closed enforcement surface — host orchestrator runs the gate even if the skill is never invoked.
+- **`task-handoff` skill** emitted at every selected runtime's skills path including Codex (`.codex/skills/task-handoff/SKILL.md`). The host CLI session loads it before composing delegation packets and passes `Skills Referenced: task-handoff loaded=true`. Skill body holds the canonical 12 Required Minimum fields, Recommended Packet Form table, Acceptance Checklist, and Reporting Template (including the new `Build gate:` line). Subagent templates keep the inline content as fail-closed minimum and point at the skill as source of truth. Subagents never re-delegate through this skill — they are executors and `return-to-orchestrator` when scope exceeds their owned paths.
+- Hard rule #35 (Build Gate auto-opt-out for software-dev) and #36 (`task-handoff` skill is the host-side source of truth; subagents are executors).
+- Validator coverage: `check_sdlc_build_gate_policy()`, `check_task_handoff_skill_policy()`, and `check_upgrade_mismatch_detection_policy()` verify reference, snippet, skill templates, `AGENTS.md.template`, `SKILL.md`, topology, interview, handoff, platforms, context-optimization, and all 5 subagent templates carry the expected markers.
+- **Upgrade-mode mismatch & deprecation detection.** `upgrade` mode now runs a structural diff against the current plugin's expected output (in addition to the version-stamp playbook). New detection signals: `stale-stamp`, `missing-section`, `missing-skill`, `missing-role`, `deprecated-artifact`, `stale-prose`, `unsupported-runtime-field`, `adapter-drift`, `missing-overflow-link`. The plugin renders a per-group mismatch report (`delete | add | patch | replace`), asks for per-group approval, backs up (`.bak` per file + `.agents-system-setup/migration-backup/<timestamp>/` for directory removals), appends `.agents-system-setup/migration.jsonl` entries, and updates the manifest atomically after all writes succeed. Catches drift even when stamps are correct but content has evolved.
+- New `v1.4.0 → v1.5.0` row in the version-stamp migration playbook with 6 coordinated emissions (task-handoff skill, Build Gate emission for software-dev, Instruction Memory Audit section, subagent template patches, Orchestration Operating Model update, stale Codex skills wording fix).
+- **OpenCode root-session `permission.skill` gate.** When OpenCode is among the selected runtimes and the plugin emits host-loaded skills (`task-handoff`, optional `code-change-build-gate`), the plugin now also proposes `agent.<root>.permission.skill` in `opencode.json` with `"*": ask` plus explicit allow entries for the emitted skills. Treated as a **separate config approval gate** parallel to `permission.task`. If declined, subagents fall back to inline fail-closed minimum only and the output contract records `opencode_skill_gate: declined`.
+- New validator check `check_opencode_root_skill_gate()` enforces the gate is documented and rejects any `permission.skill["*"] = "allow"` in present `opencode.json` files.
+
+### Changed
+
+- `references/topology.md` adds a Software-Dev Universal Subagents (Build Gate) section listing `build-runner`, `change-bug-hunter`, `change-validator` with the rule that they are added only when Phase 1.7 classifies as `software-dev` and Q9d strictness is not `Skip`.
+- `references/interview.md` adds Q9d (Build Gate strictness) conditional on `software-dev`.
+- `references/handoff.md` notes that the canonical packet schema also lives in the host-side `task-handoff` skill and reinforces the executor-only rule for subagents.
+- `references/context-optimization.md` adds task-type routing rows for `code-change-build-gate` and `task-handoff`.
+- `references/platforms.md` adds a Skill auto-load and pointer-fallback rule: Copilot/Claude/OpenCode/Gemini subagents keep an inline Acceptance + Reporting minimum because skill auto-load is not guaranteed in their subagent context; Codex pointer-only is acceptable because its skill loader is reliable. **Codex skills support is correctly stated as native**, replacing earlier inconsistent text.
+- `assets/AGENTS.md.template` adds `## Build Gate (SDLC)` section with `{{BUILD_GATE_MATRIX}}` placeholder and Read First hook; Orchestration Operating Model now points at the `task-handoff` skill and explicitly tells subagents they are executors.
+- All 5 subagent templates (`subagent.agent.md.template`, `subagent.claude.md.template`, `subagent.opencode.md.template`, `subagent.gemini.md.template`, `subagent.codex.toml.template`) add a `task-handoff` skill source-of-truth pointer at the top of Acceptance Checklist and Reporting Template sections (inline content preserved as fail-closed minimum) and include the new `Build gate:` line in the Reporting Template.
+- `SKILL.md` wires Phase 1.9 Q9d, Phase 2 Build Gate plan section, Phase 4 emission for both new skills, Phase 7 verification points 15 and 16, and **Phase 1.5 upgrade mode now also runs the structural mismatch/deprecation diff**. Compacted four previously multi-line bullets to fit within the 500-line cap.
+
+### Fixed
+
+- `assets/AGENTS.md.template` Phase 4 emission instruction for skills no longer says "Codex → no native skills (describe in `AGENTS.md`)"; Codex skills are emitted at `.codex/skills/<name>/SKILL.md`.
+- `references/misplaced-artifacts-migration.md` Skills target-mapping row corrected for Codex (was `n/a — describe in AGENTS.md`, now `.codex/skills/<name>/SKILL.md`) and OpenCode (now mentions `permission.skill` gating). Resolves contradiction with the per-platform table elsewhere in the same file and with `platforms.md`.
+- `references/misplaced-artifacts-migration.md` `missing-section` detection rule now uses the literal generated heading `Architecture & Design Pattern Decisions` (with `&`, not `/`), preventing a false positive where current generated `AGENTS.md` files would be reported as missing the section.
+- `references/instruction-memory-audit.md` `duplicate-policy` entry now explicitly exempts the v1.5.0 subagent template structure (fail-closed inline minimum + source-of-truth pointer) so improve/upgrade audits do not flag the new intended layering as duplication.
+
+### Validation
+
+- `bash scripts/validate.sh` clean (1 informational `SKILL.md` size warning at 499 lines, expected `.ps1` LF/CRLF warnings).
+- All 42 validator checks pass including the 4 new ones (`check_sdlc_build_gate_policy`, `check_task_handoff_skill_policy`, `check_upgrade_mismatch_detection_policy`, `check_opencode_root_skill_gate`).
+- `SKILL.md` at 499 lines (cap: 500).
+
 ## [1.4.0] - 2026-05-26
 
 ### Added
@@ -142,14 +183,6 @@ For users upgrading from v1.3.0:
 
 - New validator checks: `check_operational_state_artifacts`, `check_cwd_reconnaissance_policy`, `check_misplaced_artifacts_migration_policy`.
 - All gates: `bash scripts/validate.sh` passes (1 informational SKILL.md size warning, expected `.ps1` LF/CRLF warnings); `git diff --check` clean; `markdownlint-cli2@0.22.1` 0 errors over 39 files; `python3 -m py_compile scripts/_validate.py` clean.
-
-## [Unreleased]
-
-### Added
-
-### Changed
-
-### Fixed
 
 ## [1.0.3] - 2026-05-14
 

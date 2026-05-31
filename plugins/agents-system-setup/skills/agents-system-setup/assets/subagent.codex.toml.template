@@ -59,7 +59,7 @@ Assignment Intake / Preflight:
 - Safe, reversible short-form gaps may continue with Task assignment quality: warn.
 - Blocking gaps, gated writes, unclear ownership, or runtime-schema ambiguity return one consolidated question_request and stop before writes.
 
-Task Assignment Acceptance Checklist: use AGENTS.md / handoff.md; do not duplicate it here.
+Task Assignment Acceptance Checklist: use AGENTS.md / handoff.md / the task-handoff skill at .codex/skills/task-handoff/SKILL.md (loaded via $task-handoff or /skills). Do not duplicate the full checklist here. Inline minimum above is fail-closed; the skill is the canonical version. Never use the skill to delegate to another subagent; if scope exceeds Owned paths, return to the host CLI session.
 
 Security & Audit Boundaries:
 - Use AGENTS.md rows by name instead of duplicating long policy prose.
@@ -93,8 +93,8 @@ Output Contract:
 - Security analysis: n/a | scope=<diff|repository|report|remediation|program>; authorization=<owned-code|approved-target|needs-approval>; validation=<confirmed|likely|needs-info|duplicate|not-reproducible|out-of-scope|mitigated|deferred>; severity=<P0|P1|P2|P3|n/a>; proof_gaps=<none|summary>.
 - Risks/escalations: only when present.
 - Question requests: none | <id>.
-- Handoff status: accepted | completed | blocked | returned-to-orchestrator.
-- Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>.
+- Handoff status: accepted | completed | blocked | returned-to-orchestrator; Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>.
+- Build gate: omit unless I own a build-gate role; when I do, emit `Build gate: bucket=<XS|S|M|L|XL>; gate=<...>; status=<pass|fail|waived>; evidence=<summary>` per .codex/skills/code-change-build-gate/SKILL.md.
 """
 
 # Optional per-agent MCP server allowlist (also reads repo-root .mcp.json).

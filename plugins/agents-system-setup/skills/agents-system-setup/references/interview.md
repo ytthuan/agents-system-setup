@@ -114,6 +114,26 @@ sizing and safe authorization boundaries. Do not auto-enable external scanning,
 exploit execution, disclosure outreach, MCP servers, or security plugins from
 this answer alone.
 
+## 9d. SDLC Build Gate (only when software-dev)
+
+Ask this only when Phase 1.7 classified the project as `software-dev` (the
+project brief or detected language signals matched the software-dev keyword
+set). Skip for documentation sites, security-team-only setups, research, or
+content projects.
+
+- Q: "Enable the SDLC Build Gate for code changes? It runs build, unit test,
+  e2e test, code review, change-scoped bug hunt, and final validation; gates
+  scale with the diff size and critical surfaces touched."
+- Choices: `["Standard (Recommended)", "Strict (promote recommended gates to required; XL needs two reviewers + release-validator)", "Light (merge change-validator into reviewer; XS=build+review only)", "Skip"]`
+- Record as `build_gate_strictness`: `standard | strict | light | skipped`.
+
+If `skipped`, the plugin renders `Build Gate (SDLC): n/a — user skipped` in
+`AGENTS.md` and does not emit `build-runner`, `change-bug-hunter`,
+`change-validator`, the `code-change-build-gate` skill, or the matrix
+snippet. If `standard|strict|light`, the plugin emits the Build Gate per
+[sdlc-build-gate.md](./sdlc-build-gate.md). Default is `standard` when the
+user accepts the recommendation.
+
 ## 9b. Advanced agent behavior
 
 Ask these choices together after topology so users compare the tradeoffs in one
