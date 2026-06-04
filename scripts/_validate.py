@@ -4414,6 +4414,83 @@ def check_explorer_agents_reference() -> None:
         ),
     )
 
+
+def check_host_builtins_routing_reference() -> None:
+    """Ensure host-builtins-routing reference and snippet preserve required routing anchors and literals."""
+    reference_path = SKILL_ROOT / "references" / "host-builtins-routing.md"
+    require_contains(
+        reference_path,
+        (
+            "# Host Builtins Routing",
+            "## Source citations table",
+            "## Routing decision rules",
+            "## Per-runtime routing inventory",
+            "### GitHub Copilot CLI",
+            "### Claude Code",
+            "### OpenCode",
+            "### OpenAI Codex CLI and App",
+            "### Gemini CLI",
+            "host_builtins_routing: declined",
+            "Subagent rule",
+        ),
+    )
+
+    snippet_path = SKILL_ROOT / "assets" / "host-builtins-routing.snippet.md"
+    require_contains(
+        snippet_path,
+        (
+            "<!-- agents-system-setup:host-builtins-routing -->",
+            "### Native Runtime Agents",
+            "host_builtins_routing: declined",
+        ),
+    )
+    try:
+        snippet = snippet_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return
+    except UnicodeDecodeError:
+        return
+    rel = snippet_path.relative_to(REPO).as_posix()
+    if snippet.count("<!-- agents-system-setup:host-builtins-routing -->") < 2:
+        err(f"{rel}: host-builtins-routing anchor must appear at least twice")
+    if snippet.count("### Native Runtime Agents") < 2:
+        err(f"{rel}: Native Runtime Agents heading must appear at least twice")
+
+
+def check_host_builtins_routing_in_agents_md() -> None:
+    """Ensure AGENTS.md.template contains the host-builtins placeholder in the orchestrator section."""
+    template = SKILL_ROOT / "assets" / "AGENTS.md.template"
+    require_contains(template, ("{{HOST_BUILTINS_ROUTING_BLOCK}}",))
+    rel = template.relative_to(REPO).as_posix()
+    try:
+        lines = template.read_text(encoding="utf-8").splitlines()
+    except FileNotFoundError:
+        return
+    except UnicodeDecodeError:
+        return
+
+    platform_line = next(
+        (i for i, line in enumerate(lines, start=1) if line == "### Platform-native delegation"),
+        None,
+    )
+    placeholder_line = next(
+        (i for i, line in enumerate(lines, start=1) if "{{HOST_BUILTINS_ROUTING_BLOCK}}" in line),
+        None,
+    )
+    wave_line = next(
+        (i for i, line in enumerate(lines, start=1) if line == "## Wave Execution"),
+        None,
+    )
+    if not platform_line or not placeholder_line or not wave_line:
+        err(f"{rel}: cannot verify host builtins placeholder placement")
+        return
+    if not (platform_line < placeholder_line < wave_line):
+        err(
+            f"{rel}: {{HOST_BUILTINS_ROUTING_BLOCK}} must be between "
+            "### Platform-native delegation and ## Wave Execution"
+        )
+
+
 def check_task_handoff_skill_policy() -> None:
     """Ensure the host-side task-handoff skill is emitted and referenced as the source of truth."""
     skill_path = (
@@ -4562,6 +4639,8 @@ def main() -> int:
     check_audience_tags_in_agents_md()
     check_subagent_self_containment()
     check_explorer_agents_reference()
+    check_host_builtins_routing_reference()
+    check_host_builtins_routing_in_agents_md()
     check_task_handoff_skill_policy()
     check_upgrade_mismatch_detection_policy()
 

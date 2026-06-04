@@ -2,6 +2,36 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [1.7.0] - 2026-06-04
+
+### Added
+
+- **Native Runtime Agents routing for GENERATED systems.** New hard rule #38: when `subagent_count >= 2`, generated `AGENTS.md` carries a `### Native Runtime Agents` subsection under `## Orchestration Operating Model` (anchor `<!-- agents-system-setup:host-builtins-routing -->`) telling the host orchestrator to route broad recon to explore-class built-ins (Copilot `task(explore)`, Claude `Explore`, OpenCode `explore`, Codex `explorer`, Gemini `codebase_investigator`) and verbose ad-hoc command execution to task-class built-ins (Copilot `task`, Claude `general-purpose`, OpenCode `general`). Codex and Gemini have NO documented task-class built-in — explicit fallback: custom worker subagent / `@build-runner` / root session. Balanced/Full → full per-runtime table; Compact → 1-line summary + reference link.
+- **New `references/host-builtins-routing.md`** (194 lines) — per-runtime native built-in inventory with source citations (Claude `docs.claude.com/.../sub-agents`, OpenCode `opencode.ai/docs/agents/`, Codex `developers.openai.com/codex/subagents`, Gemini `geminicli.com/docs/core/subagents/`, Copilot runtime-defined). Documents the ownership boundary (Build Gate evidence stays with named owners; native task-class output is `non-gate evidence` only), the subagent rule (subagents NEVER re-delegate to built-ins per hard rule #36; they `return-to-orchestrator` if scope exceeds owned surface), and the OpenCode `permission.task` allow requirement for `explore`/`general` (or `host_builtins_routing: declined` recorded in the output contract). Explicitly refuses to map Codex `reviewer` as a task-class substitute.
+- **New `assets/host-builtins-routing.snippet.md`** (80 lines) — the snippet rendered into generated `AGENTS.md` via the `{{HOST_BUILTINS_ROUTING_BLOCK}}` placeholder. Two variants: full (Balanced/Full + 2+ subagents) with the per-runtime routing table + ownership boundary + subagent rule + OpenCode gate; compact (Compact + 2+ subagents) with a 1-line summary + reference link. Stable validator anchors: `<!-- agents-system-setup:host-builtins-routing -->` HTML comment + `### Native Runtime Agents` heading literal.
+- **v1.6.0 → v1.7.0 upgrade migration** in `references/misplaced-artifacts-migration.md`: 1 new playbook row + write-ahead 8-step procedure mirroring v1.6.0's `prepared` → `applied` → `verified` ledger states. Step 3 conflict-scan grep AGENTS.md outside any managed block for terms like `Host Built-in`, `native runtime agents`, `general-purpose`, `task-class`, `explore-class`, `host_builtins_routing`; any match → classify row as `manual-review` and never auto-modify. Step 6 also updates OpenCode `opencode.json` `permission.task` with `explore: allow` and `general: allow` entries (or records `host_builtins_routing: declined`). Rollback: JSONL is append-only; `prepared` rows without `applied` indicate aborted migrations — restore from `backup_path`.
+- **3 new detection signals** in the Mismatch & Deprecation Detection table: `missing-native-runtime-agents-subsection` (auto-classification: `add`; triggers on `subagent_count >= 2` regardless of profile — Balanced/Full renders full variant, Compact renders compact variant), `missing-host-builtins-anchor` (auto-classification: `patch` — insert anchor before existing heading), `unmanaged-host-routing-prose` (auto-classification: `manual-review` — never auto-modify).
+- **2 new validator checks** in `scripts/_validate.py`: `check_host_builtins_routing_reference()` asserts H1/section headings + per-runtime subsections + `host_builtins_routing: declined` + `Subagent rule` literals in the new reference; `check_host_builtins_routing_in_agents_md()` asserts the `{{HOST_BUILTINS_ROUTING_BLOCK}}` placeholder exists in `AGENTS.md.template` and is positioned between `### Platform-native delegation` and `## Wave Execution`.
+- **SDLC Build Gate boundary line** in `references/sdlc-build-gate.md` anti-patterns: forbids routing required Build Gate evidence (build, unit test, e2e, code review, change bug hunt, validation) through native task-class built-ins. Named owners (`@build-runner`, `@tester`, `@playwright-e2e`, `@reviewer`, `@change-bug-hunter`, `@change-validator`) remain authoritative.
+
+### Changed
+
+- `SKILL.md` adds hard rule #38 (Native Runtime Agents routing) and Phase 4 emission bullet "Native Runtime Agents block (v1.7.0+)" near the existing layered-context emission rule; adds Phase 7 verification step #18 for the new subsection + OpenCode gate; trims Phase 8 (-2 lines via paragraph merge) and consolidates two topology anti-pattern bullets (-1 line) to keep the file at 499/500 lines. Hard rule numbering #32-#37 unchanged.
+- `AGENTS.md.template` inserts `{{HOST_BUILTINS_ROUTING_BLOCK}}` between the existing `### Platform-native delegation` table and the `## Wave Execution` heading — both under `## Orchestration Operating Model`. The renderer emits empty string when `subagent_count < 2`; no orphan blank lines.
+
+### Validation
+
+- `bash scripts/validate.sh`: `[OK] All checks passed (2 warning(s))` — same pre-existing warnings as v1.6.0 (SKILL.md size 499/500 + Codex `developer_instructions` 72 lines vs 65 soft target). No new ERROR.
+- `npx --yes markdownlint-cli2 plugins/**/*.md`: clean.
+- Rubber-duck (gpt-5.5) plan critique: 12 findings adopted before implementation (2 BLOCKING: build-runner vs host-task ownership boundary, hard rule #36 conflict on subagent templates; 3 HIGH: honest Codex mapping, OpenCode permission.task gate extension, no standalone section duplicating existing AGENTS.md routing tables; 4 MEDIUM: explicit Gemini fallback, profile-aware emission incl. Compact, SKILL.md line budget trim plan, write-ahead migration ledger; 3 LOW: stable validator anchors, "Native Runtime Agents" naming, source citations table).
+- Code-review (gpt-5.5) post-implementation: 1 HIGH, no BLOCKING/MEDIUM/LOW — fixed (migration detection signal narrowing `Balanced/Full` only widened to `regardless of profile` so Compact systems are also caught).
+
+### Migration notes
+
+- Existing v1.6.x systems upgrade by running `agents-system-setup upgrade`. The 8-step write-ahead procedure backs up every modified artifact under `.agents-system-setup/migration-backup/<ts>/`, write-ahead-records each operation in `.agents-system-setup/migration.jsonl` before any mutation, then flips to `verified` only after the post-write anchor presence check passes. Manifest `.agents-system-setup/generated.json` › `version` bumps to `1.7.0` only after every artifact reaches `verified`.
+- **Subagent files are NOT modified by this release** — built-in routing is orchestrator-side only (hard rule #36). The migration touches `AGENTS.md` and, for OpenCode targets, `opencode.json` `permission.task`. No regeneration of subagent templates.
+- **No breaking changes.** Single-agent setups (subagent_count < 2) skip the section entirely. Compact profile + 2+ subagents render the 1-line summary; Balanced/Full + 2+ subagents render the full per-runtime table. Unmanaged user-authored routing prose triggers `manual-review` classification — never auto-modified.
+
 ## [1.6.0] - 2026-06-04
 
 ### Added

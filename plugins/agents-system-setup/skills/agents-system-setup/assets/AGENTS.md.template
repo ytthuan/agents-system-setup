@@ -278,6 +278,8 @@ Legend: ✅ primary owner · 🟡 assists · *(blank)* not involved.
 | OpenAI Codex (CLI + App) | Root `AGENTS.md` asks Codex to spawn child agents; specialists live in `.codex/agents/*.toml` | Keep shared artifacts free of required CLI-only slash commands. |
 | Gemini CLI | Root `GEMINI.md` session delegates to `.gemini/agents/*.md` local subagents | Gemini subagents cannot recursively delegate; root session owns all fan-out. |
 
+{{HOST_BUILTINS_ROUTING_BLOCK}}
+
 ## Wave Execution
 
 <!-- agents-system-setup:wave-execution -->

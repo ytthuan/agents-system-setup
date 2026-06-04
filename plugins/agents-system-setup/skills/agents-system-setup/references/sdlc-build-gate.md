@@ -187,6 +187,7 @@ The plugin renders the Build Gate in two places:
   skill = silent gate).
 - Pinning concrete LOC counts inside generated AGENTS.md — use bucket labels
   and link to this reference.
+- **Routing required Build Gate evidence through native task-class built-ins** (Copilot `task`, Claude `general-purpose`, OpenCode `general`). Build, unit test, e2e, code review, change bug hunt, and validation evidence MUST be owned by `@build-runner` / `@tester` / `@playwright-e2e` / `@reviewer` / `@change-bug-hunter` / `@change-validator`. Native task-class output is `non-gate evidence` — usable for ad-hoc orchestrator checks only. See [host-builtins-routing](./host-builtins-routing.md).
 
 ## Verification
 
