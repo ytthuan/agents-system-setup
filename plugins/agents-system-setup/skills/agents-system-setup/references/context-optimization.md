@@ -165,6 +165,41 @@ Output profile (Phase 1.9) controls subagent body verbosity. The frontmatter and
 
 Renderers must keep section headings (so validators and humans can find them) and keep the link target valid. Codex TOML `developer_instructions` follows the "summary + pointer" rule from [agent-format](./agent-format.md#codex-toml-summary--pointer-rule) regardless of profile because TOML cannot link inline.
 
+## Layered context & audience tags (v1.6.0+)
+
+v1.6.0 introduces per-section `**Audience:** <value>` markers and inline project-standard digests in subagent files so the host orchestrator and specialist subagents can route their reading. The emission is conditional: it only activates when `subagent_count >= 2` AND `output_profile in {balanced, full}`.
+
+### Per-profile rendering rules
+
+| Profile | Audience markers | Self-Contained Notice | Subagent digest |
+|---|---|---|---|
+| `compact` | omitted | omitted | required (managed block) |
+| `balanced` | visible under every `## Section` | emitted at end of AGENTS.md | required (managed block) |
+| `full` | visible + "Why this section matters for <audience>" leading sentence | emitted with full guidance | required (managed block) + leading rationale |
+
+### tiktoken measurement protocol
+
+Use OpenAI's `tiktoken` (encoding `cl100k_base`) to measure effective context per subagent turn. Run before and after upgrading:
+
+```python
+import tiktoken
+enc = tiktoken.get_encoding("cl100k_base")
+def count(path): return len(enc.encode(open(path).read()))
+before = count(".github/agents/X.agent.md") + count("AGENTS.md")  # v1.5.0 effective load
+after  = count(".github/agents/X.agent.md")                       # v1.6.0 — AGENTS.md not needed
+reduction = 1 - after / before
+print(f"reduction: {reduction:.0%}")
+```
+
+Goal: ≥ 40% reduction per subagent turn vs v1.5.0. This is an empirical observation, NOT a release gate.
+
+### Anti-patterns
+
+- Emitting audience tags in Compact profile (regresses small-project context).
+- Using HTML comments (`<!-- read-by: ... -->`) instead of visible `**Audience:**` lines — comments are unreliable across runtime markdown loaders.
+- Treating the digest hash as an exact integrity check (it's a drift detector; WARNING-level only).
+- Adding a 4th audience value (e.g., `reviewer-only`) — three values (`all | host-orchestrator | subagents`) is the canonical set.
+
 ## 7. Anti-patterns
 
 - Treating `<details>` blocks as context optimization; models still read the text.

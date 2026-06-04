@@ -8,6 +8,10 @@ mode: subagent
 {{OPTIONAL_PERMISSION_BLOCK}}
 ---
 
+<!-- subagent-digest:managed:start v=<auto-computed-hash> -->
+{{PROJECT_STANDARD_DIGEST}}
+<!-- subagent-digest:managed:end -->
+
 <!-- agents-system-setup:platform: opencode -->
 <!-- agents-system-setup:generated-by: {{PLUGIN_VERSION}} -->
 <!-- agents-system-setup:replicated-from: {{REPLICATION_SOURCE}} -->

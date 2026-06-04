@@ -54,6 +54,8 @@ pointer-only is acceptable.
 > adapters, so expected imports/symlinks/copies are not duplicate-policy findings
 > unless they drift or contradict `AGENTS.md`.
 
+- **Native explorer agents** for codebase recon: every supported runtime ships a built-in explorer subagent (Copilot CLI `task/explore`, Claude Code `Explore`, OpenCode `explore`, Codex `explorer`, Gemini CLI `codebase_investigator`). See [explorer-agents](./explorer-agents.md) for the per-runtime mapping, the 5-thread parallel recon recipe, and the trigger heuristic (`source_files > 50` OR `top_level_dirs > 8` OR `frameworks_detected > 3` OR `recon_threads_requested > 2`).
+
 ## Agent Frontmatter — per platform
 
 ### Copilot CLI (`.agent.md`)
