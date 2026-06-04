@@ -494,6 +494,7 @@ playbook is additive — running `improve` from `v1.2.0` to `v1.4.0` applies the
 | `v1.2.0 → v1.3.0` | Delete `orchestrator.agent.md` / `.claude/agents/orchestrator.md` / `.opencode/agents/orchestrator.md` / `.gemini/agents/orchestrator.md`; consolidate Orchestration Operating Model into `AGENTS.md`; relocate OpenCode `permission.task` to `opencode.json` with extract-and-preserve. (See [Deprecated orchestrator subagent files](#deprecated-orchestrator-subagent-files) above.) |
 | `v1.3.0 → v1.4.0` | Trim AGENTS.md › Orchestration Operating Model from ~83 to ~37 lines (preserve inline Required Minimum 12-field summary and malformed-assignment behavior); trim subagent Acceptance Checklist from 14 → 6 items (preserve receiver-side defenses: required-min, owned-paths intersection, approvals, full-form gate, security-team fields, no-invent rule); add `generated-by` stamps; emit central manifest. |
 | `v1.4.0 → v1.5.0` | See [v1.4.0 → v1.5.0 details](#v140--v150-migration-details) below — the row was extracted because it spans multiple coordinated emissions across skills, AGENTS.md sections, roster roles, and all 5 subagent templates. |
+| `v1.5.0 → v1.6.0` | See [v1.5.0 → v1.6.0 details](#v150--v160-migration-details) below — adds audience tags to AGENTS.md, inlines project-standard digest into every subagent file. Subagents migrated FIRST per atomic 3-state ledger. |
 
 ### v1.4.0 → v1.5.0 migration details
 
@@ -528,6 +529,37 @@ artifact), apply these deltas in order:
    Codex supports `.codex/skills/<name>/SKILL.md` (project) or
    `~/.codex/skills/<name>/SKILL.md` (user).
 
+### v1.5.0 → v1.6.0 migration details
+
+The v1.5.0 → v1.6.0 upgrade introduces layered context (visible audience tags) and self-contained subagent files with inline project-standard digests. Migration is atomic via a 3-state ledger (`prepared` → `applied` → `verified`). Subagent files are migrated FIRST; AGENTS.md is migrated LAST; the manifest version bumps only after every artifact is `verified`.
+
+#### Detection signals
+
+- `missing-audience-tag` — AGENTS.md `## Section` heading lacks a visible `**Audience:** <value>` line (only flagged when `subagent_count >= 2` AND profile in {balanced, full}; skipped for Compact/single-agent setups).
+- `non-self-contained-subagent` — subagent file (`.agent.md`/`.md` or Codex `.toml`) lacks the `<!-- subagent-digest:managed:start v=<hash> --> ... :end -->` block, OR the body hash does not match the marker (drift; severity WARNING).
+
+#### 8-step atomic procedure
+
+1. Read `.agents-system-setup/generated.json`; confirm stamp is `1.5.x`.
+2. Render the v1.5.0 → v1.6.0 migration plan; `ask_user` for approval.
+3. For each subagent file:
+   a. Back up to `.agents-system-setup/migration-backup/<ts>/<rel-path>`.
+   b. **Write-ahead ledger** — append `{"artifact":"<rel-path>","state":"prepared","backup_path":"<abs-backup>","intended_action":"inject-digest","ts":"<iso>","migration":"v1.5.0-v1.6.0"}` to `.agents-system-setup/migration.jsonl` and fsync; the row MUST exist on disk before the artifact is touched.
+   c. Inject `<!-- subagent-digest:managed:start v=<hash> --> ... :end -->` block (Codex uses 3-line literal variant; others use rendered digest).
+   d. Append `{"artifact":"<rel-path>","state":"applied","ts":"<iso>"}` to the ledger after the artifact write succeeds.
+4. After ALL subagents reach `applied`: back up `AGENTS.md`, write-ahead `{"artifact":"AGENTS.md","state":"prepared","backup_path":"<abs-backup>","intended_action":"insert-audience-tags-and-notice",...}`, insert `**Audience:**` markers under every `## Section` (gated), append `## Subagent Self-Contained Notice` block, then append `{"artifact":"AGENTS.md","state":"applied",...}`.
+5. Validation pass: re-read every modified artifact, parse frontmatter, recompute digest hash, confirm marker matches body.
+6. On pass: append `{"artifact":"<rel-path>","state":"verified","ts":"<iso>"}` for every artifact (do not mutate prior `prepared` / `applied` rows — JSONL is append-only).
+7. Update `.agents-system-setup/generated.json` › `version` to `1.6.0`. This step is the ONLY artifact that fails closed — if any earlier step errored, this never runs and the system remains a half-migrated state (some artifacts at `applied`, others at `prepared`) for the next `upgrade` resume.
+8. On resume after partial run: scan ledger for each artifact's last state. If the last state is `prepared` (write-ahead recorded but `applied` never appended), restore from `backup_path` and re-prompt user to retry or abort. If the last state is `applied` (modification succeeded but `verified` never appended), re-run the step 5 validation pass.
+
+#### Anti-patterns
+
+- Migrating AGENTS.md before subagents (rollback target unclear).
+- Bumping `generated.json` version before all artifacts reach `verified`.
+- Auto-applying without `ask_user` approval at step 2.
+- Treating digest hash drift as ERROR (it's WARNING — content evolves naturally).
+
 ## Mismatch & Deprecation Detection (upgrade mode)
 
 The version-stamp playbook above handles the **content delta** between known
@@ -550,6 +582,9 @@ before any write.
 | `unsupported-runtime-field` | Field that the runtime never loaded | Codex agent TOML `memory` or `request_user_input`, Gemini `mcpServers` (must be `mcp_servers`), Copilot custom-agent `tools:` containing `ask_user`, OpenCode `mcp-servers:` in agent frontmatter. |
 | `adapter-drift` | `CLAUDE.md` / `GEMINI.md` no longer mirrors `AGENTS.md` | Hash mismatch when adapter was originally a copy; resolve via [instruction-memory-audit](./instruction-memory-audit.md). |
 | `missing-overflow-link` | Long section moved to references with no pointer | `AGENTS.md` references a moved section by name but the Overflow Details link is missing. |
+
+- `missing-audience-tag` — AGENTS.md `## Section` heading lacks a visible `**Audience:** <value>` line when conditions warrant (subagent_count >= 2, profile balanced/full). Classify: `patch` (insert marker via section-header rewrite).
+- `non-self-contained-subagent` — subagent file lacks the `<!-- subagent-digest:managed:start v=<hash> -->` block or has hash mismatch. Classify: `patch` (inject block or update body+hash).
 
 ### Upgrade procedure
 

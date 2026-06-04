@@ -4298,6 +4298,122 @@ def check_sdlc_build_gate_policy() -> None:
     )
 
 
+def check_layered_context_hard_rule() -> None:
+    """Ensure hard rule #37 (layered context & self-contained subagents) is declared in SKILL.md and the supporting snippets exist with the canonical content."""
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "Layered context & self-contained subagents",
+            "subagent_count >= 2",
+            "**Audience:** all | host-orchestrator | subagents",
+            "subagent-digest:managed:start",
+            "audience-tags snippet",
+            "project-standard-digest snippet",
+            "explorer-agents",
+        ),
+    )
+    audience_path = SKILL_ROOT / "assets" / "audience-tags.snippet.md"
+    require_contains(
+        audience_path,
+        (
+            "**Audience:**",
+            "all",
+            "host-orchestrator",
+            "subagents",
+            "subagent_count >= 2",
+            "balanced",
+            "Subagent Self-Contained Notice",
+        ),
+    )
+    digest_path = SKILL_ROOT / "assets" / "project-standard-digest.snippet.md"
+    require_contains(
+        digest_path,
+        (
+            "subagent-digest:managed:start v=",
+            "subagent-digest:managed:end",
+            "sha256",
+            "task-handoff",
+            "Codex variant",
+        ),
+    )
+
+
+def check_audience_tags_in_agents_md() -> None:
+    """Ensure AGENTS.md.template carries the audience-tag placeholders and Project Snapshot has the **Audience:** all marker."""
+    template = SKILL_ROOT / "assets" / "AGENTS.md.template"
+    require_contains(
+        template,
+        (
+            "{{AUDIENCE_TAGS_BLOCK}}",
+            "{{SUBAGENT_SELF_CONTAINED_NOTICE}}",
+            "{{PROJECT_SNAPSHOT_AUDIENCE}}",
+        ),
+    )
+
+
+def check_subagent_self_containment() -> None:
+    """Ensure every subagent template carries the digest managed-block markers and placeholder; Codex uses the 3-line literal variant."""
+    md_templates = [
+        SKILL_ROOT / "assets" / "subagent.agent.md.template",
+        SKILL_ROOT / "assets" / "subagent.claude.md.template",
+        SKILL_ROOT / "assets" / "subagent.opencode.md.template",
+        SKILL_ROOT / "assets" / "subagent.gemini.md.template",
+    ]
+    for path in md_templates:
+        require_contains(
+            path,
+            (
+                "<!-- subagent-digest:managed:start v=",
+                "{{PROJECT_STANDARD_DIGEST}}",
+                "<!-- subagent-digest:managed:end -->",
+            ),
+        )
+    codex_path = SKILL_ROOT / "assets" / "subagent.codex.toml.template"
+    require_contains(
+        codex_path,
+        (
+            "<!-- subagent-digest:managed:start v=",
+            "Project standard digest (managed by agents-system-setup):",
+            "Boundary: least privilege",
+            "Handoff: consult `task-handoff` skill",
+            "<!-- subagent-digest:managed:end -->",
+        ),
+    )
+
+
+def check_explorer_agents_reference() -> None:
+    """Ensure explorer-agents.md exists with verified per-runtime mapping and SKILL.md Phase 1 references it."""
+    explorer_path = SKILL_ROOT / "references" / "explorer-agents.md"
+    require_contains(
+        explorer_path,
+        (
+            "GitHub Copilot CLI",
+            "`task` tool, `agent_type: \"explore\"`",
+            "`Explore` built-in subagent",
+            "`explore` built-in subagent",
+            "`explorer` built-in agent",
+            "`codebase_investigator` built-in subagent",
+            "source_files > 50",
+            "top_level_dirs > 8",
+            "frameworks_detected > 3",
+            "recon_threads_requested > 2",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "explorer-agents",
+            "native explorer subagent",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "platforms.md",
+        (
+            "Native explorer agents",
+            "explorer-agents",
+        ),
+    )
+
 def check_task_handoff_skill_policy() -> None:
     """Ensure the host-side task-handoff skill is emitted and referenced as the source of truth."""
     skill_path = (
@@ -4442,6 +4558,10 @@ def main() -> int:
     check_learning_memory_policy()
     check_instruction_memory_audit_policy()
     check_sdlc_build_gate_policy()
+    check_layered_context_hard_rule()
+    check_audience_tags_in_agents_md()
+    check_subagent_self_containment()
+    check_explorer_agents_reference()
     check_task_handoff_skill_policy()
     check_upgrade_mismatch_detection_policy()
 

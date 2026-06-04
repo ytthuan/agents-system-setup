@@ -30,6 +30,13 @@ description = "Use when {{TRIGGER_PHRASES}}. {{ONE_LINE_RESPONSIBILITY}}."
 # details only when the task needs them. Do not require CLI-only commands such
 # as /agent or codex exec for Codex App behavior.
 developer_instructions = """
+<!-- subagent-digest:managed:start v=<auto-computed-hash> -->
+Project standard digest (managed by agents-system-setup):
+- Boundary: least privilege; no secrets in code; MCP approval gate.
+- Handoff: consult `task-handoff` skill when host says loaded=true; never re-delegate.
+- See `AGENTS.md` rows for project-wide context.
+<!-- subagent-digest:managed:end -->
+
 {{DEVELOPER_INSTRUCTIONS}}
 
 # Codex TOML summary + pointer rule:

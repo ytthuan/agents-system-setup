@@ -13,6 +13,10 @@ description: 'Use when {{TRIGGER_PHRASES}}. {{ONE_LINE_RESPONSIBILITY}}.'
 {{OPTIONAL_MCP_SERVERS_BLOCK}}
 ---
 
+<!-- subagent-digest:managed:start v=<auto-computed-hash> -->
+{{PROJECT_STANDARD_DIGEST}}
+<!-- subagent-digest:managed:end -->
+
 <!-- agents-system-setup:platform: claude-code -->
 <!-- agents-system-setup:generated-by: {{PLUGIN_VERSION}} -->
 <!-- agents-system-setup:replicated-from: {{REPLICATION_SOURCE}} -->

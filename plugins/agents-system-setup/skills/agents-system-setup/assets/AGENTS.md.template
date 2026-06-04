@@ -10,6 +10,8 @@
 
 ## Project Snapshot
 
+{{PROJECT_SNAPSHOT_AUDIENCE}}
+
 - **Purpose:** {{PURPOSE}}
 - **Type:** {{PROJECT_TYPE}}
 - **Languages:** {{LANGUAGES}}
@@ -116,6 +118,8 @@ Route by [Directory Architecture](#directory-architecture) ownership, the [Agent
 - **No side effects:** preflight never edits MCP config, plugin/runtime settings, generated agents, memory files, or release/version metadata.
 
 ## Human Input / Question Protocol
+
+<!-- markdownlint-disable MD055 MD056 -->
 
 | Runtime | Native question surface | Allowlist / config rule | Non-interactive or child-agent fallback |
 |---|---|---|---|
@@ -330,6 +334,8 @@ Legend: ✅ primary owner · 🟡 assists · *(blank)* not involved.
 |---|---|---|
 {{SKILL_TABLE_ROWS}}
 
+<!-- markdownlint-enable MD055 MD056 -->
+
 ## Plugins / MCP Servers
 
 {{PLUGIN_LIST}}
@@ -359,5 +365,9 @@ Legend: ✅ primary owner · 🟡 assists · *(blank)* not involved.
 - Code style enforced by: {{FORMATTER}}
 
 <!-- agents-system-setup:managed:end -->
+
+{{AUDIENCE_TAGS_BLOCK}}
+
+{{SUBAGENT_SELF_CONTAINED_NOTICE}}
 
 <!-- Add project-specific guidance below this line; it will be preserved on updates. -->
