@@ -19,6 +19,7 @@ description: 'Use when {{TRIGGER_PHRASES}}. {{ONE_LINE_RESPONSIBILITY}}.'
 
 <!-- agents-system-setup:platform: claude-code -->
 <!-- agents-system-setup:generated-by: {{PLUGIN_VERSION}} -->
+<!-- agents-system-setup:tool-catalog-version: {{PLUGIN_VERSION}} -->
 <!-- agents-system-setup:replicated-from: {{REPLICATION_SOURCE}} -->
 {{OPTIONAL_MCP_APPROVAL_MARKER}}
 

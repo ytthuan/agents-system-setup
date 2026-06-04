@@ -17,6 +17,7 @@ kind: local
 
 <!-- agents-system-setup:platform: gemini-cli -->
 <!-- agents-system-setup:generated-by: {{PLUGIN_VERSION}} -->
+<!-- agents-system-setup:tool-catalog-version: {{PLUGIN_VERSION}} -->
 <!-- agents-system-setup:replicated-from: {{REPLICATION_SOURCE}} -->
 {{OPTIONAL_MCP_APPROVAL_MARKER}}
 

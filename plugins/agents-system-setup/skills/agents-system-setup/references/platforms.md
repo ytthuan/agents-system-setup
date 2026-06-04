@@ -85,6 +85,8 @@ Copilot source-backed runtime notes:
 
 #### Copilot CLI Standard Tool Profiles
 
+> **Canonical tool list:** `assets/tool-catalog.json` (see [tool-catalog](./tool-catalog.md) for the human view). The tables below are an emit-time convenience; the JSON catalog is authoritative.
+
 Generated Copilot CLI agents apply one of these named profiles (selected per role at emit time; user can override via the interview):
 
 | Profile | `tools:` allowlist | Use for |

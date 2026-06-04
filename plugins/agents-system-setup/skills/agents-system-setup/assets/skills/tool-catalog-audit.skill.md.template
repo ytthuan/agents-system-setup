@@ -1,0 +1,137 @@
+---
+name: tool-catalog-audit
+description: 'Use when the host orchestrator needs to verify that generated agent tool configurations (tools allowlist, permission keys, tool_allowlist) match the runtime-correct tool catalog. Read-only. Returns findings; the orchestrator owns approval and any patch decisions.'
+---
+
+<!-- agents-system-setup:generated-by: {{PLUGIN_VERSION}} -->
+<!-- agents-system-setup:generated-at: {{GENERATED_AT}} -->
+<!-- agents-system-setup:skill-kind: host-audit -->
+
+# Tool Catalog Audit (host-side)
+
+## Purpose
+
+Verify that generated agents reference current runtime-correct tool names from
+`assets/tool-catalog.json`. This is a host-side audit skill only: subagents
+never invoke it, and the skill never edits files. The host orchestrator scans
+approved paths, reviews findings, asks for any required approval, and owns
+migration ledger writes.
+
+## Input contract
+
+```yaml
+runtimes: [<runtime-id>...]
+scan_paths: [<glob>...]
+catalog_version_expected: "1.8.0" # optional
+```
+
+`runtimes` must use catalog runtime IDs such as `copilot-cli`, `claude-code`,
+`opencode`, `codex`, or `gemini-cli`. `scan_paths` are chosen by the host
+orchestrator; do not expand the scan outside those paths.
+
+## Audit procedure
+
+### Name-allowlist runtimes
+
+Applies to Copilot CLI, VS Code Copilot, Claude Code, and Gemini CLI.
+
+1. Load `assets/tool-catalog.json` and select the runtime block.
+2. For each agent file, parse frontmatter using that runtime's shape.
+3. Extract `tools:` or explicit `tool_allowlist` entries.
+4. Compare each configured name against catalog names and aliases.
+5. Emit one finding per unknown, legacy, cross-runtime, or missing-stamp tool
+   name. Do not patch the file.
+6. For shared Copilot / VS Code files, flag `scope: vscode-only` or
+   `scope: cli-only` entries unless the host packet proves explicit opt-in.
+
+### Permission-policy runtime
+
+Applies to OpenCode.
+
+1. Parse each `permission:` block.
+2. Verify no `tools:` key exists; `tools:` is deprecated upstream.
+3. Verify wildcard defaults for `task` and `skill` are `deny` or `ask`.
+4. Verify named `allow` entries reference real roster agents or skill names
+   supplied by the host scan context.
+5. Emit findings for broad wildcards, deprecated keys, or unknown named
+   allow entries. Never rewrite the permission map.
+
+### N/a runtime
+
+Applies to Codex.
+
+1. Skip files that do not set `tool_allowlist`.
+2. If `tool_allowlist` is present in the TOML, run the name-allowlist check
+   with Codex parent-session semantics.
+3. Separately report malformed `sandbox_mode` or MCP entries when they are in
+   scope for the host scan.
+
+## Output
+
+Return a findings list in this JSON-ish shape:
+
+```json
+[
+  {
+    "file_path": "<path>",
+    "runtime": "<runtime-id>",
+    "signal_type": "unknown-tool-name",
+    "current_value": "<observed value>",
+    "suggested_fix": "<human-reviewed fix; never applied automatically>",
+    "severity": "warn"
+  }
+]
+```
+
+Allowed `signal_type` values are:
+
+- `unknown-tool-name`
+- `legacy-tool-name`
+- `cross-runtime-tool-leak`
+- `missing-tool-catalog-stamp`
+- `opencode-permission-wildcard-too-broad`
+
+Allowed `severity` values are `warn` and `error`.
+
+## Boundary rules (READ FIRST)
+
+1. This skill is **READ-ONLY**. It returns findings and never modifies files.
+2. This skill is **HOST-ONLY**. Subagents must not invoke it; they
+   `return-to-orchestrator` if they detect tool issues in their owned files.
+3. Per-file fix decisions are owned by the orchestrator plus user approval per
+   the migration ledger pattern in `references/misplaced-artifacts-migration.md`.
+4. All subagent tool-list changes default to `manual-review` classification
+   because tool access is a security boundary.
+5. Do not infer user approval from a clean finding. Clean means no catalog issue
+   was found in the scanned surface only.
+
+## Detection signal definitions
+
+| Signal | What it catches | Detection rule |
+|---|---|---|
+| `unknown-tool-name` | Tool or permission name absent from the selected runtime block | A configured name is not in catalog `tools`, `aliases`, `permission_keys`, or verified wildcard forms for that runtime. |
+| `legacy-tool-name` | Deprecated or compatibility-only name that should not be emitted by v1.8.0 defaults | Name is present only as an alias, deprecated key, or runtime note and no explicit opt-in marker is present. |
+| `cross-runtime-tool-leak` | Tool names copied from another runtime | Name exists in a different runtime block but not the selected runtime block, such as Copilot `execute` in Claude or Claude `Bash` in Copilot default output. |
+| `missing-tool-catalog-stamp` | Generated file has no evidence of catalog-aware emission | File has a generated-by stamp but no v1.8.0+ catalog marker, or the central manifest lacks `tool_catalog_version`. |
+| `opencode-permission-wildcard-too-broad` | OpenCode delegation or skill gates are too permissive | `permission.task` or `permission.skill` uses `*`: `allow`, or named allows are missing when broad delegation is not approved. |
+
+## Reporting template
+
+```text
+Tool catalog audit: ok | findings
+Catalog version: <version>
+Runtimes scanned: <runtime ids>
+Files scanned: <count>
+Findings:
+  - <severity> <signal_type> <file_path>: <current_value> -> <suggested_fix>
+Skipped: <paths or runtimes with rationale>
+Handoff status: completed | blocked | returned-to-orchestrator
+```
+
+## Anti-patterns
+
+- Running this skill from inside a generated subagent.
+- Auto-fixing tool lists because a suggested replacement looks obvious.
+- Treating OpenCode `tools:` as a current schema.
+- Requiring Codex `tool_allowlist` when the file intentionally inherits the
+  parent session toolbelt.

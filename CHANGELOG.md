@@ -2,6 +2,43 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [1.8.0] - 2026-06-04
+
+### Added
+
+- **Per-runtime tool catalog system.** New `assets/tool-catalog.json` (canonical machine-readable data) + `references/tool-catalog.md` (human view that explicitly points to JSON as authoritative). Catalog covers 6 runtimes: Copilot CLI, VS Code Copilot, Claude Code, OpenCode, Codex (CLI + App), Gemini CLI. Each runtime block carries `audit_kind` (`name-allowlist` for Copilot/Claude/Gemini; `permission-policy` for OpenCode since `tools:` is deprecated upstream; `n/a-unless-explicit` for Codex which inherits session tools by default), per-tool `scope` (`both | cli-only | vscode-only`), `aliases[]` for legacy/renamed names, `source_url` + `last_verified` dates, and per-runtime `profiles{}` for named tool subsets.
+- **New `assets/skills/tool-catalog-audit.skill.md.template`** — host-side, read-only audit skill emitted at every selected runtime's skills path (Copilot/Claude/OpenCode/Codex/Gemini). Procedure inputs: selected runtime(s) + paths to scan. Outputs: findings list (unknown / legacy / cross-runtime / missing-stamp / opencode-permission-wildcard-too-broad) with suggested fix per signal. **Per-runtime audit adapters**: name-allowlist (Copilot/Claude/Gemini) validate every `tools:` / `tool_allowlist` entry against the catalog block; permission-policy (OpenCode) validates `permission:` map keys and forbids the deprecated `tools:` key; n/a-unless-explicit (Codex) skips audit unless `tool_allowlist` is explicitly set. **Subagents NEVER invoke this skill** (host-side only per hard rule #36); skill is read-only and returns findings only — the orchestrator owns approval and any migration patch.
+- **New `scripts/check-tool-catalog-freshness.py`** — minimal URL-liveness checker (HEAD + GET fallback, stdlib only, timeout-safe) + `last_verified` age check (default 90-day threshold). Exit codes: 0 ok, 1 stale, 2 dead URL, 3 catalog missing. **Does NOT scrape tool names from upstream docs** — live tool-name refresh requires per-runtime parser robustness deferred to v1.9.0.
+- **v1.7.0 → v1.8.0 upgrade migration** in `references/misplaced-artifacts-migration.md`: 1 new playbook row + 8-step write-ahead procedure (mirrors v1.5→v1.6 / v1.6→v1.7 `prepared` → `applied` → `verified` ledger pattern) + 4 new detection signals. **All subagent tool-list changes default to `manual-review` — never auto-patched** because tool allowlists are security boundaries.
+- **4 new detection signals**: `missing-tool-catalog-stamp` (auto: `audit-needed` — informational only, not error); `unknown-tool-name-in-agent` (auto: `manual-review` — suggested closest match shown to user, never auto-applied); `legacy-tool-name-in-agent` (auto: `manual-review` — alias map shows old → new, user approves per file); `cross-runtime-tool-leak` (auto: `manual-review` — severe, usually means runtime mix-up).
+- **4 new validator checks** in `scripts/_validate.py` (lines 4494-4638): `check_tool_catalog_json_schema()` (JSON parses + required runtime keys + every profile tool name exists in `tools[].name` for name-allowlist runtimes + OpenCode has `deprecated_keys.tools` + Codex `default_behavior == inherit-session`); `check_tool_catalog_reference()` (required headings + per-runtime sections); `check_tool_catalog_audit_skill_template()` (per-runtime adapter sections + host-side + read-only declarations); `check_tool_catalog_stamp_in_templates()` (AGENTS.md.template + 5 subagent templates carry the new stamp marker).
+
+### Changed
+
+- **`SKILL.md` adds hard rule #39 (Tool catalog discipline)** and a Phase 4 "Tool catalog stamp & emit-time validation (v1.8.0+)" bullet near the existing Native Runtime Agents bullet; Phase 7 verify #19 covers stamp presence + tool-name catalog membership + scope-defaults; Phase 5 numbered list collapsed from 5 items to a single sentence (-5 lines, freed budget for #39). Lands at **497/500** lines (3 lines headroom). Hard rule numbering #32-#38 unchanged.
+- **AGENTS.md.template + 5 subagent templates** (Copilot, Claude, OpenCode, Codex TOML, Gemini): add `<!-- agents-system-setup:tool-catalog-version: {{PLUGIN_VERSION}} -->` (or `# ...` for Codex TOML) immediately after the existing `generated-by` stamp. The marker tells `upgrade` mode whether a generated file was emitted catalog-aware (v1.8.0+) or pre-catalog (needs audit, not invalid).
+- **`references/platforms.md` Copilot CLI Standard Tool Profiles section**: 1-line pointer added directing readers to `assets/tool-catalog.json` as the canonical tool list. Existing profile tables remain valid as an emit-time convenience (validator literals depend on them).
+
+### Validation
+
+- `bash scripts/validate.sh`: `[OK] All checks passed (2 warning(s))` — same pre-existing warnings as v1.7.0 (SKILL.md 497/500 + Codex `developer_instructions` 72 lines vs 65 soft target).
+- `npx --yes markdownlint-cli2 plugins/**/*.md`: clean.
+- Rubber-duck (gpt-5.5) plan critique: **16 findings adopted** before implementation (3 BLOCKING: refresh-script false-confidence → manual catalog + freshness-only script for v1.8.0, defer live scraping to v1.9.0; markdown+JSON dual source → JSON canonical, MD is human view; auto-patch unsafe → all subagent tool changes default to `manual-review`. 5 HIGH: scope too large → catalog only in v1.8.0; VS Code shared-file safety → default-deny `scope: cli-only` / `scope: vscode-only`; OpenCode audit shape → per-runtime adapters; backward compat → per-file stamp marker; workflow hardening → deferred to v1.9.0. 5 MEDIUM + 3 LOW.)
+- Code-review (gpt-5.5) post-implementation: **1 HIGH adopted** — Copilot `vscode` tool was inconsistently marked `scope: vscode-only` while also appearing in the `standard` profile. Resolved by reclassifying `vscode` as `scope: both` (it's safely includable in shared `.github/agents/*.agent.md` because Copilot CLI silently ignores it when VS Code is not the host) and removing the introduced `vs-code-shared-opt-in` profile alias. Preserves the established `[vscode, execute, read, agent, edit, search, todo]` standard literal that 5 validator checks + 6 documentation places depend on.
+
+### Migration notes
+
+- **No breaking changes.** Single-agent setups skip the stamp marker behavior (no roster to audit). Existing v1.7.x generated agents have no stamp; upgrade classifies them as `missing-tool-catalog-stamp` → `audit-needed` (informational only, NOT error or auto-patch).
+- **The audit skill is detection-only in v1.8.0.** Tool-list rewrites require explicit per-file user approval via the migration ledger. Manifest gets new field `tool_catalog_version: "1.8.0"` (+ optional `tool_catalog_hash`).
+- **`assets/tool-catalog.json` is canonical.** When editing the catalog, update the JSON FIRST; the human-readable `references/tool-catalog.md` should be re-rendered from the JSON when content diverges.
+- **OpenCode `tools:` is deprecated upstream** — audit reports any `tools:` key in OpenCode agents as a manual-review signal (use `permission:` block instead).
+- **Codex audit is n/a by default** — Codex subagents inherit parent session tools; catalog audit only runs against subagents that explicitly set `tool_allowlist`. Validate `sandbox_mode` / MCP / skills instead.
+
+### Deferred to v1.9.0
+
+- `.github/workflows/refresh-tool-catalog.yml` (scheduled cron + auto-issue on drift; needs `contents: read` + `issues: write`, URL allowlist, timeouts, sanitization, pinned action SHAs).
+- `scripts/refresh-tool-catalog.py` (live doc-scraping refresh; needs per-runtime parser robustness proven first to avoid the "false confidence" failure mode flagged by rubber-duck).
+
 ## [1.7.0] - 2026-06-04
 
 ### Added
