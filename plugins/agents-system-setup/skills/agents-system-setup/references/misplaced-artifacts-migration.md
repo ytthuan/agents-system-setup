@@ -495,6 +495,7 @@ playbook is additive — running `improve` from `v1.2.0` to `v1.4.0` applies the
 | `v1.3.0 → v1.4.0` | Trim AGENTS.md › Orchestration Operating Model from ~83 to ~37 lines (preserve inline Required Minimum 12-field summary and malformed-assignment behavior); trim subagent Acceptance Checklist from 14 → 6 items (preserve receiver-side defenses: required-min, owned-paths intersection, approvals, full-form gate, security-team fields, no-invent rule); add `generated-by` stamps; emit central manifest. |
 | `v1.4.0 → v1.5.0` | See [v1.4.0 → v1.5.0 details](#v140--v150-migration-details) below — the row was extracted because it spans multiple coordinated emissions across skills, AGENTS.md sections, roster roles, and all 5 subagent templates. |
 | `v1.5.0 → v1.6.0` | See [v1.5.0 → v1.6.0 details](#v150--v160-migration-details) below — adds audience tags to AGENTS.md, inlines project-standard digest into every subagent file. Subagents migrated FIRST per atomic 3-state ledger. |
+| `v1.6.0 → v1.7.0` | See [v1.6.0 → v1.7.0 details](#v160--v170-details) below — add `## Orchestration Operating Model` › `### Native Runtime Agents` with `<!-- agents-system-setup:host-builtins-routing -->` anchor to `AGENTS.md`; for OpenCode targets, propose extending `permission.task` with `explore` and `general` allows; no subagent file mutations (orchestrator-side only per hard rule #38). |
 
 ### v1.4.0 → v1.5.0 migration details
 
@@ -560,6 +561,55 @@ The v1.5.0 → v1.6.0 upgrade introduces layered context (visible audience tags)
 - Auto-applying without `ask_user` approval at step 2.
 - Treating digest hash drift as ERROR (it's WARNING — content evolves naturally).
 
+### v1.6.0 → v1.7.0 details
+
+The v1.6.0 → v1.7.0 upgrade introduces orchestrator-side native runtime agent
+routing. Migration is atomic via the same append-only 3-state ledger
+(`prepared` → `applied` → `verified`) in
+`.agents-system-setup/migration.jsonl`.
+
+#### 8-step atomic procedure
+
+1. Read `.agents-system-setup/generated.json` and the generated artifact stamp;
+   confirm the source version is `1.6.0` or `1.6.x`.
+2. Render the proposed diff: insert the `### Native Runtime Agents` subsection
+   under `## Orchestration Operating Model` in `AGENTS.md` using the full or
+   compact variant from `host-builtins-routing.snippet.md` based on the recorded
+   `output_profile`.
+3. **Conflict scan (manual-review classification):** grep `AGENTS.md` outside
+   any managed block for existing prose containing: `Host Built-in`,
+   `native runtime agents`, `general-purpose`, `task-class`, `explore-class`,
+   `host_builtins_routing`. Any match outside managed blocks classifies the row
+   as `manual-review` and prompts the user to either (a) merge their custom prose
+   into the managed block, (b) keep the custom prose and skip emission, or
+   (c) overwrite (requires explicit confirmation). Do NOT auto-modify unmanaged
+   prose.
+4. `ask_user` per-group approval (`add`, `patch`, and `manual-review` groups
+   separately).
+5. For each approved file: back up to
+   `.agents-system-setup/migration-backup/<timestamp>/`, append a `prepared`
+   ledger row with `backup_path` and `intended_action` to
+   `.agents-system-setup/migration.jsonl`, modify the file, then append an
+   `applied` ledger row.
+6. For OpenCode targets: ALSO update `opencode.json` `permission.task` to add
+   `explore: allow` and `general: allow` entries (or record
+   `host_builtins_routing: declined` in the manifest if the user declines this
+   gate); use the same `prepared` → `applied` ledger pattern.
+7. Run the validation pass: re-run the 2 new validator functions
+   (`check_host_builtins_routing_in_agents_md` cannot fully verify the rendered
+   `AGENTS.md`, but the manifest update can record the anchor presence);
+   manually grep for the `<!-- agents-system-setup:host-builtins-routing -->`
+   anchor in the user's emitted `AGENTS.md`.
+8. On success, append `verified` ledger rows for every modified file, then bump
+   `.agents-system-setup/generated.json` version to `1.7.0`. Resume protocol:
+   scan the ledger; entries with `prepared` but no `applied` restore from
+   backup; entries with `applied` but no `verified` re-run validation.
+
+#### Rollback
+
+`prepared` rows without `applied` indicate aborted migrations; restore from
+`backup_path`. JSONL is append-only.
+
 ## Mismatch & Deprecation Detection (upgrade mode)
 
 The version-stamp playbook above handles the **content delta** between known
@@ -585,6 +635,9 @@ before any write.
 
 - `missing-audience-tag` — AGENTS.md `## Section` heading lacks a visible `**Audience:** <value>` line when conditions warrant (subagent_count >= 2, profile balanced/full). Classify: `patch` (insert marker via section-header rewrite).
 - `non-self-contained-subagent` — subagent file lacks the `<!-- subagent-digest:managed:start v=<hash> -->` block or has hash mismatch. Classify: `patch` (inject block or update body+hash).
+- `missing-native-runtime-agents-subsection` — AGENTS.md has no `### Native Runtime Agents` subsection AND subagent_count >= 2 (regardless of profile: Balanced/Full → full variant; Compact → compact variant). Classify: `add`.
+- `missing-host-builtins-anchor` — AGENTS.md has the heading but no `<!-- agents-system-setup:host-builtins-routing -->` anchor. Classify: `patch` (insert anchor before the heading).
+- `unmanaged-host-routing-prose` — AGENTS.md outside any managed block contains the conflict-scan terms from the v1.6.0 → v1.7.0 procedure. Classify: `manual-review` (never auto-modify).
 
 ### Upgrade procedure
 
