@@ -1,0 +1,628 @@
+{
+  "catalog_version": "1.8.0",
+  "last_updated": "2026-06-04",
+  "schema_doc": "https://github.com/ytthuan/agents-system-setup/blob/main/plugins/agents-system-setup/skills/agents-system-setup/references/tool-catalog.md",
+  "runtimes": {
+    "copilot-cli": {
+      "display_name": "GitHub Copilot CLI",
+      "audit_kind": "name-allowlist",
+      "frontmatter_key": "tools",
+      "frontmatter_shape": "yaml-list",
+      "source_url": "https://docs.github.com/en/copilot/reference/custom-agents-configuration",
+      "shared_file_runtimes": [
+        "vscode-copilot"
+      ],
+      "tools": [
+        {
+          "name": "vscode",
+          "category": "execute",
+          "scope": "both",
+          "aliases": [],
+          "last_verified": "2026-06-04",
+          "notes": "Activates VS Code integration when host is VS Code Copilot; silently ignored by Copilot CLI when VS Code is not the host. Safe to include in shared `.github/agents/*.agent.md` files; this is the recommended default for the Standard Tool Profile."
+        },
+        {
+          "name": "execute",
+          "category": "execute",
+          "scope": "both",
+          "aliases": [
+            "shell",
+            "Bash",
+            "powershell"
+          ],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "read",
+          "category": "read",
+          "scope": "both",
+          "aliases": [
+            "Read",
+            "NotebookRead"
+          ],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "edit",
+          "category": "write",
+          "scope": "both",
+          "aliases": [
+            "Edit",
+            "MultiEdit",
+            "Write",
+            "NotebookEdit"
+          ],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "search",
+          "category": "search",
+          "scope": "both",
+          "aliases": [
+            "Grep",
+            "Glob"
+          ],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "agent",
+          "category": "delegation",
+          "scope": "both",
+          "aliases": [
+            "custom-agent",
+            "Task"
+          ],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "web",
+          "category": "web",
+          "scope": "both",
+          "aliases": [
+            "WebSearch",
+            "WebFetch"
+          ],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "todo",
+          "category": "todo",
+          "scope": "both",
+          "aliases": [
+            "TodoWrite"
+          ],
+          "last_verified": "2026-06-04"
+        }
+      ],
+      "profiles": {
+        "standard": [
+          "vscode",
+          "execute",
+          "read",
+          "agent",
+          "edit",
+          "search",
+          "todo"
+        ],
+        "read-only": [
+          "read",
+          "search"
+        ],
+        "runner": [
+          "execute",
+          "read",
+          "search",
+          "todo"
+        ],
+        "research": [
+          "read",
+          "search",
+          "web",
+          "todo"
+        ],
+        "inherit": null
+      },
+      "notes": "The Standard Tool Profile includes the `vscode` alias because it is the established cross-surface default — VS Code Copilot activates IDE integration with it, and Copilot CLI silently ignores it when not running under VS Code. Other `scope: cli-only` or `scope: vscode-only` tools (if any are added in future catalog updates) require explicit opt-in for shared `.github/agents/*.agent.md` files per hard rule #39."
+    },
+    "vscode-copilot": {
+      "display_name": "VS Code Copilot",
+      "audit_kind": "name-allowlist",
+      "frontmatter_key": "tools",
+      "frontmatter_shape": "yaml-list",
+      "source_url": "https://code.visualstudio.com/docs/copilot/customization/custom-agents",
+      "shared_file_runtimes": [
+        "copilot-cli"
+      ],
+      "tools": [
+        {
+          "name": "vscode",
+          "category": "execute",
+          "scope": "vscode-only",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "agent",
+          "category": "delegation",
+          "scope": "both",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "edit",
+          "category": "write",
+          "scope": "both",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "execute",
+          "category": "execute",
+          "scope": "both",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "read",
+          "category": "read",
+          "scope": "both",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "search",
+          "category": "search",
+          "scope": "both",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "todo",
+          "category": "todo",
+          "scope": "both",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "web",
+          "category": "web",
+          "scope": "both",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "search/codebase",
+          "category": "search",
+          "scope": "vscode-only",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "search/usages",
+          "category": "search",
+          "scope": "vscode-only",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "web/fetch",
+          "category": "web",
+          "scope": "vscode-only",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "read/terminalLastCommand",
+          "category": "read",
+          "scope": "vscode-only",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        }
+      ],
+      "profiles": {
+        "standard": [
+          "agent",
+          "read",
+          "edit",
+          "search",
+          "todo"
+        ],
+        "read-only": [
+          "read",
+          "search"
+        ],
+        "planner-ide": [
+          "search/codebase",
+          "search/usages",
+          "web/fetch"
+        ],
+        "implementer-ide": [
+          "edit",
+          "read/terminalLastCommand"
+        ],
+        "inherit": null
+      },
+      "notes": "Shared `.github/agents/*.agent.md` file format with Copilot CLI. Tools with `scope: vscode-only` are silently ignored by Copilot CLI and require explicit opt-in for shared files."
+    },
+    "claude-code": {
+      "display_name": "Claude Code",
+      "audit_kind": "name-allowlist",
+      "frontmatter_key": "tools",
+      "frontmatter_shape": "comma-string",
+      "source_url": "https://docs.claude.com/en/docs/claude-code/sub-agents",
+      "tools": [
+        {
+          "name": "Read",
+          "category": "read",
+          "scope": "both",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "Write",
+          "category": "write",
+          "scope": "both",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "Edit",
+          "category": "write",
+          "scope": "both",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "Bash",
+          "category": "execute",
+          "scope": "both",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "Grep",
+          "category": "search",
+          "scope": "both",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "Glob",
+          "category": "search",
+          "scope": "both",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "Agent",
+          "category": "delegation",
+          "scope": "both",
+          "aliases": [
+            "Task"
+          ],
+          "last_verified": "2026-06-04",
+          "subagent_availability": "main-thread-only"
+        },
+        {
+          "name": "WebFetch",
+          "category": "web",
+          "scope": "both",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "WebSearch",
+          "category": "web",
+          "scope": "both",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "TodoWrite",
+          "category": "todo",
+          "scope": "both",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "AskUserQuestion",
+          "category": "interaction",
+          "scope": "both",
+          "aliases": [],
+          "last_verified": "2026-06-04",
+          "subagent_availability": "unavailable"
+        },
+        {
+          "name": "Task",
+          "category": "delegation",
+          "scope": "both",
+          "aliases": [
+            "Agent"
+          ],
+          "last_verified": "2026-06-04",
+          "subagent_availability": "legacy-main-thread-only"
+        }
+      ],
+      "disallowedTools_field": {
+        "frontmatter_key": "disallowedTools",
+        "frontmatter_shape": "comma-string"
+      },
+      "profiles": {
+        "standard": [
+          "Read",
+          "Write",
+          "Edit",
+          "Bash",
+          "Grep",
+          "Glob",
+          "TodoWrite"
+        ],
+        "read-only": [
+          "Read",
+          "Grep",
+          "Glob"
+        ],
+        "researcher": [
+          "Read",
+          "Grep",
+          "Glob",
+          "WebFetch",
+          "WebSearch"
+        ],
+        "main-thread-coordinator": [
+          "Agent",
+          "Read",
+          "Bash"
+        ]
+      },
+      "notes": "Tool names are case-sensitive. `tools:` is a comma-separated string in frontmatter (NOT a YAML list). `disallowedTools:` is a separate frontmatter key, not a tool. Current Claude Code docs say `Agent`, `Task`, and `AskUserQuestion` are not available inside spawned subagents even when listed; use them only where the runtime supports main-thread agent execution, otherwise subagents return `question_request`."
+    },
+    "opencode": {
+      "display_name": "OpenCode",
+      "audit_kind": "permission-policy",
+      "frontmatter_key": "permission",
+      "frontmatter_shape": "nested-permission-map",
+      "source_url": "https://opencode.ai/docs/agents/",
+      "deprecated_keys": [
+        "tools"
+      ],
+      "permission_keys": [
+        {
+          "name": "read",
+          "values": [
+            "allow",
+            "ask",
+            "deny",
+            "<file-pattern-map>"
+          ],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "edit",
+          "values": [
+            "allow",
+            "ask",
+            "deny",
+            "<file-pattern-map>"
+          ],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "glob",
+          "values": [
+            "allow",
+            "ask",
+            "deny",
+            "<glob-pattern-map>"
+          ],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "grep",
+          "values": [
+            "allow",
+            "ask",
+            "deny",
+            "<grep-pattern-map>"
+          ],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "list",
+          "values": [
+            "allow",
+            "ask",
+            "deny",
+            "<path-pattern-map>"
+          ],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "bash",
+          "values": [
+            "allow",
+            "ask",
+            "deny",
+            "<command-pattern-map>"
+          ],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "task",
+          "values": [
+            "allow",
+            "ask",
+            "deny",
+            "<roster-agent-map>"
+          ],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "external_directory",
+          "values": [
+            "allow",
+            "ask",
+            "deny",
+            "<path-pattern-map>"
+          ],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "todowrite",
+          "values": [
+            "allow",
+            "ask",
+            "deny"
+          ],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "webfetch",
+          "values": [
+            "allow",
+            "ask",
+            "deny"
+          ],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "websearch",
+          "values": [
+            "allow",
+            "ask",
+            "deny"
+          ],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "codesearch",
+          "values": [
+            "allow",
+            "ask",
+            "deny"
+          ],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "lsp",
+          "values": [
+            "allow",
+            "ask",
+            "deny",
+            "<operation-pattern-map>"
+          ],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "skill",
+          "values": [
+            "allow",
+            "ask",
+            "deny",
+            "<skill-name-map>"
+          ],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "question",
+          "values": [
+            "allow",
+            "ask",
+            "deny"
+          ],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "doom_loop",
+          "values": [
+            "allow",
+            "ask",
+            "deny"
+          ],
+          "last_verified": "2026-06-04"
+        }
+      ],
+      "notes": "OpenCode uses a nested permission map, NOT a tools allowlist. The old `tools:` key is deprecated upstream. Audit checks: wildcard default must be `deny` or `ask` for `task` and `skill` keys; explicit `allow` entries must be named (no `*: allow`)."
+    },
+    "codex": {
+      "display_name": "OpenAI Codex (CLI + App)",
+      "audit_kind": "n/a-unless-explicit",
+      "frontmatter_key": "tool_allowlist",
+      "frontmatter_shape": "toml-array",
+      "source_url": "https://developers.openai.com/codex/subagents",
+      "default_behavior": "inherit-session",
+      "tools": [],
+      "notes": "Codex subagents inherit the parent session toolbelt by default. Per-agent `tool_allowlist` is optional. Catalog audit is n/a unless `tool_allowlist` is explicitly set in a subagent TOML; in that case, the allowlist names must follow the parent session conventions. Validate `sandbox_mode` (read-only | workspace-write | danger-full-access) and MCP entries instead."
+    },
+    "gemini-cli": {
+      "display_name": "Gemini CLI",
+      "audit_kind": "name-allowlist",
+      "frontmatter_key": "tools",
+      "frontmatter_shape": "yaml-list",
+      "source_url": "https://github.com/google-gemini/gemini-cli/blob/main/docs/core/subagents.md",
+      "tools": [
+        {
+          "name": "read_file",
+          "category": "read",
+          "scope": "both",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "grep_search",
+          "category": "search",
+          "scope": "both",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "run_shell_command",
+          "category": "execute",
+          "scope": "both",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        },
+        {
+          "name": "ask_user",
+          "category": "interaction",
+          "scope": "both",
+          "aliases": [],
+          "last_verified": "2026-06-04"
+        }
+      ],
+      "wildcards": [
+        "*",
+        "mcp_*",
+        "mcp_<server>_*"
+      ],
+      "profiles": {
+        "standard": [
+          "read_file",
+          "grep_search",
+          "run_shell_command"
+        ],
+        "read-only": [
+          "read_file",
+          "grep_search"
+        ],
+        "interactive": [
+          "read_file",
+          "grep_search",
+          "ask_user"
+        ],
+        "inherit": null
+      },
+      "unverified_candidates": [
+        "glob",
+        "list_directory",
+        "read_many_files",
+        "write_file",
+        "edit",
+        "web_fetch",
+        "google_web_search",
+        "save_memory"
+      ],
+      "notes": "Gemini local subagents cannot recursively delegate; tools that spawn sub-tasks (for example, `task` / `agent`) are not part of the Gemini local-subagent tool surface. The upstream subagents docs verify `read_file`, `grep_search`, `run_shell_command`, `ask_user`, and wildcard forms; other common Gemini tool names remain candidates until a parser-backed refresh lands."
+    }
+  }
+}

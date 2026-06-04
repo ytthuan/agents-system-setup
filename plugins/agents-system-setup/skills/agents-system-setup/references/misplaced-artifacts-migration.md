@@ -496,6 +496,7 @@ playbook is additive — running `improve` from `v1.2.0` to `v1.4.0` applies the
 | `v1.4.0 → v1.5.0` | See [v1.4.0 → v1.5.0 details](#v140--v150-migration-details) below — the row was extracted because it spans multiple coordinated emissions across skills, AGENTS.md sections, roster roles, and all 5 subagent templates. |
 | `v1.5.0 → v1.6.0` | See [v1.5.0 → v1.6.0 details](#v150--v160-migration-details) below — adds audience tags to AGENTS.md, inlines project-standard digest into every subagent file. Subagents migrated FIRST per atomic 3-state ledger. |
 | `v1.6.0 → v1.7.0` | See [v1.6.0 → v1.7.0 details](#v160--v170-details) below — add `## Orchestration Operating Model` › `### Native Runtime Agents` with `<!-- agents-system-setup:host-builtins-routing -->` anchor to `AGENTS.md`; for OpenCode targets, propose extending `permission.task` with `explore` and `general` allows; no subagent file mutations (orchestrator-side only per hard rule #38). |
+| `v1.7.0 → v1.8.0` | See [v1.7.0 → v1.8.0 details](#v170--v180-details) below — emit `tool-catalog-audit` skill at every selected runtime's skills path; add `tool_catalog_version` field to `.agents-system-setup/generated.json`; add per-file `<!-- agents-system-setup:tool-catalog-version: {{PLUGIN_VERSION}} -->` stamp to AGENTS.md and every generated agent. Tool list changes default to `manual-review` — never auto-patch subagent `tools:` / `tool_allowlist` (security boundary). |
 
 ### v1.4.0 → v1.5.0 migration details
 
@@ -610,6 +611,56 @@ routing. Migration is atomic via the same append-only 3-state ledger
 `prepared` rows without `applied` indicate aborted migrations; restore from
 `backup_path`. JSONL is append-only.
 
+### v1.7.0 → v1.8.0 details
+
+The v1.7.0 → v1.8.0 upgrade introduces catalog-aware tool validation and a
+host-side read-only `tool-catalog-audit` skill. Migration stays additive and
+uses the same append-only ledger pattern.
+
+#### 8-step write-ahead procedure
+
+1. Read `.agents-system-setup/generated.json` and stamps; confirm source
+   version is `1.7.0` or `1.7.x`.
+2. Render the proposed diff: insert `tool-catalog-audit` skill files at every
+   selected runtime's skills path; add `tool_catalog_version: "1.8.0"` to the
+   manifest; render per-file stamp markers in any regenerated file. Do NOT
+   modify any existing subagent `tools:` / `tool_allowlist` lists in this step.
+3. Run the `tool-catalog-audit` skill in REPORT mode against every generated
+   agent file. Classify each finding:
+   - `unknown-tool-name-in-agent` → `manual-review` (suggested closest match
+     shown to user; never auto-applied).
+   - `legacy-tool-name-in-agent` → `manual-review` (alias map shows old → new;
+     never auto-applied).
+   - `cross-runtime-tool-leak` → `manual-review` (severe; usually means
+     runtime mix-up).
+   - `missing-tool-catalog-stamp` → `audit-needed` (informational; user may add
+     stamp at next regeneration).
+   - `opencode-permission-wildcard-too-broad` (when OpenCode files have
+     `"*": allow` on `permission.task` or `permission.skill`) →
+     `manual-review`.
+4. `ask_user` per-group approval (`add` = new skill files; `audit-needed` =
+   stamp additions; `manual-review` = grouped per-file, user opts in to each
+   fix).
+5. For each approved file: backup to
+   `.agents-system-setup/migration-backup/<timestamp>/`, append `prepared`
+   ledger row with `backup_path` + `intended_action` to
+   `.agents-system-setup/migration.jsonl`, modify file, append `applied`
+   ledger row.
+6. Add `tool_catalog_version: "1.8.0"` and
+   `tool_catalog_hash: "<sha256-first-12-of-tool-catalog.json>"` to
+   `.agents-system-setup/generated.json` (write-ahead pattern: `prepared` →
+   modify → `applied`).
+7. Run validation: re-run `check_tool_catalog_stamp_in_templates` against the
+   user's emitted files; run the audit skill again to confirm no new ERRORs.
+8. On success, append `verified` ledger rows for every modified file. Resume
+   protocol: scan ledger; `prepared` without `applied` → restore from backup;
+   `applied` without `verified` → re-validate.
+
+#### Rollback
+
+Tool-list changes are NEVER auto-applied, so rollback typically only restores
+stamp markers, skill files, and manifest fields. JSONL is append-only.
+
 ## Mismatch & Deprecation Detection (upgrade mode)
 
 The version-stamp playbook above handles the **content delta** between known
@@ -638,6 +689,10 @@ before any write.
 - `missing-native-runtime-agents-subsection` — AGENTS.md has no `### Native Runtime Agents` subsection AND subagent_count >= 2 (regardless of profile: Balanced/Full → full variant; Compact → compact variant). Classify: `add`.
 - `missing-host-builtins-anchor` — AGENTS.md has the heading but no `<!-- agents-system-setup:host-builtins-routing -->` anchor. Classify: `patch` (insert anchor before the heading).
 - `unmanaged-host-routing-prose` — AGENTS.md outside any managed block contains the conflict-scan terms from the v1.6.0 → v1.7.0 procedure. Classify: `manual-review` (never auto-modify).
+- `missing-tool-catalog-stamp` — generated file has no `<!-- agents-system-setup:tool-catalog-version: ... -->` marker AND has a `generated-by` stamp ≥ 1.8.0. Classify: `audit-needed` (informational; user may add stamp at next regeneration).
+- `unknown-tool-name-in-agent` — agent file references a tool name not in the runtime's catalog block. Classify: `manual-review` (suggested closest match shown; never auto-applied — tool allowlists are security boundaries).
+- `legacy-tool-name-in-agent` — agent file references a tool name in the runtime's `aliases[]`. Classify: `manual-review` (alias map shows old → new; user approves per file).
+- `cross-runtime-tool-leak` — agent file references a tool name that belongs to a DIFFERENT runtime's catalog (e.g., Copilot `vscode` in `.claude/agents/*.md`, or Claude `Bash` in `.gemini/agents/*.md`). Classify: `manual-review` (severe; usually means runtime mix-up).
 
 ### Upgrade procedure
 

@@ -4491,6 +4491,151 @@ def check_host_builtins_routing_in_agents_md() -> None:
         )
 
 
+def check_tool_catalog_json_schema() -> None:
+    """Ensure the v1.8.0 tool catalog has the expected runtime schema."""
+    catalog_path = SKILL_ROOT / "assets" / "tool-catalog.json"
+    rel = catalog_path.relative_to(REPO).as_posix()
+    try:
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        err(f"{rel}: required tool catalog file is missing")
+        return
+    except json.JSONDecodeError as e:
+        err(f"{rel}: invalid JSON: {e}")
+        return
+    except UnicodeDecodeError:
+        err(f"{rel}: not valid UTF-8")
+        return
+
+    for key in ("catalog_version", "last_updated", "runtimes"):
+        if key not in catalog:
+            err(f"{rel}: missing top-level field `{key}`")
+    if not isinstance(catalog.get("catalog_version"), str) or not catalog.get("catalog_version"):
+        err(f"{rel}: `catalog_version` must be a non-empty string")
+
+    runtimes = catalog.get("runtimes")
+    expected_runtimes = {
+        "copilot-cli",
+        "vscode-copilot",
+        "claude-code",
+        "opencode",
+        "codex",
+        "gemini-cli",
+    }
+    if not isinstance(runtimes, dict):
+        err(f"{rel}: `runtimes` must be an object")
+        return
+    if set(runtimes) != expected_runtimes:
+        err(f"{rel}: `runtimes` keys must be exactly {sorted(expected_runtimes)}")
+        return
+
+    allowed_audit_kinds = {
+        "name-allowlist",
+        "permission-policy",
+        "n/a-unless-explicit",
+    }
+    for runtime_id, runtime in runtimes.items():
+        if not isinstance(runtime, dict):
+            err(f"{rel}: `runtimes.{runtime_id}` must be an object")
+            continue
+        for key in ("display_name", "audit_kind", "source_url"):
+            if key not in runtime:
+                err(f"{rel}: missing field `runtimes.{runtime_id}.{key}`")
+        audit_kind = runtime.get("audit_kind")
+        if audit_kind not in allowed_audit_kinds:
+            err(f"{rel}: `runtimes.{runtime_id}.audit_kind` has unsupported value `{audit_kind}`")
+
+        profiles = runtime.get("profiles")
+        if audit_kind == "name-allowlist" and profiles:
+            tools = runtime.get("tools")
+            if not isinstance(tools, list):
+                err(f"{rel}: `runtimes.{runtime_id}.tools` must be a list for profile validation")
+                continue
+            tool_names = {
+                tool.get("name")
+                for tool in tools
+                if isinstance(tool, dict) and isinstance(tool.get("name"), str)
+            }
+            if not isinstance(profiles, dict):
+                err(f"{rel}: `runtimes.{runtime_id}.profiles` must be an object")
+                continue
+            for profile_name, profile_tools in profiles.items():
+                if profile_tools is None:
+                    continue
+                if not isinstance(profile_tools, list):
+                    err(f"{rel}: `runtimes.{runtime_id}.profiles.{profile_name}` must be a list or null")
+                    continue
+                for tool_name in profile_tools:
+                    if tool_name not in tool_names:
+                        err(
+                            f"{rel}: profile `runtimes.{runtime_id}.profiles.{profile_name}` "
+                            f"references unknown tool `{tool_name}`"
+                        )
+
+    opencode = runtimes["opencode"]
+    if opencode.get("audit_kind") != "permission-policy":
+        err(f"{rel}: `runtimes.opencode.audit_kind` must be `permission-policy`")
+    if not isinstance(opencode.get("permission_keys"), list):
+        err(f"{rel}: `runtimes.opencode.permission_keys` must be a list")
+    if "tools" not in opencode.get("deprecated_keys", []):
+        err(f"{rel}: `runtimes.opencode.deprecated_keys` must include `tools`")
+
+    codex = runtimes["codex"]
+    if codex.get("audit_kind") != "n/a-unless-explicit":
+        err(f"{rel}: `runtimes.codex.audit_kind` must be `n/a-unless-explicit`")
+    if codex.get("default_behavior") != "inherit-session":
+        err(f"{rel}: `runtimes.codex.default_behavior` must be `inherit-session`")
+
+
+def check_tool_catalog_reference() -> None:
+    """Ensure the human tool catalog reference keeps stable runtime headings."""
+    require_contains(
+        SKILL_ROOT / "references" / "tool-catalog.md",
+        (
+            "# Tool Catalog",
+            "Canonical data is `assets/tool-catalog.json`; this reference is the human view of that data.",
+            "## GitHub Copilot CLI (`copilot-cli`)",
+            "## VS Code Copilot (`vscode-copilot`)",
+            "## Claude Code (`claude-code`)",
+            "## OpenCode (`opencode`)",
+            "## OpenAI Codex (CLI + App) (`codex`)",
+            "## Gemini CLI (`gemini-cli`)",
+            "## Audit kinds reference",
+            "## Anti-patterns",
+        ),
+    )
+
+
+def check_tool_catalog_audit_skill_template() -> None:
+    """Ensure the host-side read-only tool catalog audit skill template is present."""
+    require_contains(
+        SKILL_ROOT / "assets" / "skills" / "tool-catalog-audit.skill.md.template",
+        (
+            "name: tool-catalog-audit",
+            "# Tool Catalog Audit (host-side)",
+            "Read-only.",
+            "name-allowlist",
+            "Permission-policy runtime",
+            "missing-tool-catalog-stamp",
+            "unknown-tool-name",
+        ),
+    )
+
+
+def check_tool_catalog_stamp_in_templates() -> None:
+    """Ensure generated AGENTS.md and every subagent template carries the catalog stamp."""
+    stamp = "agents-system-setup:tool-catalog-version: {{PLUGIN_VERSION}}"
+    for template_name in (
+        "AGENTS.md.template",
+        "subagent.agent.md.template",
+        "subagent.claude.md.template",
+        "subagent.opencode.md.template",
+        "subagent.gemini.md.template",
+        "subagent.codex.toml.template",
+    ):
+        require_contains(SKILL_ROOT / "assets" / template_name, (stamp,))
+
+
 def check_task_handoff_skill_policy() -> None:
     """Ensure the host-side task-handoff skill is emitted and referenced as the source of truth."""
     skill_path = (
@@ -4641,6 +4786,10 @@ def main() -> int:
     check_explorer_agents_reference()
     check_host_builtins_routing_reference()
     check_host_builtins_routing_in_agents_md()
+    check_tool_catalog_json_schema()
+    check_tool_catalog_reference()
+    check_tool_catalog_audit_skill_template()
+    check_tool_catalog_stamp_in_templates()
     check_task_handoff_skill_policy()
     check_upgrade_mismatch_detection_policy()
 

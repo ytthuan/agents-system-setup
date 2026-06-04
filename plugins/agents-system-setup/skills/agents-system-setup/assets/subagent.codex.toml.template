@@ -3,6 +3,7 @@
 # Spec: https://developers.openai.com/codex/subagents
 #
 # agents-system-setup:generated-by: {{PLUGIN_VERSION}}
+# agents-system-setup:tool-catalog-version: {{PLUGIN_VERSION}}
 # agents-system-setup:generated-at: {{GENERATED_AT}}
 # agents-system-setup:platform: codex-cli
 # agents-system-setup:replicated-from: {{REPLICATION_SOURCE}}
