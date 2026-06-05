@@ -2,6 +2,17 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [1.8.1] - 2026-06-05
+
+### Fixed
+
+- **"Try it" output no longer tells Copilot users to type `@orchestrator`.** `references/output-contract.md` previously printed the Copilot example as `copilot` then `@orchestrator <task>`, implying `@orchestrator` is an invokable custom agent. It is not — the host CLI session is the orchestrator (hard rule #33), so no `orchestrator.agent.md` is registered and `@orchestrator` does not resolve to an agent. This nudged some generating sessions into hand-writing a stray `.github/agents/orchestrator.agent.md` (no version stamp, violating #33). The example now tells users to run `copilot` and describe the task directly to the session (which reads `AGENTS.md` and acts as the orchestrator), and to fan out to a specialized subagent with `@<agent-name>`. The routing-alias concept stays documented in `AGENTS.md` / `topology.md` / `README.md` and remains validator-required.
+
+### Validation
+
+- `bash scripts/validate.sh`: `[OK] All checks passed` (same 2 pre-existing warnings as v1.8.0).
+- `npx --yes markdownlint-cli2@0.22.1 CHANGELOG.md references/output-contract.md`: clean.
+
 ## [1.8.0] - 2026-06-04
 
 ### Added

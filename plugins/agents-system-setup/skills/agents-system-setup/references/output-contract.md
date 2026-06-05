@@ -71,7 +71,7 @@ Details on request:
 
 Try it:
   <render selected runtimes only; omit every unselected runtime>
-  - If `copilot` selected: `copilot` then `@orchestrator <task>`; optional `copilot /fleet` for the wave plan
+  - If `copilot` selected: run `copilot`, then describe the task directly to the session — it reads `AGENTS.md` and acts as the orchestrator (there is no `@orchestrator` agent to type); fan out to a specialized subagent with `@<agent-name>`; optional `copilot /fleet` for the wave plan
   - If `claude` selected: `claude` then invoke a subagent
   - If `opencode` selected: `opencode` then pick a primary or `@mention` a subagent; inspect child sessions
   - If `codex-cli` selected: `codex`; CLI can use `/agent`; CLI + App artifacts are `AGENTS.md` plus `.codex/agents/*.toml`
