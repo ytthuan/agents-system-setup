@@ -1,0 +1,384 @@
+#!/usr/bin/env python3
+# agents-system-setup:generated-by: {{PLUGIN_VERSION}}
+# agents-system-setup:generated-at: {{GENERATED_AT}}
+# agents-system-setup:tool-kind: host-doctor
+#
+# agents-doctor: read-only health check for a generated agent system.
+#
+# Reconciles the agent files on disk against the central manifest
+# `.agents-system-setup/generated.json` and reports drift: stray agents
+# (especially a hand-written `orchestrator` file, which violates the
+# host-session-is-the-orchestrator rule), missing artifacts, checksum drift,
+# missing version stamps, and operational-state misroutes.
+#
+# This tool NEVER modifies files. It is safe to run by a human, in CI, or by
+# the host CLI session. Standard library only; no third-party dependencies.
+#
+# Usage:
+#   python3 .agents-system-setup/agents-doctor.py            # human summary
+#   python3 .agents-system-setup/agents-doctor.py --json     # machine output
+#   python3 .agents-system-setup/agents-doctor.py --strict   # warnings fail CI
+#   python3 .agents-system-setup/agents-doctor.py --root .   # explicit repo root
+#
+# Exit codes:
+#   0  clean (no error-severity findings; warnings allowed unless --strict)
+#   1  one or more error-severity findings (or warnings under --strict)
+#   2  no manifest found (only orchestrator + operational-state checks ran)
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import re
+import sys
+from pathlib import Path
+
+OPERATIONAL_STATE_DIR = ".agents-system-setup"
+MANIFEST_NAME = "generated.json"
+
+# Forbidden runtime-artifact subtrees inside the operational-state directory.
+# These mirror the plugin validator: only directory names are forbidden, never
+# flat files (this doctor script itself is a sanctioned flat read-only tool).
+FORBIDDEN_STATE_SUBTREES = {
+    "agents", "skills", "hooks", "commands", "prompts", "plugins",
+}
+
+# runtime id -> (agents directory, file glob patterns)
+AGENT_SURFACES = {
+    "copilot-cli": (".github/agents", ("*.agent.md", "*.md")),
+    "claude-code": (".claude/agents", ("*.md",)),
+    "opencode": (".opencode/agents", ("*.md",)),
+    "codex-cli": (".codex/agents", ("*.toml",)),
+    "gemini-cli": (".gemini/agents", ("*.md",)),
+}
+
+STAMP_RE = re.compile(r"agents-system-setup:generated-by:\s*([^\s\-][^\s]*)")
+SEVERITY_ORDER = {"error": 0, "warn": 1, "info": 2}
+
+
+def agent_stem(path: Path) -> str:
+    """Return the logical agent name for an agent file."""
+    name = path.name
+    if name.endswith(".agent.md"):
+        return name[: -len(".agent.md")]
+    return path.stem
+
+
+def sha256_of(path: Path) -> str | None:
+    try:
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(65536), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+    except OSError:
+        return None
+
+
+def read_stamp_version(path: Path) -> str | None:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    match = STAMP_RE.search(text)
+    return match.group(1) if match else None
+
+
+class Finding:
+    __slots__ = ("severity", "signal", "path", "detail", "suggested_action")
+
+    def __init__(self, severity, signal, path, detail, suggested_action):
+        self.severity = severity
+        self.signal = signal
+        self.path = path
+        self.detail = detail
+        self.suggested_action = suggested_action
+
+    def as_dict(self) -> dict:
+        return {
+            "severity": self.severity,
+            "signal": self.signal,
+            "path": self.path,
+            "detail": self.detail,
+            "suggested_action": self.suggested_action,
+        }
+
+
+def load_manifest(root: Path) -> dict | None:
+    manifest_path = root / OPERATIONAL_STATE_DIR / MANIFEST_NAME
+    if not manifest_path.is_file():
+        return None
+    try:
+        return json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def discover_agent_files(root: Path) -> list[Path]:
+    found: list[Path] = []
+    seen: set[Path] = set()
+    for _runtime, (rel_dir, globs) in AGENT_SURFACES.items():
+        agents_dir = root / rel_dir
+        if not agents_dir.is_dir():
+            continue
+        for pattern in globs:
+            for path in sorted(agents_dir.glob(pattern)):
+                if path.is_file() and path not in seen:
+                    seen.add(path)
+                    found.append(path)
+    return found
+
+
+def manifest_artifact_paths(manifest: dict, kinds: set[str]) -> dict[str, dict]:
+    paths: dict[str, dict] = {}
+    for artifact in manifest.get("artifacts", []):
+        if not isinstance(artifact, dict):
+            continue
+        path = artifact.get("path")
+        if path and artifact.get("kind") in kinds:
+            paths[str(path).replace("\\", "/")] = artifact
+    return paths
+
+
+def check_orchestrator_files(root: Path, agent_files: list[Path]) -> list[Finding]:
+    findings: list[Finding] = []
+    for path in agent_files:
+        if agent_stem(path).lower() == "orchestrator":
+            rel = path.relative_to(root).as_posix()
+            findings.append(
+                Finding(
+                    "error",
+                    "orchestrator-subagent-file",
+                    rel,
+                    "An orchestrator agent file exists, but the orchestrator is the "
+                    "host CLI session reading AGENTS.md, never an emitted agent.",
+                    "Delete this file; route via AGENTS.md > Orchestration Operating "
+                    "Model. Run the plugin in upgrade mode for a guided removal.",
+                )
+            )
+    return findings
+
+
+def check_operational_state(root: Path) -> list[Finding]:
+    findings: list[Finding] = []
+    state_root = root / OPERATIONAL_STATE_DIR
+    if not state_root.is_dir():
+        return findings
+    for entry in sorted(state_root.iterdir()):
+        if entry.is_dir() and entry.name in FORBIDDEN_STATE_SUBTREES:
+            rel = entry.relative_to(root).as_posix()
+            findings.append(
+                Finding(
+                    "error",
+                    "operational-state-artifact",
+                    rel,
+                    "Runtime artifact subtree inside .agents-system-setup/ is "
+                    "silently inert; loaders never read it.",
+                    "Move contents to the platform-standard path and record the "
+                    "move in .agents-system-setup/migration.jsonl.",
+                )
+            )
+    return findings
+
+
+def check_reconciliation(
+    root: Path, manifest: dict, agent_files: list[Path]
+) -> list[Finding]:
+    findings: list[Finding] = []
+    subagent_paths = manifest_artifact_paths(manifest, {"subagent", "agents-md"})
+    all_known = manifest_artifact_paths(
+        manifest, {"subagent", "agents-md", "skill", "mcp-config", "hooks", "other"}
+    )
+
+    # Stray agents: on disk but not in the manifest.
+    for path in agent_files:
+        rel = path.relative_to(root).as_posix()
+        if rel in all_known:
+            continue
+        if agent_stem(path).lower() == "orchestrator":
+            continue  # already reported by the orchestrator check
+        findings.append(
+            Finding(
+                "error",
+                "stray-agent",
+                rel,
+                "Agent file is present on disk but absent from the manifest; it was "
+                "likely hand-written outside the plugin.",
+                "Remove it, or re-run the plugin (update/improve) so it is tracked "
+                "and validated.",
+            )
+        )
+
+    # Missing artifacts: in the manifest but absent on disk.
+    for rel, artifact in sorted(subagent_paths.items()):
+        if not (root / rel).is_file():
+            findings.append(
+                Finding(
+                    "error",
+                    "missing-artifact",
+                    rel,
+                    "Manifest lists this artifact, but it is missing on disk.",
+                    "Restore it from version control or re-run the plugin to "
+                    "regenerate the agent system.",
+                )
+            )
+
+    # Checksum drift: content changed since generation.
+    for rel, artifact in sorted(all_known.items()):
+        checksum = artifact.get("checksum")
+        target = root / rel
+        if not checksum or not target.is_file():
+            continue
+        expected = str(checksum).split(":", 1)[-1].strip()
+        actual = sha256_of(target)
+        if expected and actual and expected != actual:
+            findings.append(
+                Finding(
+                    "warn",
+                    "checksum-drift",
+                    rel,
+                    "File content differs from the manifest checksum (edited since "
+                    "generation).",
+                    "Expected if you intentionally edited it; otherwise re-run the "
+                    "plugin to refresh the manifest.",
+                )
+            )
+
+    # Missing stamps on agent files.
+    for path in agent_files:
+        rel = path.relative_to(root).as_posix()
+        if read_stamp_version(path) is None:
+            findings.append(
+                Finding(
+                    "warn",
+                    "missing-stamp",
+                    rel,
+                    "Agent file has no agents-system-setup:generated-by stamp.",
+                    "Re-run the plugin (update/upgrade) to stamp it, or confirm it "
+                    "is intentionally hand-authored.",
+                )
+            )
+
+    # Manifest version vs AGENTS.md stamp.
+    manifest_version = manifest.get("plugin_version")
+    agents_md = root / "AGENTS.md"
+    agents_md_version = read_stamp_version(agents_md) if agents_md.is_file() else None
+    if manifest_version and agents_md_version and manifest_version != agents_md_version:
+        findings.append(
+            Finding(
+                "warn",
+                "manifest-version-drift",
+                "AGENTS.md",
+                "AGENTS.md stamp ({0}) does not match the manifest version "
+                "({1}).".format(agents_md_version, manifest_version),
+                "Run the plugin in upgrade mode to reconcile versions.",
+            )
+        )
+    return findings
+
+
+def run(root: Path) -> tuple[list[Finding], bool]:
+    """Return (findings, manifest_present)."""
+    agent_files = discover_agent_files(root)
+    findings: list[Finding] = []
+    findings.extend(check_orchestrator_files(root, agent_files))
+    findings.extend(check_operational_state(root))
+
+    manifest = load_manifest(root)
+    if manifest is None:
+        return findings, False
+
+    findings.extend(check_reconciliation(root, manifest, agent_files))
+    return findings, True
+
+
+def sort_findings(findings: list[Finding]) -> list[Finding]:
+    return sorted(
+        findings,
+        key=lambda f: (SEVERITY_ORDER.get(f.severity, 9), f.signal, f.path),
+    )
+
+
+def emit_human(findings: list[Finding], manifest_present: bool, root: Path) -> None:
+    manifest_path = (root / OPERATIONAL_STATE_DIR / MANIFEST_NAME).as_posix()
+    errors = [f for f in findings if f.severity == "error"]
+    warns = [f for f in findings if f.severity == "warn"]
+    if not findings:
+        headline = "ok"
+    else:
+        headline = "{0} error(s), {1} warning(s)".format(len(errors), len(warns))
+    print("agents-doctor: {0}".format(headline))
+    print("manifest: {0}".format(manifest_path if manifest_present else "MISSING"))
+    if not manifest_present:
+        print(
+            "  (no manifest: only orchestrator + operational-state checks ran; "
+            "run the plugin to generate one)"
+        )
+    if not findings:
+        return
+    print("findings:")
+    for finding in sort_findings(findings):
+        print(
+            "  [{0}] {1} {2}: {3}".format(
+                finding.severity.upper(), finding.signal, finding.path, finding.detail
+            )
+        )
+        print("      fix: {0}".format(finding.suggested_action))
+
+
+def emit_json(findings: list[Finding], manifest_present: bool, root: Path) -> None:
+    payload = {
+        "ok": not any(f.severity == "error" for f in findings),
+        "manifest_present": manifest_present,
+        "root": root.as_posix(),
+        "counts": {
+            "error": sum(1 for f in findings if f.severity == "error"),
+            "warn": sum(1 for f in findings if f.severity == "warn"),
+        },
+        "findings": [f.as_dict() for f in sort_findings(findings)],
+    }
+    print(json.dumps(payload, indent=2))
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Read-only health check for a generated agent system."
+    )
+    parser.add_argument(
+        "--root",
+        default=None,
+        help="Repository root (default: the parent of this script's directory).",
+    )
+    parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Treat warning-severity findings as failures (exit 1).",
+    )
+    args = parser.parse_args(argv)
+
+    if args.root is not None:
+        root = Path(args.root).resolve()
+    else:
+        # The script is emitted at <root>/.agents-system-setup/agents-doctor.py.
+        root = Path(__file__).resolve().parent.parent
+
+    findings, manifest_present = run(root)
+
+    if args.json:
+        emit_json(findings, manifest_present, root)
+    else:
+        emit_human(findings, manifest_present, root)
+
+    if not manifest_present:
+        return 2
+    if any(f.severity == "error" for f in findings):
+        return 1
+    if args.strict and any(f.severity == "warn" for f in findings):
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -497,6 +497,7 @@ playbook is additive — running `improve` from `v1.2.0` to `v1.4.0` applies the
 | `v1.5.0 → v1.6.0` | See [v1.5.0 → v1.6.0 details](#v150--v160-migration-details) below — adds audience tags to AGENTS.md, inlines project-standard digest into every subagent file. Subagents migrated FIRST per atomic 3-state ledger. |
 | `v1.6.0 → v1.7.0` | See [v1.6.0 → v1.7.0 details](#v160--v170-details) below — add `## Orchestration Operating Model` › `### Native Runtime Agents` with `<!-- agents-system-setup:host-builtins-routing -->` anchor to `AGENTS.md`; for OpenCode targets, propose extending `permission.task` with `explore` and `general` allows; no subagent file mutations (orchestrator-side only per hard rule #38). |
 | `v1.7.0 → v1.8.0` | See [v1.7.0 → v1.8.0 details](#v170--v180-details) below — emit `tool-catalog-audit` skill at every selected runtime's skills path; add `tool_catalog_version` field to `.agents-system-setup/generated.json`; add per-file `<!-- agents-system-setup:tool-catalog-version: {{PLUGIN_VERSION}} -->` stamp to AGENTS.md and every generated agent. Tool list changes default to `manual-review` — never auto-patch subagent `tools:` / `tool_allowlist` (security boundary). |
+| `v1.8.0 → v1.9.0` | See [v1.8.0 → v1.9.0 details](#v180--v190-details) below — emit the host-side read-only `agents-doctor` skill at every selected runtime's skills path (Codex included) and the read-only engine to `.agents-system-setup/agents-doctor.py`; add both to `.agents-system-setup/generated.json` (`kind: skill` + `kind: other`); add the `## Generated-System Health Check` pointer to `AGENTS.md`. Purely additive — no subagent file mutations. |
 
 ### v1.4.0 → v1.5.0 migration details
 
@@ -660,6 +661,40 @@ uses the same append-only ledger pattern.
 
 Tool-list changes are NEVER auto-applied, so rollback typically only restores
 stamp markers, skill files, and manifest fields. JSONL is append-only.
+
+### v1.8.0 → v1.9.0 details
+
+The v1.8.0 → v1.9.0 upgrade adds the host-side read-only `agents-doctor` health
+check. Migration is **purely additive** — it emits two new files and two manifest
+entries, and never touches existing subagents.
+
+#### 6-step write-ahead procedure
+
+1. Read `.agents-system-setup/generated.json` and stamps; confirm source version
+   is `1.8.0` or `1.8.x`.
+2. Render the proposed diff: the `agents-doctor` skill at every selected runtime's
+   skills path (Codex included), the engine at `.agents-system-setup/agents-doctor.py`
+   (substituting `{{PLUGIN_VERSION}}` / `{{GENERATED_AT}}`), and the
+   `## Generated-System Health Check` pointer in `AGENTS.md`. `ask_user` to approve.
+3. For each new file: append a `prepared` ledger row with `intended_action`,
+   write the file, append an `applied` row. No backups are needed for net-new
+   files; the `## Generated-System Health Check` insertion backs up `AGENTS.md`
+   to `.agents-system-setup/migration-backup/<timestamp>/` first.
+4. Add the skill (`kind: skill`) and the engine (`kind: other`) to
+   `.agents-system-setup/generated.json` (write-ahead: `prepared` → modify →
+   `applied`); bump manifest `plugin_version` to `1.9.0` only after step 5 passes.
+5. Run `python3 .agents-system-setup/agents-doctor.py`; confirm it reconciles
+   clean (no `stray-agent` / `orchestrator-subagent-file` / `missing-artifact`
+   errors). A pre-existing stray `orchestrator` file surfaces here — route its
+   removal through [Deprecated orchestrator subagent files](#deprecated-orchestrator-subagent-files).
+6. On success, append `verified` ledger rows. Resume protocol: `prepared`
+   without `applied` → delete the partial file; `applied` without `verified` →
+   re-run step 5.
+
+#### Rollback
+
+All changes are net-new files plus one managed-block insertion in `AGENTS.md`;
+remove the two files and restore `AGENTS.md` from backup. JSONL is append-only.
 
 ## Mismatch & Deprecation Detection (upgrade mode)
 

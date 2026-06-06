@@ -1,0 +1,121 @@
+---
+name: agents-doctor
+description: 'Use when the host orchestrator (or a human/CI) needs to verify that the generated agent system on disk still matches its manifest. Read-only. Reconciles agent files against .agents-system-setup/generated.json and reports strays (including a hand-written orchestrator file), missing artifacts, checksum drift, missing stamps, and operational-state misroutes. Returns findings; the orchestrator owns any fix decisions.'
+---
+
+<!-- agents-system-setup:generated-by: {{PLUGIN_VERSION}} -->
+<!-- agents-system-setup:generated-at: {{GENERATED_AT}} -->
+<!-- agents-system-setup:skill-kind: host-doctor -->
+
+# Agents Doctor (host-side)
+
+## Purpose
+
+Reconcile the agent system on disk against the central manifest
+`.agents-system-setup/generated.json` and report drift. This is a host-side,
+**read-only** check: it never edits files. Subagents never invoke it; the host
+CLI session (or a human, or CI) runs it, reviews findings, and owns any fix or
+migration decision.
+
+The most important signal is a **stray `orchestrator` agent file**: the
+orchestrator is the host CLI session reading `AGENTS.md`, never an emitted
+subagent (no `orchestrator.agent.md` / `.claude/agents/orchestrator.md` /
+`.opencode/agents/orchestrator.md` / `.codex/agents/orchestrator.toml` /
+`.gemini/agents/orchestrator.md`). A generating session that hand-writes one
+produces an unregistered file that no runtime resolves.
+
+## How to run
+
+Prefer the bundled engine; it is standard-library Python only and read-only:
+
+```bash
+python3 .agents-system-setup/agents-doctor.py          # human summary
+python3 .agents-system-setup/agents-doctor.py --json    # machine-readable
+python3 .agents-system-setup/agents-doctor.py --strict   # warnings fail (CI)
+```
+
+Exit codes: `0` clean · `1` error-severity findings (or warnings under
+`--strict`) · `2` no manifest found.
+
+If Python is unavailable, perform the same checks manually by reading the
+manifest and scanning the runtime agent directories per the catalog below.
+
+## Input contract
+
+```yaml
+root: <repo-root>            # default: parent of .agents-system-setup/
+strict: false                # treat warnings as failures
+```
+
+The host does not expand the scan beyond the runtime agent directories
+(`.github/agents`, `.claude/agents`, `.opencode/agents`, `.codex/agents`,
+`.gemini/agents`), the skills paths, and `.agents-system-setup/`.
+
+## Check catalog
+
+| Signal | Severity | Detection rule |
+|---|---|---|
+| `orchestrator-subagent-file` | error | An agent file whose logical name is `orchestrator` exists in any runtime agents directory (always invalid per the host-session-is-orchestrator rule). |
+| `stray-agent` | error | An agent file exists on disk but its path is absent from manifest `artifacts[]` (likely hand-written outside the plugin). |
+| `missing-artifact` | error | A manifest `subagent` / `agents-md` artifact path is missing on disk. |
+| `checksum-drift` | warn | A file's sha256 differs from the manifest `checksum` (edited since generation; content evolves naturally, so this is a warning). |
+| `missing-stamp` | warn | An agent file has no `agents-system-setup:generated-by` stamp (pre-stamp or hand-authored). |
+| `operational-state-artifact` | error | A forbidden subtree (`agents` / `skills` / `hooks` / `commands` / `prompts` / `plugins`) exists inside `.agents-system-setup/`. |
+| `manifest-version-drift` | warn | The manifest `plugin_version` differs from the `AGENTS.md` stamp (suggest running upgrade mode). |
+
+If `.agents-system-setup/generated.json` is absent, only
+`orchestrator-subagent-file` and `operational-state-artifact` can run; the engine
+exits `2` and the host should offer to (re-)run the plugin so a manifest exists.
+
+## Output
+
+The engine returns a findings list (`--json`):
+
+```json
+{
+  "ok": false,
+  "manifest_present": true,
+  "counts": {"error": 1, "warn": 0},
+  "findings": [
+    {
+      "severity": "error",
+      "signal": "orchestrator-subagent-file",
+      "path": ".github/agents/orchestrator.agent.md",
+      "detail": "<why this is wrong>",
+      "suggested_action": "<host-reviewed fix; never applied automatically>"
+    }
+  ]
+}
+```
+
+## Reporting template
+
+```text
+Agents doctor: ok | findings
+Manifest: <path | MISSING>
+Errors: <count>  Warnings: <count>
+Findings:
+  - <severity> <signal> <path>: <detail> -> <suggested_action>
+Handoff status: completed | blocked | returned-to-orchestrator
+```
+
+## Boundary rules (READ FIRST)
+
+1. This skill is **READ-ONLY**. It returns findings and never modifies files.
+2. This skill is **HOST-ONLY**. Subagents must not invoke it; if a subagent
+   notices drift in its owned files it `return-to-orchestrator`.
+3. Fixes are owned by the host orchestrator plus user approval. Stray/orchestrator
+   removals go through the upgrade-mode migration ledger in
+   `references/misplaced-artifacts-migration.md`, never a silent delete.
+4. A clean result means no drift was found in the scanned surfaces only; it is
+   not approval for any write.
+
+## Anti-patterns
+
+- Running this skill from inside a generated subagent.
+- Auto-deleting a stray or orchestrator file because the finding looks obvious —
+  route removals through the migration ledger with user approval.
+- Treating `checksum-drift` as an error; content evolves and the warning is
+  informational unless `--strict` is set for CI.
+- Expanding the scan outside the runtime agent directories and
+  `.agents-system-setup/`.

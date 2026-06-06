@@ -2,6 +2,32 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [1.9.0] - 2026-06-06
+
+### Added
+
+- **`agents-doctor` — re-runnable, read-only health check for the generated agent system.** Closes the post-generation lifecycle gap: Phase 7 verification runs once inside the generating session as prose, so nothing afterward catches a session that hand-writes a stray `orchestrator` agent file (which violates hard rule #33 and resolves in no runtime), an accidentally deleted agent, or a partial-run manifest. The doctor reconciles the agent files on disk against the central manifest `.agents-system-setup/generated.json` and is runnable by a human, by CI, or by the host session.
+  - **New `assets/agents-doctor.py.template`** — standard-library-only, read-only engine emitted to `.agents-system-setup/agents-doctor.py`. Signals: `orchestrator-subagent-file` (error), `stray-agent` (error), `missing-artifact` (error), `operational-state-artifact` (error), `checksum-drift` (warn), `missing-stamp` (warn), `manifest-version-drift` (warn). `--json` for machines, `--strict` to fail CI on warnings. Exit codes: `0` clean · `1` error findings (or warnings under `--strict`) · `2` no manifest. Never modifies files.
+  - **New `assets/skills/agents-doctor.skill.md.template`** — host-side, read-only skill (`skill-kind: host-doctor`) emitted at every selected runtime's skills path (Copilot/Claude/OpenCode/Codex/Gemini). Documents the check catalog, input/output contract, reporting template, and boundary rules. **Subagents never invoke it** (hard rule #36); they `return-to-orchestrator` on drift. Removals route through the upgrade-mode migration ledger, never a silent delete.
+  - **New `references/agents-doctor.md`** — full spec: signal catalog, reconciliation algorithm, exit codes, placement rationale (the engine is the one sanctioned read-only tool inside `.agents-system-setup/`; the forbidden-subtree rule targets directories, not flat tools), CI usage, and boundary rules.
+  - **`AGENTS.md.template`** gains a `## Generated-System Health Check` section so generated projects self-document how to run the doctor.
+
+### Changed
+
+- **`SKILL.md` (497 → 499 lines):** hard rule #34 (manifest) now names the `agents-doctor` skill/script as the manifest's reconciliation tool; Phase 4 gains an emit bullet (skill + engine + two manifest entries: `kind: skill` and `kind: other`); Phase 7 gains verify item #20 (doctor emitted, stamped, manifested, and reconciles clean). No new hard-rule number — the doctor is the consumer of rule #34's manifest.
+- **`scripts/_validate.py`:** new `check_agents_doctor_skill_policy()` asserts the skill template, engine template, SKILL.md wiring, reference doc, and the `AGENTS.md.template` pointer.
+- **`references/misplaced-artifacts-migration.md`:** new `v1.8.0 → v1.9.0` upgrade playbook row + 6-step additive write-ahead procedure so `upgrade` mode emits the doctor for existing systems (purely additive — no subagent mutations).
+
+### Validation
+
+- `bash scripts/validate.sh`: `[OK] All checks passed (2 warning(s))` — same pre-existing warnings as v1.8.x (SKILL.md 499 lines + Codex `developer_instructions` 72 lines).
+- `npx --yes markdownlint-cli2@0.22.1` on changed Markdown: clean.
+- Rendered-template smoke tests: stray `orchestrator.agent.md` and `orchestrator.toml` → `orchestrator-subagent-file` error + exit 1; stray agent → exit 1; checksum drift → warn (exit 0, exit 1 under `--strict`); missing manifest → exit 2; clean system → exit 0.
+
+### Deferred
+
+- The previously-listed tool-catalog live-refresh items (`refresh-tool-catalog.yml`, `scripts/refresh-tool-catalog.py`) remain deferred to a future release; a default CI workflow that runs `agents-doctor --strict` (P2) is the natural follow-up.
+
 ## [1.8.1] - 2026-06-05
 
 ### Fixed

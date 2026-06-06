@@ -4736,6 +4736,73 @@ def check_task_handoff_skill_policy() -> None:
     )
 
 
+def check_agents_doctor_skill_policy() -> None:
+    """Ensure the host-side read-only agents-doctor health check is present and wired.
+
+    The doctor reconciles the generated agent system on disk against the central
+    manifest and catches strays (especially a hand-written orchestrator file),
+    missing artifacts, checksum drift, and operational-state misroutes.
+    """
+    skill_path = SKILL_ROOT / "assets" / "skills" / "agents-doctor.skill.md.template"
+    require_contains(
+        skill_path,
+        (
+            "name: agents-doctor",
+            "agents-system-setup:skill-kind: host-doctor",
+            "# Agents Doctor (host-side)",
+            "**READ-ONLY**",
+            "**HOST-ONLY**",
+            "orchestrator-subagent-file",
+            "stray-agent",
+            ".agents-system-setup/generated.json",
+            "python3 .agents-system-setup/agents-doctor.py",
+        ),
+    )
+    script_path = SKILL_ROOT / "assets" / "agents-doctor.py.template"
+    require_contains(
+        script_path,
+        (
+            "agents-system-setup:generated-by: {{PLUGIN_VERSION}}",
+            "agents-system-setup:tool-kind: host-doctor",
+            "This tool NEVER modifies files",
+            "generated.json",
+            "orchestrator-subagent-file",
+            "stray-agent",
+            "operational-state-artifact",
+            "--json",
+            "--strict",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "agents-doctor",
+            "reconciles on-disk agents against",
+            ".agents-system-setup/agents-doctor.py",
+            "stray-agent",
+            "orchestrator-subagent-file",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "agents-doctor.md",
+        (
+            "# Agents Doctor — generated-system health check",
+            "## Signal catalog",
+            "## Reconciliation algorithm",
+            "## Exit codes",
+            "orchestrator-subagent-file",
+            "stray-agent",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "## Generated-System Health Check",
+            "python3 .agents-system-setup/agents-doctor.py",
+        ),
+    )
+
+
 # ---------- main ----------
 
 def main() -> int:
@@ -4791,6 +4858,7 @@ def main() -> int:
     check_tool_catalog_audit_skill_template()
     check_tool_catalog_stamp_in_templates()
     check_task_handoff_skill_policy()
+    check_agents_doctor_skill_policy()
     check_upgrade_mismatch_detection_policy()
 
     if WARNINGS:

@@ -118,6 +118,13 @@ Route by [Directory Architecture](#directory-architecture) ownership, the [Agent
 - **Human-needed cases:** missing checkout, dirty worktree, missing upstream, local-only commits, divergence, fetch failure, plugin-manager ambiguity, or any update that would edit runtime settings.
 - **No side effects:** preflight never edits MCP config, plugin/runtime settings, generated agents, memory files, or release/version metadata.
 
+## Generated-System Health Check
+
+- **Run anytime (read-only):** `python3 .agents-system-setup/agents-doctor.py` — add `--json` for CI or `--strict` to fail on warnings.
+- **What it catches:** stray agents (including a hand-written `orchestrator` file, which no runtime resolves), missing artifacts, checksum drift, missing stamps, and operational-state misroutes — reconciled against `.agents-system-setup/generated.json`.
+- **Fixes are gated:** the doctor never edits files. Route stray/orchestrator removals through `agents-system-setup upgrade`, not a silent delete.
+- The host session may also load the `agents-doctor` skill to run the same checks.
+
 ## Human Input / Question Protocol
 
 <!-- markdownlint-disable MD055 MD056 -->
