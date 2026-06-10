@@ -2567,6 +2567,25 @@ def check_no_orchestrator_subagent_emission() -> None:
                         f"an orchestrator subagent file still exists: `{line.strip()[:120]}`"
                     )
 
+    # 13. output-contract.md "Try it" Copilot example must tell users to
+    # describe the task directly to the host session, never to type
+    # `@orchestrator` as an invokable agent (regression guard for the v1.8.1
+    # fix; the host CLI session is the orchestrator per hard rule #33).
+    require_contains(
+        SKILL_ROOT / "references" / "output-contract.md",
+        (
+            "describe the task directly to the session",
+            "there is no `@orchestrator` agent to type",
+        ),
+    )
+    require_not_contains(
+        SKILL_ROOT / "references" / "output-contract.md",
+        (
+            "> @orchestrator",
+            "`@orchestrator <task>`",
+        ),
+    )
+
 
 def check_pointer_files_to_agents_md() -> None:
     """When Claude Code or Gemini CLI are targets, the pointer files
