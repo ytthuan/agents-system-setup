@@ -2,6 +2,18 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [1.9.1] - 2026-06-10
+
+### Fixed
+
+- **Validator now guards the v1.8.1 "Try it" fix from regressing.** `references/output-contract.md` was corrected in v1.8.1 to stop telling Copilot users to type `@orchestrator` (the host CLI session is the orchestrator per hard rule #33), but `scripts/_validate.py` had no check pinning that wording, so it could silently revert. `check_no_orchestrator_subagent_emission()` gains check #13: a `require_contains` for `describe the task directly to the session` and `` there is no `@orchestrator` agent to type ``, plus a `require_not_contains` for the stale `> @orchestrator` and `` `@orchestrator <task>` `` renderings.
+
+### Validation
+
+- `bash scripts/validate.sh`: `[OK] All checks passed (2 warning(s))` — same pre-existing warnings as v1.9.0 (SKILL.md 499 lines + Codex `developer_instructions` 72 lines).
+- Regression check: injecting the stale `@orchestrator` rendering into `output-contract.md` trips all four new markers (2 missing-required + 2 forbidden-stale); reverting restores a clean run.
+- `npx --yes markdownlint-cli2@0.22.1 CHANGELOG.md`: clean.
+
 ## [1.9.0] - 2026-06-06
 
 ### Added
