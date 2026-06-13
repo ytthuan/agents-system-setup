@@ -107,6 +107,14 @@ aggregates.
 | Change bug hunt | `@change-bug-hunter` | scanned paths, candidate count, suspicion list, severity, link to evidence |
 | Validation | `@change-validator` | aggregated gate status, required-approval status, residual risk note |
 
+The **Code review** gate includes the maintainability / project-convention /
+code-smell verdict from [code-quality](./code-quality.md), owned by
+`@code-quality-reviewer` (or `@reviewer` when merged) and reported as
+`Code quality: ok|warn|fail|n/a; signals=<list|none>`. That standard is the
+*authoring* craft applied while the code is written; this Build Gate is the
+*verification* that the change holds together. `@change-validator` folds the
+`Code quality:` line into the review evidence and never overrides the verdict.
+
 ## Strictness
 
 User picks one in Q9d:

@@ -19,6 +19,7 @@
 - **Curated plugin / MCP recommendations** from vendor-official catalogs, every recommendation tagged `[Tier · Vendor]` and **opt-in per item**.
 - **Mandatory MCP approval gate** — no MCP config is ever written without explicit user approval.
 - **Source-backed governance baseline** — OWASP GenAI, NIST SSDF, MCP Security Best Practices, GitHub Code Security, SLSA, OPA, Azure Well-Architected, C4, and TOGAF (enterprise only).
+- **Code Quality & Maintainability standards** — for software-dev projects, generated coding agents apply source-backed authoring craft *while writing* (Google Eng-Practices, ISO/IEC 25010, refactoring/code-smells, Clean Code concepts, McCabe complexity), leading with **conform to the project's existing linters/conventions first**. A read-only `code-quality-reviewer` reports code smells; the host loads the `code-quality` skill before code edits. Complementary to the SDLC Build Gate (verification) and distinct from content-quality (generated-prose review).
 - **Context-optimized output profiles** — `Balanced` by default, with `Compact` and `Full` options for generated files and summaries.
 - **Artifact tracking choice** — generated systems can be team-shared in git, local-only via `.git/info/exclude`, or written to personal/global runtime paths.
 - **Memory & Learning System** — generated agents can load curated learnings, run a before-finish Learning Check, and propose durable project lessons without silently overwriting past memory.

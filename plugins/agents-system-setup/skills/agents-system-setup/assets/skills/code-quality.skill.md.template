@@ -1,0 +1,140 @@
+---
+name: code-quality
+description: 'Use when a software-development project writes or reviews source code and the coding agent needs the maintainability and convention standards (detect-and-conform, naming, small units, DRY, error handling, tests, code smells). USE FOR: applying project conventions before writing, picking the right authoring standard, naming the code smell and its fix, emitting the Code quality evidence line. DO NOT USE FOR: documentation-only or non-software projects, generated-agent prose review (use content-quality), or as a substitute for the Build Gate verification.'
+---
+
+<!-- agents-system-setup:generated-by: {{PLUGIN_VERSION}} -->
+<!-- agents-system-setup:generated-at: {{GENERATED_AT}} -->
+<!-- agents-system-setup:skill-kind: code-quality -->
+
+# Code Quality & Maintainability (authoring craft)
+
+## When to Use
+
+- The project has source code — `software-dev`, or a non-software-dev but
+  code-bearing repo (scripts, IaC, notebooks, config logic) — and
+  `code_quality_strictness` is not `skipped` or `n/a`.
+- A coding/implementer agent is about to write or change source code.
+- A reviewer needs the maintainability / convention / code-smell verdict.
+
+This skill is the *authoring* counterpart to `code-change-build-gate`: that skill
+verifies a change passes gates; this one keeps the code itself maintainable and
+conventional while it is written.
+
+## Do Not Use
+
+- For projects with **no source code** (documentation, marketing, research) —
+  render `Code quality: n/a`.
+- For reviewing the prose of the generated agent system — that is
+  `content-quality` and `agent-quality-curator`.
+- For replacing reviewer/tester/security authority. The maintainability verdict
+  feeds the Build Gate review gate; it does not override correctness.
+
+## Hard Rules
+
+1. **Conform before you write (Rule 0).** Detect and obey the project's existing
+   conventions and configured tooling *before* applying any generic standard.
+2. **Standards apply during authoring, not only at review.** The implementer
+   owns clean code; the reviewer confirms it.
+3. **No silent failures.** Never swallow errors or turn a failure into
+   success-shaped output. Validate at system boundaries.
+4. **Tests are part of the change.** New behaviour ships with tests; a bug fix
+   ships with a regression test. Never weaken or delete tests to pass.
+5. **Smallest correct change.** Solve the present requirement (YAGNI); do not
+   reformat unrelated lines or add speculative abstractions.
+6. **Emit evidence.** Edit-capable and reviewer roles emit the `Code quality:`
+   line in their Reporting Template.
+
+## Procedure
+
+### 1. Detect and conform (Rule 0 — do this first)
+
+1. Read the project's configured tooling and obey it: `.editorconfig`,
+   ESLint/Prettier, Ruff/Black/isort, `gofmt`/`golangci-lint`, `rustfmt`/Clippy,
+   Checkstyle/Spotless, SwiftLint/SwiftFormat, ktlint, PHP-CS-Fixer, RuboCop, and
+   any `pre-commit` configuration.
+2. Match the local patterns in neighbouring files: naming, file/module layout,
+   error handling, logging, dependency injection, and test structure.
+3. Do not introduce a new framework, formatter, lint rule, or architectural
+   style unless the task explicitly calls for it and the plan approved it.
+4. If conventions are absent or conflict, fall back to the standards below and
+   record the assumption.
+
+### 2. Apply the authoring standards
+
+- **Naming** — reveal intent; searchable, pronounceable; language casing.
+- **Units** — one responsibility; short and shallow; early returns over deep
+  nesting; bounded cyclomatic complexity (extract when branching grows).
+- **DRY** — one authoritative representation of each piece of knowledge; extract
+  real duplication, but avoid speculative generality.
+- **Coupling** — keep modules orthogonal; depend on stable interfaces.
+- **Errors** — fail fast and explicitly; validate at boundaries; never swallow.
+- **Comments** — explain the non-obvious *why*; do not narrate the *what*.
+- **Dead code** — delete unused/commented-out/unreachable code.
+- **Magic values** — name constants; externalize config.
+- **Tests** — cover edge and failure paths in the project's existing test style.
+- **Formatting** — defer to the project's formatter; do not hand-format.
+
+### 3. Name the smell, apply the fix
+
+| Signal | Fix |
+|---|---|
+| `convention-drift` | Obey the project tooling; match neighbouring code. |
+| `poor-naming` | Rename to reveal intent (language convention). |
+| `long-unit` | Extract smaller single-purpose units. |
+| `deep-nesting` | Guard clauses, early returns, decomposition. |
+| `duplication` | Extract a shared, well-named abstraction (only when real). |
+| `swallowed-error` | Handle explicitly or propagate; validate at boundaries. |
+| `magic-value` | Named constant or configuration. |
+| `dead-code` | Delete it. |
+| `weak-tests` | Add edge/failure coverage and a regression test. |
+| `over-engineering` | Inline to the simplest design that meets the requirement. |
+| `tight-coupling` | Introduce a stable seam/interface; reduce dependencies. |
+| `stale-comment` | Fix the why-comment or remove it. |
+
+### 4. Strictness modifier
+
+| `code_quality_strictness` | Effect |
+|---|---|
+| `standard` | Apply Rule 0 + the standards; reviewer reports smells. |
+| `strict` | Additionally treat `over-engineering`, `tight-coupling`, and missing edge/failure tests as blocking; require the reviewer verdict before done. |
+| `light` / `advisory` | Apply Rule 0; report `fail`-level smells only; responsibility merges into `@reviewer`. |
+| `skipped` | Do not run; the plugin should not have emitted this skill. |
+
+### 5. Delegation packet (host-side)
+
+When the host delegates a `code-edit`, `bug-fix`, or `refactor` task, it loads
+this skill and includes in the packet:
+
+- task tag (`code-edit` / `bug-fix` / `refactor`)
+- `Skills Referenced: code-quality loaded=true`
+- the relevant `AGENTS.md` › Code Quality & Maintainability standards
+- the expected `Code quality:` evidence line
+
+## Output Contract
+
+Edit-capable and reviewer subagents include in their Reporting Template:
+
+```text
+Code quality: ok | warn | fail | n/a; signals=<list|none>
+```
+
+The `code-quality-reviewer` (or `@reviewer` when merged) emits:
+
+```text
+Code quality: <ok|warn|fail|n/a>; reviewer=<separate|merged|skipped>; signals=<list|none>
+```
+
+`@change-validator` aggregates this line into the Build Gate review evidence; it
+integrates the verdict and never overrides it.
+
+## Verification
+
+- The implementer applied Rule 0 (the change matches the project's configured
+  style and local patterns).
+- New behaviour has tests; a bug fix has a regression test.
+- The `Code quality:` line is present wherever source code changed.
+- Codex (CLI + App) loads this skill at `.codex/skills/code-quality/SKILL.md`
+  via the skill loader (`$code-quality` or `/skills`); other runtimes use their
+  per-runtime skills path. The `AGENTS.md` inline standards are the always-on
+  source of truth.

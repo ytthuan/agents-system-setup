@@ -134,6 +134,15 @@ snippet. If `standard|strict|light`, the plugin emits the Build Gate per
 [sdlc-build-gate.md](./sdlc-build-gate.md). Default is `standard` when the
 user accepts the recommendation.
 
+This single answer also seeds **`code_quality_strictness`** — there is no second
+strictness question. Code quality is the *authoring* craft (conventions,
+maintainability) applied while writing; the Build Gate is *verification*. Derive
+per [code-quality.md](./code-quality.md): `standard|strict|light` mirrors
+`build_gate_strictness`; `skipped` build gate floors code quality to `light`
+(standards still apply, merged into `@reviewer`) unless the user explicitly opts
+out of code quality; a non-software-dev but code-bearing project (scripts, IaC,
+config, notebooks) gets `advisory`; a project with no source code gets `n/a`.
+
 ## 9b. Advanced agent behavior
 
 Ask these choices together after topology so users compare the tradeoffs in one

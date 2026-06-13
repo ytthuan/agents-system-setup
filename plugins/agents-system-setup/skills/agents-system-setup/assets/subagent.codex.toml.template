@@ -79,6 +79,7 @@ Architecture & Design Expectations:
 - Relevant ADRs: {{RELEVANT_ADRS}}
 - Patterns to preserve: {{PATTERNS_TO_PRESERVE}}
 - Anti-patterns to avoid: {{ANTI_PATTERNS_TO_AVOID}}
+- Code Quality & Maintainability: for source-code edits or reviews, conform to existing project conventions first, then apply the AGENTS.md > Code Quality & Maintainability standards (and the .codex/skills/code-quality skill); report Code quality:.
 
 Codex Rules:
 - Do not require CLI-only commands such as /agent or codex exec for Codex App behavior.
@@ -98,6 +99,7 @@ Output Contract:
 - Evidence: only for gates touched, per Reporting Protocol.
 - Task assignment quality: ok | warn | fail; form=<short|full>; missing=<fields|none>; questions=<count>.
 - Content quality: ok | warn | fail | n/a; signals=<list|none>.
+- Code quality: ok | warn | fail | n/a; signals=<list|none>.
 - Security analysis: n/a | scope=<diff|repository|report|remediation|program>; authorization=<owned-code|approved-target|needs-approval>; validation=<confirmed|likely|needs-info|duplicate|not-reproducible|out-of-scope|mitigated|deferred>; severity=<P0|P1|P2|P3|n/a>; proof_gaps=<none|summary>.
 - Risks/escalations: only when present.
 - Question requests: none | <id>.

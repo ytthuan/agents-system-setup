@@ -4317,6 +4317,144 @@ def check_sdlc_build_gate_policy() -> None:
     )
 
 
+def check_code_quality_policy() -> None:
+    """Ensure the Code Quality & Maintainability subsystem is wired across
+    reference, skill template, snippet, AGENTS.md, SKILL.md, topology, interview,
+    the Build Gate cross-link, and the subagent/task-handoff propagation markers.
+
+    Code quality = authoring craft for project source code; complementary to the
+    Build Gate (verification) and distinct from content-quality (agent prose).
+    The propagation markers are asserted so the standards actually reach the
+    code-writing subagents, not just the docs.
+    """
+    require_contains(
+        SKILL_ROOT / "references" / "code-quality.md",
+        (
+            "# Code Quality & Maintainability Standards",
+            "Rule 0 — Conform to existing conventions first",
+            ".editorconfig",
+            "ISO/IEC 25010",
+            "cyclomatic complexity",
+            "code_quality_strictness",
+            "code-quality-reviewer",
+            "convention-drift",
+            "swallowed-error",
+            "Skills Referenced: code-quality loaded=true",
+            "Code quality: <ok|warn|fail|n/a>; reviewer=<separate|merged|skipped>; signals=<list|none>",
+            "content-quality",
+            "advisory",
+        ),
+    )
+    skill_path = (
+        SKILL_ROOT / "assets" / "skills" / "code-quality.skill.md.template"
+    )
+    require_contains(
+        skill_path,
+        (
+            "name: code-quality",
+            "agents-system-setup:skill-kind: code-quality",
+            "Conform before you write (Rule 0)",
+            "code_quality_strictness",
+            "code-bearing",
+            "Skills Referenced: code-quality loaded=true",
+            "Code quality: ok | warn | fail | n/a; signals=<list|none>",
+            ".codex/skills/code-quality/SKILL.md",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "code-quality-standards.snippet.md",
+        (
+            "agents-system-setup:code-quality-standards:start",
+            "agents-system-setup:code-quality-standards:end",
+            "{{CODE_QUALITY_STRICTNESS}}",
+            "Rule 0 — Conform to existing conventions first",
+            "Code quality: <ok|warn|fail|n/a>; reviewer=<separate|merged|skipped>; signals=<list|none>",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "## Code Quality & Maintainability",
+            "{{CODE_QUALITY_STRICTNESS}}",
+            "{{CODE_QUALITY_STANDARDS}}",
+            "{{CODE_QUALITY_REFERENCE}}",
+            "{{CODE_QUALITY_OWNER}}",
+            "{{CODE_QUALITY_SKILL_PATHS}}",
+            "{{CODE_QUALITY_STATUS}}",
+            "code-quality-reviewer",
+            "Code quality: n/a — non-software project",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "Code quality & maintainability is mandatory for software-dev",
+            "conform to the project's existing conventions first",
+            "code_quality_strictness",
+            "code-quality-reviewer",
+            "code-quality-standards",
+            "Code Quality & Maintainability emission",
+            "code-bearing repo → `advisory`",
+            "`code-quality` for code-bearing projects",
+            "Skills Referenced: code-quality loaded=true",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "topology.md",
+        (
+            "code-quality-reviewer",
+            "Code Quality Sizing Rule",
+            "code_quality_reviewer = merged",
+            "Code quality: ok|warn|fail|n/a",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "interview.md",
+        (
+            "code_quality_strictness",
+            "code-quality",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "sdlc-build-gate.md",
+        (
+            "@code-quality-reviewer",
+            "Code quality: ok|warn|fail|n/a; signals=<list|none>",
+            "code-quality",
+        ),
+    )
+    # Propagation: the Code quality reporting marker must reach every code-writing
+    # surface (subagent templates + the host-side task-handoff skill).
+    propagation_targets = [
+        SKILL_ROOT / "assets" / "subagent.agent.md.template",
+        SKILL_ROOT / "assets" / "subagent.claude.md.template",
+        SKILL_ROOT / "assets" / "subagent.opencode.md.template",
+        SKILL_ROOT / "assets" / "subagent.gemini.md.template",
+        SKILL_ROOT / "assets" / "subagent.codex.toml.template",
+        SKILL_ROOT / "assets" / "skills" / "task-handoff.skill.md.template",
+    ]
+    for path in propagation_targets:
+        require_contains(
+            path,
+            ("Code quality: ok | warn | fail | n/a; signals=<list|none>",),
+        )
+    # Apply contract: edit-capable/reviewer subagent templates must instruct the
+    # agent to APPLY the standards while working, not merely report the marker.
+    apply_instruction_targets = [
+        SKILL_ROOT / "assets" / "subagent.agent.md.template",
+        SKILL_ROOT / "assets" / "subagent.claude.md.template",
+        SKILL_ROOT / "assets" / "subagent.opencode.md.template",
+        SKILL_ROOT / "assets" / "subagent.gemini.md.template",
+        SKILL_ROOT / "assets" / "subagent.codex.toml.template",
+    ]
+    for path in apply_instruction_targets:
+        require_contains(path, ("Code Quality & Maintainability",))
+    require_contains(
+        SKILL_ROOT / "assets" / "skills" / "task-handoff.skill.md.template",
+        ("Skills Referenced: code-quality loaded=true",),
+    )
+
+
 def check_layered_context_hard_rule() -> None:
     """Ensure hard rule #37 (layered context & self-contained subagents) is declared in SKILL.md and the supporting snippets exist with the canonical content."""
     require_contains(
@@ -4866,6 +5004,7 @@ def main() -> int:
     check_learning_memory_policy()
     check_instruction_memory_audit_policy()
     check_sdlc_build_gate_policy()
+    check_code_quality_policy()
     check_layered_context_hard_rule()
     check_audience_tags_in_agents_md()
     check_subagent_self_containment()

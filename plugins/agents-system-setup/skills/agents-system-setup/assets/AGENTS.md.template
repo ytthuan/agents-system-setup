@@ -23,6 +23,7 @@
 - **Output profile:** {{CONTEXT_PROFILE}}  <!-- balanced | compact | full -->
 - **Agent artifact tracking:** {{ARTIFACT_TRACKING}}  <!-- project-tracked | project-local | personal-global -->
 - **Content quality:** {{CONTENT_QUALITY_STATUS}}  <!-- ok | warn | fail | n/a -->
+- **Code quality:** {{CODE_QUALITY_STATUS}}  <!-- ok | warn | fail | n/a -->
 - **Security team:** {{SECURITY_TEAM_DEPTH}}  <!-- baseline | dedicated | expanded | n/a -->
 
 ## Read First
@@ -229,6 +230,20 @@ If `AGENTS.md` was already loaded this turn, prefer `Context freshness: recent` 
 {{BUILD_GATE_MATRIX}}
 
 > When the project is **not software-dev** or the user picked `Skip`, this section renders `Build Gate (SDLC): n/a — non-software project | user skipped` and the Build Gate roles/skill are not emitted.
+
+## Code Quality & Maintainability
+
+- **Strictness:** {{CODE_QUALITY_STRICTNESS}}  <!-- standard | strict | light | advisory | skipped | n/a -->
+- **Reference:** {{CODE_QUALITY_REFERENCE}}
+- **Skill (host-loaded):** `code-quality` at the selected runtime's skills path (`{{CODE_QUALITY_SKILL_PATHS}}`). The host loads it before any `code-edit` / `bug-fix` / `refactor` assignment and passes `Skills Referenced: code-quality loaded=true`.
+- **Use when:** writing or reviewing source code. Standards apply **while writing**, not only at review; the Build Gate then verifies the change.
+- **Owner:** {{CODE_QUALITY_OWNER}}  <!-- @code-quality-reviewer | @reviewer (merged) -->
+- **Boundary:** `@code-quality-reviewer` owns the maintainability/convention/code-smell verdict only; `@reviewer` owns correctness, `architecture-reviewer` owns boundaries, `change-bug-hunter` owns diff-scoped bugs. `@change-validator` folds the verdict into the review gate, never overrides it.
+- **Output marker:** `Code quality: <ok|warn|fail|n/a>; reviewer=<separate|merged|skipped>; signals=<list|none>`.
+
+{{CODE_QUALITY_STANDARDS}}
+
+> When the project has **no source code** (docs/marketing/research), this section renders `Code quality: n/a — non-software project` and no `code-quality-reviewer` is emitted.
 
 ## Directory Architecture
 

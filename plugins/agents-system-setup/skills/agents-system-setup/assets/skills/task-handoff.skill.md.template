@@ -86,6 +86,11 @@ Use full-form whenever the task touches MCP, secrets, CI/release, dependency
 manifests, generated scripts, ADRs, fan-out waves, or the Build Gate — even
 if the table above suggests short-form.
 
+For `code-edit`, `bug-fix`, `refactor`, and `code-review` tasks, also load the
+`code-quality` skill and pass `Skills Referenced: code-quality loaded=true` so the
+implementer and reviewer apply the project's conventions and maintainability
+standards while working.
+
 ## Acceptance Checklist (consumer side — subagent runs this before work)
 
 1. All 12 Required Minimum fields are present and non-empty.
@@ -131,6 +136,7 @@ Evidence:
 Gates touched: <list with status>
 Task assignment quality: ok | warn | fail; form=<short|full>; missing=<fields|none>; questions=<count>
 Content quality: ok | warn | fail | n/a; signals=<list|none>
+Code quality: ok | warn | fail | n/a; signals=<list|none>
 Security analysis: n/a | scope=<diff|repository|report|remediation|program>; authorization=<owned-code|approved-target|needs-approval>; validation=<confirmed|likely|needs-info|duplicate|not-reproducible|out-of-scope|mitigated|deferred>; severity=<P0|P1|P2|P3|n/a>; proof_gaps=<none|summary>
 Build gate: n/a | bucket=<XS|S|M|L|XL>; gate=<build|unit|e2e|review|bug-hunt|validation>; status=<pass|fail|waived>; evidence=<summary>
 Risks / escalations: <list or "none">

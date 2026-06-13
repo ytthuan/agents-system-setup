@@ -15,6 +15,7 @@ Each row also names the **owned paths** that feed into AGENTS.md › Directory A
 | `planner` | Decompose tasks, write plan.md | read-only + write to plan.md | `plan.md`, `**/plan.md` |
 | `implementer` | Make code changes | full file edit + bash | source dirs (project-specific) |
 | `reviewer` | Critique diffs, flag risks | read-only + bash (lint/test) | *(none — read-only)* |
+| `code-quality-reviewer` | Maintainability, project-convention conformance, and code-smell verdict for source-code changes (software-dev) | read-only + bash (lint/format check) | *(none — read-only; merges into `@reviewer` for light/advisory/tiny)* |
 | `tester` | Run/extend tests, triage failures | read + bash | `tests/**`, `**/__tests__/**`, `**/*.test.*`, `**/*.spec.*` |
 | `docs-writer` | Update README/CHANGELOG/docs | docs files only | `README.md`, `CHANGELOG.md`, `docs/**`, `**/*.md` (excluding agent files) |
 | `security-auditor` | Review secrets, tool/MCP boundaries, dependency risk, least privilege | read-only + bash for scanners/tests | *(none by default — read-only; tightly scoped remediation only if approved)* |
@@ -136,6 +137,28 @@ The quality curator uses the signal taxonomy in
 `unsupported-assertion`, `silent-gate-gap`, and `prompt-hygiene-risk`. It
 reports `Content quality: ok|warn|fail|n/a; signals=<list|none>` and never
 replaces reviewer, tester, security, architecture, or validator roles.
+
+## Code Quality Sizing Rule
+
+`code-quality-reviewer` is **default-on for software-dev projects** (it rides the
+Phase 1.7 classification, like the Build Gate). It owns the maintainability,
+project-convention-conformance, and code-smell verdict for source-code changes —
+distinct from `@reviewer` (correctness), `architecture-reviewer` (boundaries),
+and `change-bug-hunter` (diff-scoped bugs). It is **read-only** and never
+substitutes for the Build Gate.
+
+| Signal | Topology decision |
+|---|---|
+| `code_quality_strictness` is `standard` or `strict` | Generate `code-quality-reviewer` as a separate read-only subagent. |
+| `code_quality_strictness` is `light` or `advisory`, or a tiny direct setup | Merge the responsibility into `@reviewer` and record `code_quality_reviewer = merged`. |
+| `code_quality_strictness` is `skipped` or `n/a` (non-software / no source code) | Do not emit the role; render the `n/a` rationale in `AGENTS.md`. |
+
+The implementer (and other edit-capable roles) apply the standards from
+[code-quality](./code-quality.md) **while writing**; the reviewer confirms them.
+All edit-capable and reviewer roles emit `Code quality: ok|warn|fail|n/a;
+signals=<list|none>`, which `@change-validator` folds into the Build Gate review
+evidence. Do not confuse `code-quality` (project source) with `content-quality`
+(generated agent prose).
 
 ## Security Team Sizing Rule
 

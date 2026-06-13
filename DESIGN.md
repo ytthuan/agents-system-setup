@@ -68,6 +68,16 @@ runtimes inside the replication branch.
 
 **Why source-backed?** OWASP GenAI, NIST SSDF, MCP Security Best Practices, GitHub Code Security, SLSA, OPA, Azure Well-Architected, C4, and TOGAF each cover different parts of the risk model. The skill uses them as references, not as automatic installs.
 
+### Code Quality & Maintainability (software-dev)
+
+**Why a separate concern from the Build Gate?** The SDLC Build Gate is *verification* — it checks that a change builds, tests, and reviews cleanly after it is written. Code quality is *authoring craft* — the standards a coding agent applies *while writing* so the result is maintainable and conventional, not merely green. The two are complementary; neither substitutes for the other. It is also distinct from `content-quality`, which reviews the generated agent *prose*, not project source code.
+
+**Why "conform to existing conventions first"?** A project's own configured linters, formatters, and local patterns are higher-signal than any generic style guide. The highest-leverage rule is to detect and obey `.editorconfig`/ESLint/Ruff/gofmt/rustfmt/etc. and match neighbouring code before applying generic clean-code principles — a "better" convention applied inconsistently is worse than the project's existing one.
+
+**Why decouple `code_quality_strictness` from the Build Gate answer?** Users skip the Build Gate when builds/tests are unavailable or out of scope, but still want clean code; non-software-dev repos can still contain scripts/IaC. So skipping verification floors authoring craft to `light`/`advisory` rather than off, and only an explicit opt-out disables it.
+
+**Why a propagation contract?** Subagents run in separate contexts, so documentation alone does not change what they write. The host loads the `code-quality` skill before code-bearing assignments, passes `Skills Referenced: code-quality loaded=true`, and every edit-capable/reviewer template emits a `Code quality:` marker the validator can verify.
+
 ### Phase 1.9 — Output Profile & Context Budget
 
 **Why ask this explicitly?** Some users want exhaustive onboarding docs; others want the shortest useful agent memory. The default `Balanced` profile keeps routing, ownership, security/audit, architecture, and quality gates inline while moving long rationale into references.

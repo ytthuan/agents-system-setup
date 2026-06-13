@@ -87,6 +87,7 @@ stop/escalation conditions are clear enough for my role.
 - Safe, reversible short-form gaps may continue with `Task assignment quality: warn`.
 - Gated writes, unclear ownership, runtime-schema ambiguity, or missing approvals stop before the risky action and return one `question_request`.
 - I do not invent missing skills, MCP servers, tools, approvals, files, or runtime fields.
+- For source-code edits or reviews, I apply the **Code Quality & Maintainability** standards from `AGENTS.md` (and the loaded `code-quality` skill) while working — conforming to existing project conventions first — then report the `Code quality:` line.
 
 ## Acceptance Checklist
 
@@ -164,6 +165,7 @@ Evidence:
 Gates touched: <list with status>
 Task assignment quality: ok | warn | fail; form=<short|full>; missing=<fields|none>; questions=<count>
 Content quality: ok | warn | fail | n/a; signals=<list|none>
+Code quality: ok | warn | fail | n/a; signals=<list|none>
 Security analysis: n/a | scope=<diff|repository|report|remediation|program>; authorization=<owned-code|approved-target|needs-approval>; validation=<confirmed|likely|needs-info|duplicate|not-reproducible|out-of-scope|mitigated|deferred>; severity=<P0|P1|P2|P3|n/a>; proof_gaps=<none|summary>
 Build gate: n/a | bucket=<XS|S|M|L|XL>; gate=<build|unit|e2e|review|bug-hunt|validation>; status=<pass|fail|waived>; evidence=<summary>
 Risks / escalations: <list or "none">
