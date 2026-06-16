@@ -2,6 +2,22 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [1.10.1] - 2026-06-16
+
+### Added
+
+- **`plugins/agents-system-setup/plugin.json`** — a root plugin manifest for the self-contained plugin folder, so marketplace tooling that resolves `plugin.json` / `.github/plugin/plugin.json` / `.plugins/plugin.json` (for example the Awesome GitHub Copilot external-plugin quality gates and `skill-validator check --plugin`) can discover the plugin and its bundled skill. The folder previously shipped only `.claude-plugin/plugin.json` + `.codex-plugin/plugin.json`, which those tools do not recognize. Registered in `scripts/_validate.py` (`VERSIONED_MANIFESTS` + `REQUIRED`) and `scripts/_bump_version.py` so its version stays in sync with the other manifests.
+
+### Fixed
+
+- **Skill-spec conformance: `SKILL.md` file references must be at most one directory deep.** Moved the five generated skill templates from `assets/skills/*.skill.md.template` up to `assets/*.skill.md.template`, and updated the four `SKILL.md` references plus the seven `scripts/_validate.py` path checks. This clears `skill-validator` errors of the form "File reference '...' is 2 directories deep — maximum is 1 level from SKILL.md" that blocked external-marketplace validation.
+
+### Validation
+
+- `bash scripts/validate.sh`: `[OK] All checks passed (2 warning(s))` — same pre-existing warnings (SKILL.md at the 500-line cap + the Codex `developer_instructions` budget).
+- `npx --yes markdownlint-cli2@0.22.1 "**/*.md"`: 51 files, 0 errors.
+- `skill-validator check --plugin plugins/agents-system-setup` (Awesome Copilot's validator): `✅ All checks passed (1 skill(s), 0 agent(s), 1 plugin(s))`.
+
 ## [1.10.0] - 2026-06-12
 
 ### Added
