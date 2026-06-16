@@ -75,6 +75,7 @@ VERSIONED_MANIFESTS = [
     REPO / "plugin.json",
     REPO / ".claude-plugin" / "plugin.json",
     REPO / ".codex-plugin" / "plugin.json",
+    REPO / "plugins" / "agents-system-setup" / "plugin.json",
     REPO / "plugins" / "agents-system-setup" / ".claude-plugin" / "plugin.json",
     REPO / "plugins" / "agents-system-setup" / ".codex-plugin" / "plugin.json",
 ]
@@ -85,6 +86,7 @@ REQUIRED = {
     "plugin.json": ["name", "version", "description"],
     ".claude-plugin/plugin.json": ["name", "version", "description"],
     ".codex-plugin/plugin.json": ["name", "version", "description"],
+    "plugins/agents-system-setup/plugin.json": ["name", "version", "description"],
     "plugins/agents-system-setup/.claude-plugin/plugin.json": ["name", "version", "description"],
     "plugins/agents-system-setup/.codex-plugin/plugin.json": ["name", "version", "description"],
     ".agents/plugins/marketplace.json": ["name", "plugins"],
@@ -4246,9 +4248,7 @@ def check_sdlc_build_gate_policy() -> None:
     )
     skill_path = (
         SKILL_ROOT
-        / "assets"
-        / "skills"
-        / "code-change-build-gate.skill.md.template"
+        / "assets" / "code-change-build-gate.skill.md.template"
     )
     require_contains(
         skill_path,
@@ -4346,7 +4346,7 @@ def check_code_quality_policy() -> None:
         ),
     )
     skill_path = (
-        SKILL_ROOT / "assets" / "skills" / "code-quality.skill.md.template"
+        SKILL_ROOT / "assets" / "code-quality.skill.md.template"
     )
     require_contains(
         skill_path,
@@ -4431,7 +4431,7 @@ def check_code_quality_policy() -> None:
         SKILL_ROOT / "assets" / "subagent.opencode.md.template",
         SKILL_ROOT / "assets" / "subagent.gemini.md.template",
         SKILL_ROOT / "assets" / "subagent.codex.toml.template",
-        SKILL_ROOT / "assets" / "skills" / "task-handoff.skill.md.template",
+        SKILL_ROOT / "assets" / "task-handoff.skill.md.template",
     ]
     for path in propagation_targets:
         require_contains(
@@ -4450,7 +4450,7 @@ def check_code_quality_policy() -> None:
     for path in apply_instruction_targets:
         require_contains(path, ("Code Quality & Maintainability",))
     require_contains(
-        SKILL_ROOT / "assets" / "skills" / "task-handoff.skill.md.template",
+        SKILL_ROOT / "assets" / "task-handoff.skill.md.template",
         ("Skills Referenced: code-quality loaded=true",),
     )
 
@@ -4766,7 +4766,7 @@ def check_tool_catalog_reference() -> None:
 def check_tool_catalog_audit_skill_template() -> None:
     """Ensure the host-side read-only tool catalog audit skill template is present."""
     require_contains(
-        SKILL_ROOT / "assets" / "skills" / "tool-catalog-audit.skill.md.template",
+        SKILL_ROOT / "assets" / "tool-catalog-audit.skill.md.template",
         (
             "name: tool-catalog-audit",
             "# Tool Catalog Audit (host-side)",
@@ -4797,9 +4797,7 @@ def check_task_handoff_skill_policy() -> None:
     """Ensure the host-side task-handoff skill is emitted and referenced as the source of truth."""
     skill_path = (
         SKILL_ROOT
-        / "assets"
-        / "skills"
-        / "task-handoff.skill.md.template"
+        / "assets" / "task-handoff.skill.md.template"
     )
     require_contains(
         skill_path,
@@ -4900,7 +4898,7 @@ def check_agents_doctor_skill_policy() -> None:
     manifest and catches strays (especially a hand-written orchestrator file),
     missing artifacts, checksum drift, and operational-state misroutes.
     """
-    skill_path = SKILL_ROOT / "assets" / "skills" / "agents-doctor.skill.md.template"
+    skill_path = SKILL_ROOT / "assets" / "agents-doctor.skill.md.template"
     require_contains(
         skill_path,
         (

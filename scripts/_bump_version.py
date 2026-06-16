@@ -19,6 +19,7 @@ MANIFESTS = [
     REPO / "plugin.json",
     REPO / ".claude-plugin" / "plugin.json",
     REPO / ".codex-plugin" / "plugin.json",
+    REPO / "plugins" / "agents-system-setup" / "plugin.json",
     REPO / "plugins" / "agents-system-setup" / ".claude-plugin" / "plugin.json",
     REPO / "plugins" / "agents-system-setup" / ".codex-plugin" / "plugin.json",
 ]
