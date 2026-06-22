@@ -9,6 +9,20 @@
 
 - A multi-runtime plugin/skill package that **bootstraps**, **updates**, **improves**, **upgrades**, or **replicates** a complete multi-agent system across five supported runtimes: **GitHub Copilot CLI**, **Claude Code**, **OpenCode**, **OpenAI Codex (CLI + App)**, and **Gemini CLI** artifact layouts — from a single skill, with a Canonical IR for bidirectional replication, parallel-aware orchestration, mandatory security/audit/architecture governance, version-stamped artifacts, and compact-by-default context output baked in.
 
+## Relationship to Copilot `/init` and native `AGENTS.md` support
+
+This plugin **complements** Copilot's built-in `/init` and native `AGENTS.md` interop — it does not duplicate them. `/init` analyzes a repo and seeds a single Copilot guidance file, which Copilot (and other agents) then read natively. That single-file, single-runtime bootstrap is the *starting point* this plugin builds on, not what it competes with — an `/init`-seeded `AGENTS.md` is a valid input to `update`/`improve` mode.
+
+`agents-system-setup` adds capabilities no built-in command provides:
+
+- **A governed multi-agent system, not one guidance file.** Generates an Agent Roster, Capability Matrix, Security & Audit Matrix, Threat Model, Architecture/ADR decisions, and N specialized subagents with parallel-safety waves, wired to a host-session Orchestration Operating Model.
+- **Cross-runtime, via a Canonical IR.** Emits and *replicates* the same system across five runtimes — Copilot CLI, Claude Code, OpenCode, OpenAI Codex, Gemini CLI — each in its native agent/skill/permission format. `/init` is Copilot-only.
+- **Lifecycle, not one-shot.** Five modes: `init`, `update` (non-destructive managed blocks), `improve` (audit → opt-in fixes), `upgrade` (version-stamped migration of an existing system), and `replicate` (port between runtimes).
+- **Security & governance gates.** A mandatory MCP approval gate (no MCP config is written without explicit approval) and a source-backed baseline (OWASP GenAI, NIST SSDF, MCP Security Best Practices, SLSA, …).
+- **Opt-in plugin/MCP discovery** from vendor-official catalogs, every item tagged `[Tier · Vendor]` and approved per item.
+
+In short: `/init` writes the first file for one agent; this plugin architects, governs, audits, upgrades, and ports a multi-agent system across five.
+
 ## What it generates
 
 - `AGENTS.md` at repo root with a **Read First** section, **Context Loading Policy**, **Directory Architecture**, **Agent Roster (with parallel-safety waves)**, **Capability Matrix**, **Security & Audit Matrix**, **Threat Model**, **Architecture / Design Pattern Decisions**, **ADR Index**, and **Quality Gates**.
@@ -147,7 +161,7 @@ exceptions so large rosters do not trigger one prompt per agent.
 
 ## Parallel subagents & Claude Code agent teams
 
-The host CLI session orchestrator always fans out **parallel-safe subagents** in one wave (multiple `Task` calls in a single response), then awaits before the next wave. Parallel-safety is computed automatically from the Directory Architecture — see [parallelism reference](./plugins/agents-system-setup/skills/agents-system-setup/references/parallelism.md).
+The host CLI session orchestrator always fans out **parallel-safe subagents** in one wave (multiple `Task` calls in a single response), then awaits before the next wave. Parallel-safety is computed automatically from the Directory Architecture — see [parallelism reference](./plugins/agents-system-setup/skills/agents-system-setup/references/parallelism.md). Under the **GitHub Copilot app**, that same parallel-safety computation also identifies which units can become independent **child sessions / parallel PRs** (1 session per branch/PR) via `/orchestrate` — an advisory third primitive that portable generated files never depend on.
 
 For Claude Code, when 3+ subagents are independent and would benefit from peer-to-peer challenge, the generator additionally emits `AGENT-TEAMS.md` with the opt-in env var (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), settings snippet, suggested teammate roster, and a token-cost warning. Source: <https://docs.anthropic.com/en/docs/claude-code/agent-teams>.
 
