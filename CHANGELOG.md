@@ -2,6 +2,21 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [1.11.0] - 2026-06-22
+
+### Added
+
+- **Cross-session orchestration (GitHub Copilot app) — a first-class third parallelism primitive.** GitHub Copilot app v0.2.33 added `/orchestrate` + `create_session`, letting the host orchestrator delegate across **child sessions** (one session ≈ one branch ≈ one PR) instead of only in-context sub-agents. The plugin already computes parallel-safety (non-overlapping `owns`, no cross-deps, no shared-state writes) from the Directory Architecture, and that predicate is the natural **first-pass filter** for which roster units can become independent child sessions / parallel PRs. This release teaches generated systems to use it — scoped as host-app-specific and advisory so portable generated files never depend on it.
+  - **`references/parallelism.md`** — the primitives model goes from **two to three** (adds *Cross-session orchestration (GitHub Copilot app)*), with a new section that frames the parallel-safety predicate as a first-pass candidate filter and layers the four cross-session caveats the in-context wave model never had: path-disjoint is not integration-safe, wave N→N+1 is not a free stacked PR, high-churn shared files (`CHANGELOG`/lockfiles/i18n/manifests) must be excluded and integrated last, and the integration-gate location must be named. Adds Generator obligation #5, three anti-patterns, and the v0.2.33 source citation. Out of scope: cloud sessions and cross-repo / multi-workspace.
+  - **`assets/AGENTS.md.template`** — an advisory note in the Copilot row of `### Platform-native delegation` plus a scoped `## Wave Execution` bullet, **not** a first-class block — so the app-only primitive does not leak into the shared `AGENTS.md` that is copied to `CLAUDE.md`/`GEMINI.md` and read natively by Codex/OpenCode.
+  - **`SKILL.md` hard rule #13** — extended (the natural home: cross-session orchestration is a parallelism primitive) so the generator emits the Copilot-app cross-session advisory when Copilot is a selected runtime; advisory only, subagents never orchestrate sessions. Zero net lines — `SKILL.md` stays within the spec-mandated 500-line cap.
+  - **`scripts/_validate.py`** — new `check_cross_session_orchestration_policy()` keeps the advisory in sync across the parallelism reference, the `AGENTS.md` template note + Wave Execution bullet, and `SKILL.md` rule #13 (literal-substring guards).
+
+### Validation
+
+- `bash scripts/validate.sh`: `[OK] All checks passed (2 warning(s))` — same pre-existing warnings (SKILL.md at the 500-line cap + the Codex `developer_instructions` budget).
+- `npx --yes markdownlint-cli2@0.22.1 "**/*.md"`: 51 files, 0 errors.
+
 ## [1.10.1] - 2026-06-16
 
 ### Added

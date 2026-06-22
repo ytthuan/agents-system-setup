@@ -4648,6 +4648,33 @@ def check_host_builtins_routing_in_agents_md() -> None:
         )
 
 
+def check_cross_session_orchestration_policy() -> None:
+    """v1.11.0: keep the GitHub Copilot app cross-session orchestration advisory in sync
+    across the parallelism reference, the AGENTS.md.template Copilot delegation note + Wave
+    Execution bullet, and SKILL.md hard rule #13. Host-app-specific and advisory — generated
+    files never depend on it, so this only guards that the guidance is present and consistent."""
+    require_contains(
+        SKILL_ROOT / "references" / "parallelism.md",
+        (
+            "## Three distinct primitives",
+            "## Cross-session orchestration (GitHub Copilot app)",
+            "first-pass candidate filter",
+            "Subagents never orchestrate sessions",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "child sessions (1 session per branch/PR) via `/orchestrate`",
+            "GitHub Copilot app only (advisory):",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        ("optional Copilot-app cross-session advisory",),
+    )
+
+
 def check_tool_catalog_json_schema() -> None:
     """Ensure the v1.8.0 tool catalog has the expected runtime schema."""
     catalog_path = SKILL_ROOT / "assets" / "tool-catalog.json"
@@ -5009,6 +5036,7 @@ def main() -> int:
     check_explorer_agents_reference()
     check_host_builtins_routing_reference()
     check_host_builtins_routing_in_agents_md()
+    check_cross_session_orchestration_policy()
     check_tool_catalog_json_schema()
     check_tool_catalog_reference()
     check_tool_catalog_audit_skill_template()
