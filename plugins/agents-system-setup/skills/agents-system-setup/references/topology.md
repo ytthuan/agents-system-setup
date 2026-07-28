@@ -24,7 +24,7 @@ Each row also names the **owned paths** that feed into AGENTS.md › Directory A
 | `validation-reproducer` | Confirm, falsify, or defer candidate findings with bounded evidence | read-only by default; runner only after approval | validation artifacts under approved output path |
 | `attack-path-analyst` | Establish reachability, counterevidence, severity, priority, and proof gaps | read-only | *(none — read-only)* |
 | `remediation-verifier` | Verify fixes, regression tests, and nearby bypass variants | read-only unless routed through owning implementer | tests/verification artifacts when approved |
-| `architecture-reviewer` | Preserve boundaries, ADRs, quality attributes, and design-pattern rationale | read-only + docs write if ADRs approved | `docs/adr/**`, architecture docs |
+| `architecture-reviewer` | Preserve boundaries, ADRs, quality attributes, and design-pattern rationale; when `advisory_supervision` is on, also own the cross-session premise verdict | read-only + docs write if ADRs approved | `docs/adr/**`, architecture docs |
 | `design-pattern-reviewer` | Check implementation against selected patterns and anti-patterns | read-only | *(none — read-only)* |
 
 ## Software-Dev Universal Subagents (Build Gate)
@@ -159,6 +159,26 @@ All edit-capable and reviewer roles emit `Code quality: ok|warn|fail|n/a;
 signals=<list|none>`, which `@change-validator` folds into the Build Gate review
 evidence. Do not confuse `code-quality` (project source) with `content-quality`
 (generated agent prose).
+
+## Advisory Supervision Routing
+
+`advisory_supervision` (see [parallelism](./parallelism.md#supervising-a-running-child-session))
+adds **no new role**. The premise verdict on a running child session goes to the
+existing `architecture-reviewer`, which receives a host-composed premise packet
+and returns `Advisory verdict` / `premise` / `note`. Rationale: the only field
+that is not already owned — `premise` — requires visibility across every sibling
+unit, and only the host session has that. A dedicated advisor subagent would need
+the host to pre-assemble the comparison it exists to perform.
+
+| Signal | Topology decision |
+|---|---|
+| `advisory_supervision` is `plan-gate` or `standard` | `architecture-reviewer` also owns the cross-session premise verdict. |
+| `architecture-reviewer` is merged into `@reviewer` / `api-designer` (tiny setup) | The merged role carries the verdict; record `advisory_verdict_owner = merged`. |
+| `advisory_supervision` is `off` or `parallel_safe_units < 3` | Do not mention it in the roster. |
+
+The verdict owner is **read-only** and never calls `respond_to_session_plan` or
+`send_session_message` — subagents never orchestrate sessions (hard rule #33/#36).
+Only the host acts on the verdict.
 
 ## Security Team Sizing Rule
 

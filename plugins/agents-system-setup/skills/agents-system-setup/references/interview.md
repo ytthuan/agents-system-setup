@@ -193,6 +193,32 @@ an optional add-on — never as a required step.
 - Choices: `["Standard least-privilege by role (Recommended)", "Read-only everywhere", "Inherit parent tools", "Custom after generation"]`
 - Default: `Standard profile` / `Standard least-privilege by role`. Persist as `copilot_tools_profile`. The detailed mapping lives in the plan and [Copilot CLI Standard Tool Profiles](./platforms.md#copilot-cli-standard-tool-profiles): orchestrator/edit-capable agents get `[vscode, execute, read, agent, edit, search, todo]`; reviewers/auditors get `[read, search]`; runner/research profiles stay narrow.
 
+### 9e. Advisory supervision of child sessions (signal-gated, off by default)
+
+**Default: skip this question entirely.** Record `advisory_supervision = off`.
+Cross-session supervision only exists in the GitHub Copilot app, and the standard
+wave model already covers the common case.
+
+Ask **only when all three** signals hold:
+
+1. Copilot CLI / app is a selected runtime.
+2. `parallel_safe_units >= 3` — see the sizing floor in
+   [supervising a running child session](./parallelism.md#supervising-a-running-child-session);
+   below three units the cross-session integration overhead outweighs the benefit.
+3. The user mentioned child sessions, parallel PRs, `/orchestrate`, or steering
+   agents while they run.
+
+One question, no follow-up:
+
+- Q: "Should the host supervise child sessions while they run, or just dispatch and integrate?"
+- Choices: `["Off — dispatch and integrate (Recommended)", "Plan gate only", "Standard — plan gate plus premise steering"]`
+- Record as `advisory_supervision` (`off` | `plan-gate` | `standard`). See
+  [parallelism](./parallelism.md#supervising-a-running-child-session) for the
+  checkpoints, the polling ban, and the wave-close reconciliation invariant.
+
+If the question was not asked, Phase 8 wrap-up may surface it as an optional
+add-on — never as a required step.
+
 ### Output profile / context budget
 
 - Q: "How much detail should generated agent files include?"
@@ -212,6 +238,18 @@ an optional add-on — never as a required step.
 - Freeform. Allow `skip`.
 - If the Phase 1.8 external-tools answer has already been recorded as `No external tools`, default this to `skip` and do not enter Phase 3 unless the user explicitly adds capabilities.
 - If the external-tools answer is not available yet, derive likely capabilities from the detected stack, ask the user to confirm or edit the list, and later keep it skipped if the security intake confirms `No external tools` without explicit capabilities.
+
+> **This question is about skills to *install*, not skills to *author*.** Project
+> domain skills (`skill-kind: domain` — business rules, regulatory constraints,
+> this repo's coordination conventions) are **not asked for here and never
+> elicited by a blank prompt.** They are derived in Phase 2 from
+> `headline_purpose`, the Phase 1.7 domain classification, the detected stack,
+> Directory Architecture zones carrying non-obvious rules, and existing repo
+> docs/ADRs, then confirmed by Phase 2's existing plan-approval gate — the same
+> way the Directory Architecture and Agent Roster are confirmed. No extra
+> question. See the admission gate in
+> [skill format](./skill-format.md#admission-gate-for-a-domain-skill) and the
+> [placement rule](./context-optimization.md#2a-placement-rule--where-a-piece-of-knowledge-goes).
 
 ## 10b. MCP Approval Mode (only if any MCP server is among selections later)
 - Q: "How should I handle MCP server config writes when we get to the approval gate?"

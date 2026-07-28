@@ -4675,6 +4675,138 @@ def check_cross_session_orchestration_policy() -> None:
     )
 
 
+def check_advisory_supervision_policy() -> None:
+    """v1.12.0: guard the opt-in supervision protocol for running child sessions.
+
+    Supervision is the in-flight counterpart to v1.11.0's dispatch model. It is
+    Copilot-app-specific, off by default, and must stay consistent across the
+    parallelism reference, the handoff reporting contract, the topology verdict
+    owner, the interview gate, the AGENTS.md advisory lines, and SKILL.md rule #13.
+    """
+    require_contains(
+        SKILL_ROOT / "references" / "parallelism.md",
+        (
+            "### Supervising a running child session",
+            "advisory_supervision",
+            "#### C1 — the plan gate",
+            "only when the child was created in plan mode",
+            "**Polling is banned.**",
+            "Premise invalidation",
+            "`returned`, `reconciled-from-artifact`, or `explicitly-abandoned`",
+            "The branch/PR is the source of truth",
+            "**Advise, never edit.**",
+            "`parallel_safe_units < 3`",
+            "https://github.com/github/app/releases/tag/v1.0.10",
+            "https://github.com/github/copilot-cli/releases/tag/v1.0.72",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "handoff.md",
+        ("In bounds: yes | no; escaped=<paths|none>",),
+    )
+    for template in (
+        "subagent.agent.md.template",
+        "subagent.claude.md.template",
+        "subagent.gemini.md.template",
+        "subagent.opencode.md.template",
+        "task-handoff.skill.md.template",
+    ):
+        require_contains(
+            SKILL_ROOT / "assets" / template,
+            ("In bounds: yes | no; escaped=<paths|none>",),
+        )
+    require_contains(
+        SKILL_ROOT / "assets" / "subagent.codex.toml.template",
+        ("always emit `In bounds: yes | no; escaped=<paths|none>`",),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "topology.md",
+        (
+            "## Advisory Supervision Routing",
+            "adds **no new role**",
+            "advisory_verdict_owner = merged",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "interview.md",
+        (
+            "### 9e. Advisory supervision of child sessions (signal-gated, off by default)",
+            "Record `advisory_supervision = off`",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "the host supervises each running child",
+            "the branch/PR is the source of truth",
+            "rather than simulating it",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "When `advisory_supervision` is not `off`",
+            "**Advisory supervision (Q9e)** is signal-gated",
+        ),
+    )
+
+
+def check_domain_skill_policy() -> None:
+    """v1.13.0: guard the project-domain skill layer.
+
+    Before this, `SKILL.md` Phase 2 carried a bare "- Skills to create." bullet with
+    no taxonomy, no derivation rule, and no reference, while `skill.template.md` was
+    the only skill template without a `skill-kind` marker. Project domain knowledge
+    therefore defaulted into the always-loaded `AGENTS.md`. These guards keep the
+    `domain` kind, the placement rule, the admission gate, and the never-overwrite
+    ownership contract in sync.
+    """
+    require_contains(
+        SKILL_ROOT / "assets" / "skill.template.md",
+        (
+            "<!-- agents-system-setup:skill-kind: domain -->",
+            "The plugin owns this file's structure; YOU own its content.",
+            "improve` / `upgrade` never overwrite the body below",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "skill-format.md",
+        (
+            "## Skill kinds",
+            "### Admission gate for a `domain` skill",
+            "**Never overwritten.**",
+            "Soft cap: roughly one domain skill per major ownership zone",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "context-optimization.md",
+        (
+            "### 2a. Placement rule — where a piece of knowledge goes",
+            "`skill-kind: domain` skill",
+            "Routing, ownership, and gates must stay resident.",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "instruction-memory-audit.md",
+        (
+            "domain-skill-restatement",
+            "Body is **user-authored**",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "interview.md",
+        ("This question is about skills to *install*, not skills to *author*.",),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "- **Skills to create** —",
+            "never a blank \"what skills do you want?\" prompt",
+            "some-task project-specific knowledge becomes a `skill-kind: domain` skill",
+        ),
+    )
+
+
 def check_tool_catalog_json_schema() -> None:
     """Ensure the v1.8.0 tool catalog has the expected runtime schema."""
     catalog_path = SKILL_ROOT / "assets" / "tool-catalog.json"
@@ -5037,6 +5169,8 @@ def main() -> int:
     check_host_builtins_routing_reference()
     check_host_builtins_routing_in_agents_md()
     check_cross_session_orchestration_policy()
+    check_advisory_supervision_policy()
+    check_domain_skill_policy()
     check_tool_catalog_json_schema()
     check_tool_catalog_reference()
     check_tool_catalog_audit_skill_template()

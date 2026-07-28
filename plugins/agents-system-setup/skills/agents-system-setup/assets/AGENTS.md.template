@@ -295,7 +295,7 @@ Legend: ✅ primary owner · 🟡 assists · *(blank)* not involved.
 
 | Runtime | Delegation surface | Note |
 |---|---|---|
-| Copilot CLI / VS Code | Task/custom-agent calls through the orchestrator's `agent` capability | Use Task/agent fan-out for synthesized work; `/fleet` is optional CLI UX for independent batches. Under the GitHub Copilot app, a parallel-safe wave MAY also be promoted to child sessions (1 session per branch/PR) via `/orchestrate` — advisory, never a generated-file dependency. |
+| Copilot CLI / VS Code | Task/custom-agent calls through the orchestrator's `agent` capability | Use Task/agent fan-out for synthesized work; `/fleet` is optional CLI UX for independent batches. Under the GitHub Copilot app, a parallel-safe wave MAY also be promoted to child sessions (1 session per branch/PR) via `/orchestrate`, and when `advisory_supervision` is on the host supervises each running child (plan gate, premise steering, wave-close reconciliation) — advisory, never a generated-file dependency. |
 | Claude Code | `Agent` tool | Fan out independent subagents in one wave; Agent Teams remain opt-in/experimental. |
 | OpenCode | `task` / `@<agent-name>` from a primary agent | Gate delegation with `permission.task` wildcard deny/ask plus named roster allows. |
 | OpenAI Codex (CLI + App) | Root `AGENTS.md` asks Codex to spawn child agents; specialists live in `.codex/agents/*.toml` | Keep shared artifacts free of required CLI-only slash commands. |
@@ -311,7 +311,7 @@ Legend: ✅ primary owner · 🟡 assists · *(blank)* not involved.
 - Sequential delegation is only for overlapping owned paths, direct dependencies, shared-state writes, or approval gates that must complete first.
 - Codex uses this root `AGENTS.md` section as its orchestrator guidance; specialized Codex workers stay in `.codex/agents/*.toml`.
 - Gemini keeps this policy canonical here and mirrors only root-session notes in `GEMINI.md`.
-- **GitHub Copilot app only (advisory):** a parallel-safe wave MAY additionally be realized as concurrent **child sessions / PRs** (1 session per branch/PR) via `/orchestrate`, with the same dependency ordering (stacked PRs for wave N+1). Generated files never depend on it, and subagents never orchestrate sessions.
+- **GitHub Copilot app only (advisory):** a parallel-safe wave MAY additionally be realized as concurrent **child sessions / PRs** (1 session per branch/PR) via `/orchestrate`, with the same dependency ordering (stacked PRs for wave N+1). When `advisory_supervision` is `plan-gate` or `standard`, I also supervise each running child: approve or redirect its plan when it was created in plan mode, steer only on premise invalidation (never poll), and never close a wave until every dispatched unit is `returned`, `reconciled-from-artifact`, or `explicitly-abandoned` — the branch/PR is the source of truth. If `respond_to_session_plan` / `create_session` are absent from my tool surface, this is `n/a` and I fall back to the standard wave model rather than simulating it. Generated files never depend on any of this, and subagents never orchestrate sessions.
 
 ## Security & Audit Matrix
 

@@ -26,9 +26,33 @@ If the user is unsure, choose `Balanced`.
 | Prompt guidelines | Generator-side authoring guide for main-to-subagent assignments | Load only for orchestrator/generator/replication prompt-contract work; subagents use embedded intake checks. |
 | Memory & learning files | Durable lessons and Learning Index | Load the index first; load detailed entries only when category/path/runtime matches the task. |
 | Reference files | Deep detail | Load only when task needs that domain or when the user asks for full detail. |
+| Project domain skills (`skill-kind: domain`) | Project business rules, regulatory constraints, and this repo's own coordination conventions | Load on demand via the skill's trigger. Never duplicate an `AGENTS.md` row into the body — see the placement rule below. |
 | Plans / summaries | Temporary task state | Lead with outcome, keep evidence concise, link or name files for detail. |
 
 Never move mandatory gates out of sight. If details overflow, `AGENTS.md` must say where they went.
+
+### 2a. Placement rule — where a piece of knowledge goes
+
+`AGENTS.md` is loaded in **every host session**, so anything parked there is paid
+for on every task the host runs. It is also the fallback a subagent must open when
+it needs a rule beyond its 5-line project-standard digest — so domain detail
+parked there defeats the v1.6.0 layering below, forcing a whole-file load where a
+scoped skill would do. Route each piece of knowledge by how often it is actually
+needed:
+
+| Knowledge | Goes to | Why |
+|---|---|---|
+| Needed on **every** task | `AGENTS.md` (always loaded) | Routing, ownership, and gates must stay resident. |
+| Needed on **some** tasks, and specific to this project | a `skill-kind: domain` skill | Progressive loading — discovery costs ~100 tokens, the body loads only when the trigger matches. |
+| Generic engineering craft, not project-specific | an existing `host-*` skill (`task-handoff`, `code-quality`, `code-change-build-gate`) | Plugin-owned and version-stamped, so it upgrades with the plugin. |
+| Deep detail behind a skill | that skill's `references/` | At most one directory deep from `SKILL.md`. |
+
+Two failure modes this rule exists to prevent: **domain knowledge parked in
+`AGENTS.md`**, which taxes every task with detail most tasks never need; and
+**routing or gates pushed into a domain skill**, which makes them invisible unless
+a trigger happens to fire. When in doubt, ask whether the *next* task would be
+wrong without it — if yes it is `AGENTS.md`, if only *some* tasks would, it is a
+domain skill.
 
 ## 3. Context budgets
 

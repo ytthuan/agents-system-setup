@@ -66,6 +66,41 @@ disable-model-invocation: false    # default false → auto-loadable
 5. **Anti-patterns**
 6. **Output Contract**
 
+## Skill kinds
+
+Every generated `SKILL.md` carries a kind marker on its own line so `improve` /
+`upgrade` and `agents-doctor` can tell plugin-owned skills from project-owned ones:
+
+```html
+<!-- agents-system-setup:skill-kind: <kind> -->
+```
+
+| Kind | Owner | Body authored by | Upgrade behavior |
+|---|---|---|---|
+| `host-handoff`, `host-audit`, `host-doctor`, `sdlc-build-gate`, `code-quality` | plugin | plugin | Regenerated from the plugin's templates. |
+| `domain` | project | **the user** | **Never overwritten.** Scaffold only; `improve`/`upgrade` may propose additions, never replace the body. |
+
+`domain` skills hold project business rules, regulatory or compliance constraints,
+and this repo's own coordination conventions — the knowledge that is specific to
+*this* project and needed on *some* tasks. Which knowledge belongs there rather
+than in `AGENTS.md` is decided by the placement rule in
+[context optimization](./context-optimization.md#2a-placement-rule--where-a-piece-of-knowledge-goes).
+
+### Admission gate for a `domain` skill
+
+A candidate becomes a domain skill only when **all four** hold. Fail any one and
+it stays in `AGENTS.md`, moves to an existing `host-*` skill, or is dropped:
+
+1. **Project-specific** — not generic engineering craft (that is `code-quality`).
+2. **Load-on-demand** — needed for *some* tasks, not every task.
+3. **Stable trigger** — expressible as `USE FOR:` / `DO NOT USE FOR:` in the description.
+4. **Not already covered** by a `host-*` skill or an `AGENTS.md` table.
+
+Soft cap: roughly one domain skill per major ownership zone in the Directory
+Architecture. More than that usually means `AGENTS.md` content was copied rather
+than knowledge relocated — `instruction-memory-audit` treats a domain skill that
+restates an `AGENTS.md` row as redundancy, not coverage.
+
 ## Progressive Loading
 
 - Discovery: ~100 tokens (name + description)
@@ -81,4 +116,7 @@ Keep SKILL.md focused. Push depth into `references/`.
 - Folder/name mismatch
 - Absolute paths instead of `./`
 - Procedure without numbered steps
+- **A `domain` skill that restates an `AGENTS.md` row** — that is double context cost, not relocation. Move the knowledge or leave it; never copy it.
+- **Routing, ownership, or gates pushed into a `domain` skill** — they become invisible unless a trigger fires. Those stay in `AGENTS.md`.
+- **Overwriting a user-authored `domain` skill body on upgrade** — the plugin owns the scaffold, the user owns the content.
 - Writing the skill folder under `.agents-system-setup/skills/`. That directory is operational state only; runtimes do not load skills from it. Existing misroutes go through [misplaced-artifacts-migration](./misplaced-artifacts-migration.md).
