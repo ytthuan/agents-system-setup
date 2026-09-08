@@ -5,41 +5,38 @@
 #
 # agents-doctor: read-only health check for a generated agent system.
 #
-# Reconciles the agent files on disk against the central manifest
-# `.agents-system-setup/generated.json` and reports drift: stray agents
-# (especially a hand-written `orchestrator` file, which violates the
-# host-session-is-the-orchestrator rule), missing artifacts, checksum drift,
-# missing version stamps, and operational-state misroutes.
+# Reconciles generated runtime artifacts against the central manifest and
+# audits the complete canonical AGENTS.md memory contract. The memory audit is
+# also available before a manifest exists with --memory-only.
 #
 # This tool NEVER modifies files. It is safe to run by a human, in CI, or by
 # the host CLI session. Standard library only; no third-party dependencies.
 #
-# Usage:
-#   python3 .agents-system-setup/agents-doctor.py            # human summary
-#   python3 .agents-system-setup/agents-doctor.py --json     # machine output
-#   python3 .agents-system-setup/agents-doctor.py --strict   # warnings fail CI
-#   python3 .agents-system-setup/agents-doctor.py --root .   # explicit repo root
-#
 # Exit codes:
-#   0  clean (no error-severity findings; warnings allowed unless --strict)
-#   1  one or more error-severity findings (or warnings under --strict)
-#   2  no manifest found (only orchestrator + operational-state checks ran)
+#   0  clean (no errors; warnings allowed unless --strict)
+#   1  one or more errors (or warnings under --strict)
+#   2  no manifest found in normal mode
 
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import os
 import re
 import sys
 from pathlib import Path
+from urllib.parse import unquote
 
 OPERATIONAL_STATE_DIR = ".agents-system-setup"
 MANIFEST_NAME = "generated.json"
+ROOT_MEMORY_NAME = "AGENTS.md"
+ROOT_MAX_LINES = 150
+ROOT_MAX_BYTES = 12_288
+ROOT_TARGET_MIN_LINES = 80
+ROOT_TARGET_MAX_LINES = 120
 
 # Forbidden runtime-artifact subtrees inside the operational-state directory.
-# These mirror the plugin validator: only directory names are forbidden, never
-# flat files (this doctor script itself is a sanctioned flat read-only tool).
 FORBIDDEN_STATE_SUBTREES = {
     "agents", "skills", "hooks", "commands", "prompts", "plugins",
 }
@@ -53,7 +50,34 @@ AGENT_SURFACES = {
     "gemini-cli": (".gemini/agents", ("*.md",)),
 }
 
-STAMP_RE = re.compile(r"agents-system-setup:generated-by:\s*([^\s\-][^\s]*)")
+# These are the current project-local skill roots. .codex/skills is retained
+# only as a migration surface; it is not silently treated as the current Codex
+# discovery root. We intentionally do not scan user/global directories.
+NATIVE_SKILL_ROOTS = (
+    (".github/skills", "copilot-cli"),
+    (".claude/skills", "claude-code"),
+    (".opencode/skills", "opencode"),
+    (".agents/skills", "codex-cli"),
+    (".gemini/skills", "gemini-cli"),
+)
+LEGACY_SKILL_ROOTS = ((".codex/skills", "codex-cli-legacy"),)
+ALL_SKILL_ROOTS = NATIVE_SKILL_ROOTS + LEGACY_SKILL_ROOTS
+
+STAMP_RE = re.compile(
+    r"agents-system-setup:generated-by:\s*"
+    r"(v?\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.+-]+)?)(?=\s|$)"
+)
+PLACEHOLDER_RE = re.compile(r"\{\{[A-Z][A-Z0-9_]*\}\}")
+MANAGED_START = "<!-- agents-system-setup:managed:start -->"
+MANAGED_END = "<!-- agents-system-setup:managed:end -->"
+IMPORT_RE = re.compile(r"^\s*@([^\s`]+\.md)\s*$")
+LINK_RE = re.compile(r"\]\(([^)]+)\)")
+SKILL_PATH_RE = re.compile(
+    r"""(?<![\w/])([^\s`<>()|\[\]"']+[/\\]SKILL\.md)(?=$|[\s`<>()|\[\]"',;:.#?])"""
+)
+ARTIFACT_KINDS = {"subagent", "agents-md", "skill", "mcp-config", "hooks", "other"}
+INSTRUCTION_SUFFIXES = {".md", ".toml", ".json", ".yaml", ".yml"}
+CHECKSUM_RE = re.compile(r"sha256:[0-9a-f]{64}")
 SEVERITY_ORDER = {"error": 0, "warn": 1, "info": 2}
 
 
@@ -65,8 +89,57 @@ def agent_stem(path: Path) -> str:
     return path.stem
 
 
-def sha256_of(path: Path) -> str | None:
+def _root_path(root: Path) -> Path:
+    return root.resolve()
+
+
+def _inside_root(root: Path, path: Path) -> bool:
+    """Return whether a path resolves inside root without reading it."""
     try:
+        path.resolve(strict=False).relative_to(_root_path(root))
+        return True
+    except (OSError, ValueError, RuntimeError):
+        return False
+
+
+def _rel(root: Path, path: Path) -> str:
+    absolute = Path(os.path.abspath(path))
+    # Preserve adapter names while supporting aliases such as macOS /var.
+    for base in (Path(os.path.abspath(root)), _root_path(root)):
+        try:
+            return absolute.relative_to(base).as_posix()
+        except ValueError:
+            continue
+    return path.as_posix()
+
+
+def _read_bytes(root: Path, path: Path) -> tuple[bytes | None, str | None]:
+    if not _inside_root(root, path):
+        return None, "path resolves outside the assessed root"
+    try:
+        return path.read_bytes(), None
+    except OSError as exc:
+        return None, str(exc)
+
+
+def _decode_utf8(raw: bytes) -> tuple[str | None, str | None]:
+    try:
+        return raw.decode("utf-8"), None
+    except UnicodeDecodeError as exc:
+        return None, f"invalid UTF-8 at byte {exc.start}"
+
+
+def physical_lf_lines(raw: bytes) -> int:
+    """Count LF-delimited physical lines, including a final unterminated line."""
+    if not raw:
+        return 0
+    return raw.count(b"\n") + (0 if raw.endswith(b"\n") else 1)
+
+
+def sha256_of(path: Path, root: Path | None = None) -> str | None:
+    try:
+        if root is not None and not _inside_root(root, path):
+            return None
         digest = hashlib.sha256()
         with path.open("rb") as handle:
             for chunk in iter(lambda: handle.read(65536), b""):
@@ -76,10 +149,12 @@ def sha256_of(path: Path) -> str | None:
         return None
 
 
-def read_stamp_version(path: Path) -> str | None:
-    try:
-        text = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
+def read_stamp_version(path: Path, root: Path) -> str | None:
+    raw, _error = _read_bytes(root, path)
+    if raw is None:
+        return None
+    text, _error = _decode_utf8(raw)
+    if text is None:
         return None
     match = STAMP_RE.search(text)
     return match.group(1) if match else None
@@ -105,39 +180,108 @@ class Finding:
         }
 
 
+class ManifestError(ValueError):
+    pass
+
+
 def load_manifest(root: Path) -> dict | None:
     manifest_path = root / OPERATIONAL_STATE_DIR / MANIFEST_NAME
-    if not manifest_path.is_file():
-        return None
+    if not _inside_root(root, manifest_path):
+        raise ManifestError("Manifest cannot be resolved inside the assessed root.")
     try:
-        return json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        manifest_path.lstat()
+    except FileNotFoundError:
         return None
+    except OSError as exc:
+        raise ManifestError(f"Manifest metadata could not be read: {exc}.") from exc
+    raw, read_error = _read_bytes(root, manifest_path)
+    if raw is None:
+        raise ManifestError(f"Manifest could not be read safely: {read_error}.")
+    try:
+        text = raw.decode("utf-8")
+        data = json.loads(text)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ManifestError(f"Manifest is not valid UTF-8 JSON: {exc}.") from exc
+    if not isinstance(data, dict):
+        raise ManifestError("Manifest must be a JSON object.")
+    if type(data.get("schema")) is not int or data["schema"] != 1:
+        raise ManifestError("Manifest schema must be the supported integer value 1.")
+    if not isinstance(data.get("artifacts"), list):
+        raise ManifestError("Manifest artifacts must be an array.")
+    if not isinstance(data.get("plugin_version"), str) or not data["plugin_version"].strip():
+        raise ManifestError("Manifest plugin_version must be a nonempty string.")
+    paths: set[str] = set()
+    for index, artifact in enumerate(data["artifacts"]):
+        if not isinstance(artifact, dict):
+            raise ManifestError(f"Manifest artifacts[{index}] must be an object.")
+        path = artifact.get("path")
+        kind = artifact.get("kind")
+        if not isinstance(path, str) or not path.strip() or "\x00" in path:
+            raise ManifestError(f"Manifest artifacts[{index}].path must be a nonempty file path.")
+        if not isinstance(kind, str) or kind not in ARTIFACT_KINDS:
+            raise ManifestError(f"Manifest artifacts[{index}].kind is not a supported artifact kind.")
+        checksum = artifact.get("checksum")
+        if not isinstance(checksum, str) or CHECKSUM_RE.fullmatch(checksum) is None:
+            raise ManifestError(f"Manifest artifacts[{index}].checksum must be sha256:<64 lowercase hex digits>.")
+        normalized = Path(path.replace("\\", "/")).as_posix()
+        if normalized in paths:
+            raise ManifestError(f"Manifest artifacts[{index}] duplicates an earlier path.")
+        paths.add(normalized)
+    return data
 
 
-def discover_agent_files(root: Path) -> list[Path]:
+def _surface_is_safe(root: Path, path: Path, findings: list[Finding] | None) -> bool:
+    if _inside_root(root, path):
+        return True
+    if findings is not None:
+        findings.append(
+            Finding(
+                "error", "runtime-surface-out-of-root", _rel(root, path),
+                "A controlled runtime entry resolves outside the assessed root; its target was not read.",
+                "Review the entry and its ancestors before relying on runtime discovery.",
+            )
+        )
+    return False
+
+
+def discover_agent_files(root: Path, findings: list[Finding] | None = None) -> list[Path]:
     found: list[Path] = []
     seen: set[Path] = set()
     for _runtime, (rel_dir, globs) in AGENT_SURFACES.items():
         agents_dir = root / rel_dir
-        if not agents_dir.is_dir():
+        if not _surface_is_safe(root, agents_dir, findings) or not agents_dir.is_dir():
             continue
         for pattern in globs:
             for path in sorted(agents_dir.glob(pattern)):
-                if path.is_file() and path not in seen:
-                    seen.add(path)
+                if path in seen:
+                    continue
+                seen.add(path)
+                safe = _surface_is_safe(root, path, findings)
+                if not safe or path.is_file():
                     found.append(path)
+    return found
+
+
+def discover_skill_files(root: Path, findings: list[Finding] | None = None) -> list[Path]:
+    found: list[Path] = []
+    for prefix, _runtime in ALL_SKILL_ROOTS:
+        skill_root = root / prefix
+        if not _surface_is_safe(root, skill_root, findings) or not skill_root.is_dir():
+            continue
+        for directory in sorted(skill_root.iterdir()):
+            if not _surface_is_safe(root, directory, findings) or not directory.is_dir():
+                continue
+            path = directory / "SKILL.md"
+            if _surface_is_safe(root, path, findings) and path.is_file():
+                found.append(path)
     return found
 
 
 def manifest_artifact_paths(manifest: dict, kinds: set[str]) -> dict[str, dict]:
     paths: dict[str, dict] = {}
-    for artifact in manifest.get("artifacts", []):
-        if not isinstance(artifact, dict):
-            continue
-        path = artifact.get("path")
-        if path and artifact.get("kind") in kinds:
-            paths[str(path).replace("\\", "/")] = artifact
+    for artifact in manifest["artifacts"]:
+        if artifact["kind"] in kinds:
+            paths[Path(artifact["path"].replace("\\", "/")).as_posix()] = artifact
     return paths
 
 
@@ -145,7 +289,7 @@ def check_orchestrator_files(root: Path, agent_files: list[Path]) -> list[Findin
     findings: list[Finding] = []
     for path in agent_files:
         if agent_stem(path).lower() == "orchestrator":
-            rel = path.relative_to(root).as_posix()
+            rel = _rel(root, path)
             findings.append(
                 Finding(
                     "error",
@@ -153,8 +297,8 @@ def check_orchestrator_files(root: Path, agent_files: list[Path]) -> list[Findin
                     rel,
                     "An orchestrator agent file exists, but the orchestrator is the "
                     "host CLI session reading AGENTS.md, never an emitted agent.",
-                    "Delete this file; route via AGENTS.md > Orchestration Operating "
-                    "Model. Run the plugin in upgrade mode for a guided removal.",
+                    "Delete this file through the approved migration ledger; route "
+                    "orchestration via AGENTS.md.",
                 )
             )
     return findings
@@ -163,11 +307,11 @@ def check_orchestrator_files(root: Path, agent_files: list[Path]) -> list[Findin
 def check_operational_state(root: Path) -> list[Finding]:
     findings: list[Finding] = []
     state_root = root / OPERATIONAL_STATE_DIR
-    if not state_root.is_dir():
+    if not state_root.is_dir() or not _inside_root(root, state_root):
         return findings
     for entry in sorted(state_root.iterdir()):
         if entry.is_dir() and entry.name in FORBIDDEN_STATE_SUBTREES:
-            rel = entry.relative_to(root).as_posix()
+            rel = _rel(root, entry)
             findings.append(
                 Finding(
                     "error",
@@ -182,22 +326,674 @@ def check_operational_state(root: Path) -> list[Finding]:
     return findings
 
 
+def _known_output_paths(root: Path, manifest: dict | None) -> list[Path]:
+    paths = [
+        root / ROOT_MEMORY_NAME,
+        root / "CLAUDE.md",
+        root / "GEMINI.md",
+        root / ".github" / "copilot-instructions.md",
+        root / OPERATIONAL_STATE_DIR / "agents-doctor.py",
+        root / ".mcp.json",
+        root / "opencode.json",
+        root / ".vscode" / "mcp.json",
+        root / ".claude" / "settings.json",
+        root / ".codex" / "config.toml",
+        root / ".gemini" / "settings.json",
+    ]
+    paths.extend(discover_agent_files(root))
+    paths.extend(discover_skill_files(root))
+    for relative in ("docs/agents", ".github/hooks", ".claude/hooks", ".opencode/hooks", ".gemini/hooks"):
+        directory = root / relative
+        if _inside_root(root, directory) and directory.is_dir():
+            paths.extend(path for path in directory.iterdir() if _inside_root(root, path) and path.is_file())
+    canonical_text = _read_known_text(root, root / ROOT_MEMORY_NAME)
+    if canonical_text is not None:
+        for value in _declared_skill_paths(canonical_text):
+            if not value.startswith(("~", "$")):
+                paths.append(root / value)
+        for match in LINK_RE.finditer(canonical_text):
+            target = _relative_link_target(match.group(1))
+            if target is not None and Path(target).suffix.lower() == ".md":
+                paths.append(root / target)
+    if manifest is not None:
+        for rel in manifest_artifact_paths(manifest, ARTIFACT_KINDS):
+            candidate = root / rel
+            if _inside_root(root, candidate):
+                paths.append(candidate)
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for path in paths:
+        key = _rel(root, path)
+        if key not in seen:
+            seen.add(key)
+            unique.append(path)
+    return unique
+
+
+def _is_generated_output(root: Path, path: Path, manifest: dict | None) -> bool:
+    if not _inside_root(root, path):
+        return False
+    text = _read_known_text(root, path)
+    # These markers identify draft diagnostics, not permission to overwrite.
+    if text is not None and (
+        "agents-system-setup:generated-by:" in text
+        or "<!-- agents-system-setup:managed:" in text
+        or "<!-- agents-system-setup:skill-kind:" in text
+        or "<!-- subagent-digest:managed:" in text
+    ):
+        return True
+    if text is not None and path.suffix.lower() == ".json":
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            data = None
+        if isinstance(data, dict) and isinstance(data.get("x-agents-system-setup"), dict):
+            return True
+    if manifest is None:
+        return False
+    rel = _rel(root, path)
+    return rel in manifest_artifact_paths(manifest, ARTIFACT_KINDS)
+
+
+def _legacy_context(line: str) -> bool:
+    return bool(
+        re.search(
+            r"\b(legacy|migration|migrat(?:e|ed|ion)|histor(?:y|ical)|deprecated|"
+            r"formerly|old name|backward compatibility|compatibility input)\b",
+            line,
+            re.IGNORECASE,
+        )
+    )
+
+
+def _add_memory_finding(
+    findings: list[Finding],
+    severity: str,
+    signal: str,
+    path: str,
+    detail: str,
+    action: str,
+) -> None:
+    findings.append(Finding(severity, signal, path, detail, action))
+
+
+def _memory_budget_check(root: Path) -> tuple[list[Finding], dict]:
+    findings: list[Finding] = []
+    path = root / ROOT_MEMORY_NAME
+    rel = ROOT_MEMORY_NAME
+    report: dict = {
+        "canonical_path": rel,
+        "present": path.is_file(),
+        "lines": None,
+        "bytes": None,
+        "hard_limits": {"max_lines": ROOT_MAX_LINES, "max_bytes": ROOT_MAX_BYTES},
+        "target_lines": {"min": ROOT_TARGET_MIN_LINES, "max": ROOT_TARGET_MAX_LINES},
+        "token_count": {
+            "status": "unavailable",
+            "label": "unavailable",
+            "reason": "No tokenizer dependency or provider API is used by agents-doctor.",
+        },
+        "controlled_adapter_overhead": {
+            "bytes": 0,
+            "lines": 0,
+            "files": [],
+        },
+        "effective_context": {
+            "status": "unknown",
+            "reason": "Personal, global, nested, and runtime-loaded context was not observed.",
+        },
+    }
+    if path.is_symlink() and not _inside_root(root, path):
+        _add_memory_finding(
+            findings,
+            "error",
+            "memory-out-of-root-link",
+            rel,
+            "Canonical AGENTS.md resolves outside the assessed root; arbitrary "
+            "out-of-root memory is not read.",
+            "Use a regular in-root file or an in-root symlink, then re-run the doctor.",
+        )
+        return findings, report
+    if not path.is_file():
+        _add_memory_finding(
+            findings,
+            "error",
+            "missing-canonical-memory",
+            rel,
+            "The canonical project memory file AGENTS.md is missing.",
+            "Create or approve the canonical root AGENTS.md before generation completes.",
+        )
+        return findings, report
+    raw, read_error = _read_bytes(root, path)
+    if raw is None:
+        _add_memory_finding(
+            findings,
+            "error",
+            "memory-read-error",
+            rel,
+            f"AGENTS.md could not be read safely: {read_error}.",
+            "Keep the canonical memory readable and inside the assessed root.",
+        )
+        return findings, report
+    text, decode_error = _decode_utf8(raw)
+    lines = physical_lf_lines(raw)
+    report["lines"] = lines
+    report["bytes"] = len(raw)
+    if decode_error:
+        _add_memory_finding(
+            findings,
+            "error",
+            "memory-invalid-utf8",
+            rel,
+            f"AGENTS.md is not strict UTF-8 ({decode_error}); exact bytes={len(raw)}, lines={lines}.",
+            "Rewrite only after approval using valid UTF-8; do not silently drop bytes.",
+        )
+        return findings, report
+
+    if lines > ROOT_MAX_LINES:
+        _add_memory_finding(
+            findings,
+            "error",
+            "memory-budget-lines",
+            rel,
+            f"AGENTS.md exceeds the hard line budget: lines={lines}, max={ROOT_MAX_LINES}; bytes={len(raw)}.",
+            "Synthesize or relocate approved detail; never truncate or silently discard preserved content.",
+        )
+    elif lines > ROOT_TARGET_MAX_LINES:
+        _add_memory_finding(
+            findings,
+            "warn",
+            "memory-target-lines",
+            rel,
+            f"AGENTS.md is outside the advisory target: lines={lines}, target={ROOT_TARGET_MIN_LINES}-{ROOT_TARGET_MAX_LINES}; bytes={len(raw)}.",
+            "Prefer a compact synthesis when it preserves all approved rules; never pad a shorter complete file.",
+        )
+    if len(raw) > ROOT_MAX_BYTES:
+        _add_memory_finding(
+            findings,
+            "error",
+            "memory-budget-bytes",
+            rel,
+            f"AGENTS.md exceeds the hard byte budget: bytes={len(raw)}, max={ROOT_MAX_BYTES}; lines={lines}.",
+            "Relocate approved detail or synthesize the root; never truncate or silently discard preserved content.",
+        )
+    return findings, report
+
+
+def _check_managed_markers(
+    root: Path, text: str, generated: bool
+) -> list[Finding]:
+    findings: list[Finding] = []
+    start_count = text.count(MANAGED_START)
+    end_count = text.count(MANAGED_END)
+    if generated and (
+        len(STAMP_RE.findall(text)) != 1
+        or text.count("agents-system-setup:generated-by:") != 1
+    ):
+        _add_memory_finding(
+            findings,
+            "error",
+            "invalid-generation-stamp",
+            ROOT_MEMORY_NAME,
+            "Generated-style root memory requires exactly one valid generation stamp.",
+            "Review provenance and finish the approved draft; markers do not authorize rewriting user content.",
+        )
+    if (start_count, end_count) == (0, 0) and not generated:
+        return findings
+    if start_count != 1 or end_count != 1 or text.find(MANAGED_START) > text.find(MANAGED_END):
+        severity = "error" if generated else "warn"
+        _add_memory_finding(
+            findings,
+            severity,
+            "malformed-managed-markers",
+            ROOT_MEMORY_NAME,
+            f"Expected one ordered managed block; found start={start_count}, end={end_count}.",
+            "Review the managed block boundaries before any approved update; the doctor never repairs them.",
+        )
+    return findings
+
+
+def _read_known_text(root: Path, path: Path) -> str | None:
+    raw, _error = _read_bytes(root, path)
+    if raw is None:
+        return None
+    text, _decode_error = _decode_utf8(raw)
+    return text
+
+
+def _adapter_imports(path: Path, text: str) -> list[str]:
+    return [match.group(1) for line in text.splitlines() if (match := IMPORT_RE.match(line))]
+
+
+def _check_adapters(
+    root: Path, manifest: dict | None, canonical_text: str | None
+) -> tuple[list[Finding], dict]:
+    findings: list[Finding] = []
+    adapter_files = [
+        root / "CLAUDE.md",
+        root / "GEMINI.md",
+        root / ".github" / "copilot-instructions.md",
+    ]
+    graph: dict[str, list[str]] = {}
+    overhead_files: list[dict] = []
+    for path in adapter_files:
+        if not path.exists() and not path.is_symlink():
+            continue
+        rel = _rel(root, path)
+        generated = _is_generated_output(root, path, manifest)
+        if path.is_symlink() and not _inside_root(root, path):
+            _add_memory_finding(
+                findings,
+                "error" if generated else "warn",
+                "adapter-out-of-root-link",
+                rel,
+                "Adapter symlink resolves outside the assessed root; its target was not read.",
+                "Review the symlink target and keep approved memory inside the project root.",
+            )
+            continue
+        text = _read_known_text(root, path)
+        if text is None:
+            _add_memory_finding(
+                findings,
+                "error" if generated else "warn",
+                "adapter-read-error",
+                rel,
+                "Adapter exists but could not be read as strict UTF-8.",
+                "Review the adapter without automatic repair.",
+            )
+            continue
+        raw, _error = _read_bytes(root, path)
+        if raw is not None:
+            overhead_files.append(
+                {"path": rel, "lines": physical_lf_lines(raw), "bytes": len(raw)}
+            )
+        imports = _adapter_imports(path, text)
+        graph[rel] = []
+        for target in imports:
+            target_path = (path.parent / target).resolve(strict=False)
+            if not _inside_root(root, target_path):
+                _add_memory_finding(
+                    findings,
+                    "error" if generated else "warn",
+                    "adapter-out-of-root-import",
+                    rel,
+                    f"Import @{target} resolves outside the assessed root and was not read.",
+                    "Use only approved in-root canonical memory imports.",
+                )
+                continue
+            target_rel = _rel(root, target_path)
+            graph[rel].append(target_rel)
+            if target_rel != ROOT_MEMORY_NAME:
+                _add_memory_finding(
+                    findings,
+                    "error" if generated else "warn",
+                    "adapter-eager-workflow-import",
+                    rel,
+                    f"Adapter imports @{target}; adapters should import canonical AGENTS.md only.",
+                    "Move workflow/reference detail behind a native skill or local reference link.",
+                )
+        if path.name in {"CLAUDE.md", "GEMINI.md"}:
+            canonical_import = bool(
+                re.search(r"(?m)^\s*@(?:\./)?AGENTS\.md\s*$", text)
+            )
+            is_canonical_symlink = path.is_symlink() and path.resolve(strict=False) == (
+                root / ROOT_MEMORY_NAME
+            ).resolve(strict=False)
+            if not canonical_import and not is_canonical_symlink:
+                if canonical_text is not None and text == canonical_text:
+                    signal = "legacy-memory-copy"
+                    detail = "Adapter is a full copy of AGENTS.md rather than a canonical import."
+                else:
+                    signal = "adapter-drift"
+                    detail = "Adapter does not expose the canonical AGENTS.md import."
+                _add_memory_finding(
+                    findings,
+                    "warn",
+                    signal,
+                    rel,
+                    detail + " Existing/custom content is reported for review, never rewritten.",
+                    "Review the adapter and approve a thin canonical import only if appropriate.",
+                )
+                if generated:
+                    _add_memory_finding(
+                        findings,
+                        "error",
+                        "adapter-missing-canonical-import",
+                        rel,
+                        "Generated Claude/Gemini adapter is missing the canonical @AGENTS.md import.",
+                        "Regenerate or approve a thin adapter; do not overwrite custom content automatically.",
+                    )
+        elif path.name == "copilot-instructions.md":
+            if canonical_text is not None and text == canonical_text:
+                _add_memory_finding(
+                    findings,
+                    "warn",
+                    "legacy-memory-copy",
+                    rel,
+                    "Copilot instruction file duplicates canonical AGENTS.md content.",
+                    "Review whether the approved Copilot adapter is necessary; do not delete it automatically.",
+                )
+            elif "AGENTS.md" not in text and not generated:
+                _add_memory_finding(
+                    findings,
+                    "warn",
+                    "adapter-drift",
+                    rel,
+                    "Existing Copilot instructions do not identify the canonical AGENTS.md memory.",
+                    "Review precedence and preserve intentional custom instructions.",
+                )
+    # Detect cycles only across the controlled root adapter/canonical graph.
+    graph.setdefault(ROOT_MEMORY_NAME, [])
+    canonical_path = root / ROOT_MEMORY_NAME
+    canonical_text_for_graph = canonical_text
+    if canonical_text_for_graph is not None:
+        for target in _adapter_imports(canonical_path, canonical_text_for_graph):
+            target_path = (canonical_path.parent / target).resolve(strict=False)
+            if _inside_root(root, target_path):
+                graph[ROOT_MEMORY_NAME].append(_rel(root, target_path))
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(node: str, chain: list[str]) -> None:
+        if node in visiting:
+            cycle = " -> ".join(chain + [node])
+            _add_memory_finding(
+                findings,
+                "error",
+                "adapter-cycle",
+                node,
+                f"Canonical memory adapter import cycle detected: {cycle}.",
+                "Break the import cycle and keep adapters pointed at AGENTS.md only.",
+            )
+            return
+        if node in visited:
+            return
+        visiting.add(node)
+        for child in graph.get(node, []):
+            if child in graph:
+                visit(child, chain + [node])
+        visiting.remove(node)
+        visited.add(node)
+
+    for node in sorted(graph):
+        visit(node, [])
+    return findings, {
+        "bytes": sum(item["bytes"] for item in overhead_files),
+        "lines": sum(item["lines"] for item in overhead_files),
+        "files": overhead_files,
+    }
+
+
+def _relative_link_target(raw_target: str) -> str | None:
+    parts = raw_target.strip().strip("<>").split()
+    target = parts[0] if parts else ""
+    if not target or target.startswith(("#", "http://", "https://", "mailto:", "data:", "~", "$")):
+        return None
+    target = unquote(target.split("#", 1)[0].split("?", 1)[0])
+    if not target or target.startswith("/"):
+        return target or None
+    return target
+
+
+def _check_root_references(
+    root: Path, text: str, generated: bool
+) -> list[Finding]:
+    findings: list[Finding] = []
+    for match in LINK_RE.finditer(text):
+        target = _relative_link_target(match.group(1))
+        if target is None:
+            continue
+        candidate = root / target
+        if not _inside_root(root, candidate):
+            _add_memory_finding(
+                findings,
+                "error" if generated else "warn",
+                "reference-out-of-root",
+                ROOT_MEMORY_NAME,
+                f"Local reference `{target}` resolves outside the assessed root; it was not read.",
+                "Use an approved in-root project-policy/reference path.",
+            )
+            continue
+        if not candidate.exists():
+            _add_memory_finding(
+                findings,
+                "error" if generated else "warn",
+                "required-reference-missing",
+                ROOT_MEMORY_NAME,
+                f"Root memory links to missing local path `{target}`.",
+                "Create the approved local reference or remove the stale link.",
+            )
+    return findings
+
+
+def _declared_skill_paths(text: str) -> list[str]:
+    declared: list[str] = []
+    for line in text.splitlines():
+        for match in SKILL_PATH_RE.finditer(line):
+            value = unquote(match.group(1)).replace("\\", "/")
+            if re.match(r"^[A-Za-z][A-Za-z0-9+.-]*://", value):
+                continue
+            legacy = ".codex/skills/" in value or "task-handoff" in value
+            surrounding = line[:match.start()] + line[match.end():]
+            history_note = re.search(
+                r"\b(migration[- ]only|migration (?:input|history)|historical|"
+                r"history|deprecated|formerly|previous (?:path|location))\b",
+                surrounding,
+                re.IGNORECASE,
+            )
+            if legacy and history_note and not line.lstrip().startswith("|"):
+                continue
+            if value not in declared:
+                declared.append(value)
+    return declared
+
+
+def _skill_path_kind(root: Path, path: str) -> str | None:
+    if ".." in Path(path).parts:
+        return None
+    normalized = _rel(root, root / path)
+    for root_prefix, runtime in ALL_SKILL_ROOTS:
+        prefix = root_prefix + "/"
+        if not normalized.startswith(prefix):
+            continue
+        parts = Path(normalized[len(prefix):]).parts
+        if (
+            len(parts) == 2
+            and parts[-1] == "SKILL.md"
+            and _inside_root(root / root_prefix, root / path)
+        ):
+            return runtime
+    return None
+
+
+def _check_declared_skills(
+    root: Path, text: str, manifest: dict | None, generated: bool
+) -> list[Finding]:
+    findings: list[Finding] = []
+    declared = {path: generated for path in _declared_skill_paths(text)}
+    if manifest is not None:
+        declared.update(
+            {path: True for path in manifest_artifact_paths(manifest, {"skill"})}
+        )
+    for value, required in declared.items():
+        normalized = value[2:] if value.startswith("./") else value
+        rel = normalized
+        severity = "error" if required else "warn"
+        if value.startswith(("~", "$")):
+            if value.startswith("~/.codex/skills/"):
+                _add_memory_finding(
+                    findings, severity, "declared-skill-legacy-location", value,
+                    "An active user-scope Codex declaration uses the retired skill root.",
+                    "Migrate the approved skill to ~/.agents/skills; its load state is not inferred.",
+                )
+            else:
+                _add_memory_finding(
+                    findings, "info", "skill-load-state-unknown", value,
+                    "External or user-scope skill content was not read by the project audit.",
+                    "Confirm approved native discovery and loading in the target runtime.",
+                )
+            continue
+        candidate = root / normalized
+        if not _inside_root(root, candidate):
+            _add_memory_finding(
+                findings,
+                severity,
+                "declared-skill-out-of-root",
+                ROOT_MEMORY_NAME,
+                f"Declared skill path `{value}` resolves outside the assessed root.",
+                "Use an in-root project skill path; global discovery state is unknown.",
+            )
+            continue
+        runtime = _skill_path_kind(root, normalized)
+        if runtime is None:
+            _add_memory_finding(
+                findings,
+                severity,
+                "declared-skill-mislocated",
+                ROOT_MEMORY_NAME,
+                f"Declared skill path `{value}` is not contained in a native skill's directory.",
+                "Use a current native root with <name>/SKILL.md; do not traverse or link out of that root.",
+            )
+            continue
+        if runtime == "codex-cli-legacy":
+            _add_memory_finding(
+                findings,
+                severity,
+                "declared-skill-legacy-location",
+                rel,
+                "Codex skill is declared under legacy .codex/skills; current project discovery uses .agents/skills.",
+                "Migrate with explicit approval; do not silently duplicate or delete the legacy skill.",
+            )
+        if not candidate.is_file():
+            _add_memory_finding(
+                findings,
+                severity,
+                "declared-skill-missing",
+                rel,
+                f"Declared local skill path `{value}` does not exist.",
+                "Emit or restore the declared skill before the gated action; a link alone is not a load.",
+            )
+            continue
+        skill_name = candidate.parent.name
+        skill_text = _read_known_text(root, candidate)
+        match = re.search(r"(?m)^name:\s*['\"]?([^'\"#\s]+)", skill_text or "")
+        if match is None or match.group(1) != skill_name:
+            _add_memory_finding(
+                findings,
+                severity,
+                "declared-skill-name-mismatch",
+                rel,
+                f"Skill directory `{skill_name}` has no matching readable name declaration.",
+                "Preserve valid native frontmatter and rename the skill/directory together after approval.",
+            )
+    # Report overlaps without treating same-named skills as deduplicated.
+    by_name: dict[str, list[str]] = {}
+    for candidate in discover_skill_files(root):
+        by_name.setdefault(candidate.parent.name, []).append(_rel(root, candidate))
+    for name, paths in sorted(by_name.items()):
+        if len(paths) > 1:
+            _add_memory_finding(
+                findings,
+                "warn",
+                "skill-overlap",
+                ROOT_MEMORY_NAME,
+                f"Skill `{name}` is discoverable at overlapping native paths: {', '.join(paths)}.",
+                "Review runtime-specific discovery and permissions; do not assume these files are deduplicated.",
+            )
+    if declared:
+        _add_memory_finding(
+            findings,
+            "info",
+            "skill-load-state-unknown",
+            ROOT_MEMORY_NAME,
+            "Declared skill paths were checked for in-root existence and names; native "
+            "loader state and user/global discovery are unknown.",
+            "Confirm the active runtime loaded the skill before relying on a gated workflow.",
+        )
+    return findings
+
+
+def _check_unresolved_output_placeholders(
+    root: Path, manifest: dict | None
+) -> list[Finding]:
+    findings: list[Finding] = []
+    for path in _known_output_paths(root, manifest):
+        if not path.is_file() or not _is_generated_output(root, path, manifest):
+            continue
+        text = _read_known_text(root, path)
+        if text is None:
+            continue
+        matches = sorted(set(PLACEHOLDER_RE.findall(text)))
+        if matches:
+            _add_memory_finding(
+                findings,
+                "error",
+                "unresolved-placeholder",
+                _rel(root, path),
+                f"Generated output contains unresolved placeholders: {', '.join(matches)}.",
+                "Resolve every generation placeholder before publishing the artifact.",
+            )
+    return findings
+
+
+def _check_stale_delegation_name(
+    root: Path, manifest: dict | None
+) -> list[Finding]:
+    findings: list[Finding] = []
+    for path in _known_output_paths(root, manifest):
+        if path.suffix.lower() not in INSTRUCTION_SUFFIXES:
+            continue
+        if not path.is_file() or not _is_generated_output(root, path, manifest):
+            continue
+        text = _read_known_text(root, path)
+        if text is None:
+            continue
+        for line_no, line in enumerate(text.splitlines(), start=1):
+            if "task-handoff" not in line.casefold() and "host-handoff" not in line.casefold():
+                continue
+            if _legacy_context(line):
+                continue
+            _add_memory_finding(
+                findings,
+                "error",
+                "stale-task-handoff-name",
+                f"{_rel(root, path)}:{line_no}",
+                "Generated output uses the retired active task-handoff/host-handoff name.",
+                "Use task-delegation/host-delegation; keep old names only in explicit migration/history text.",
+            )
+    return findings
+
+
+def check_memory(root: Path, manifest: dict | None = None) -> tuple[list[Finding], dict]:
+    """Run the canonical memory checker used by generation and validator fixtures."""
+    findings, report = _memory_budget_check(root)
+    canonical_path = root / ROOT_MEMORY_NAME
+    canonical_text = _read_known_text(root, canonical_path) if canonical_path.is_file() else None
+    generated = _is_generated_output(root, canonical_path, manifest)
+    if canonical_text is not None:
+        findings.extend(_check_managed_markers(root, canonical_text, generated))
+        findings.extend(_check_root_references(root, canonical_text, generated))
+    findings.extend(_check_declared_skills(root, canonical_text or "", manifest, generated))
+    adapter_findings, overhead = _check_adapters(root, manifest, canonical_text)
+    findings.extend(adapter_findings)
+    report["controlled_adapter_overhead"] = overhead
+    findings.extend(_check_unresolved_output_placeholders(root, manifest))
+    findings.extend(_check_stale_delegation_name(root, manifest))
+    return findings, report
+
+
 def check_reconciliation(
     root: Path, manifest: dict, agent_files: list[Path]
 ) -> list[Finding]:
     findings: list[Finding] = []
-    subagent_paths = manifest_artifact_paths(manifest, {"subagent", "agents-md"})
-    all_known = manifest_artifact_paths(
-        manifest, {"subagent", "agents-md", "skill", "mcp-config", "hooks", "other"}
-    )
+    all_known = manifest_artifact_paths(manifest, ARTIFACT_KINDS)
 
-    # Stray agents: on disk but not in the manifest.
     for path in agent_files:
-        rel = path.relative_to(root).as_posix()
+        rel = _rel(root, path)
         if rel in all_known:
             continue
         if agent_stem(path).lower() == "orchestrator":
-            continue  # already reported by the orchestrator check
+            continue
         findings.append(
             Finding(
                 "error",
@@ -205,92 +1001,140 @@ def check_reconciliation(
                 rel,
                 "Agent file is present on disk but absent from the manifest; it was "
                 "likely hand-written outside the plugin.",
-                "Remove it, or re-run the plugin (update/improve) so it is tracked "
-                "and validated.",
+                "Remove it, or re-run the plugin so it is tracked and validated.",
             )
         )
 
-    # Missing artifacts: in the manifest but absent on disk.
-    for rel, artifact in sorted(subagent_paths.items()):
-        if not (root / rel).is_file():
+    agent_names = {_rel(root, path) for path in agent_files}
+    for path in _known_output_paths(root, None):
+        rel = _rel(root, path)
+        if rel in all_known or rel in agent_names or not _inside_root(root, path):
+            continue
+        if path.is_file() and _is_generated_output(root, path, None):
+            findings.append(
+                Finding(
+                    "error", "stray-artifact", rel,
+                    "A controlled generated-style artifact is absent from the authoritative manifest.",
+                    "Review ownership and the approved file plan before recording its checksum; do not delete or adopt it automatically.",
+                )
+            )
+
+    for rel, artifact in sorted(all_known.items()):
+        target = root / rel
+        if not _inside_root(root, target):
+            findings.append(
+                Finding(
+                    "error",
+                    "manifest-artifact-out-of-root",
+                    rel,
+                    "Manifest points to an artifact outside the assessed root; it was not read.",
+                    "Keep manifest artifact paths relative to the project root.",
+                )
+            )
+            continue
+        if not target.is_file() and artifact["kind"] != "skill":
             findings.append(
                 Finding(
                     "error",
                     "missing-artifact",
                     rel,
                     "Manifest lists this artifact, but it is missing on disk.",
-                    "Restore it from version control or re-run the plugin to "
-                    "regenerate the agent system.",
+                    "Restore it from version control or regenerate the agent system.",
                 )
             )
 
-    # Checksum drift: content changed since generation.
     for rel, artifact in sorted(all_known.items()):
-        checksum = artifact.get("checksum")
+        checksum = artifact["checksum"]
         target = root / rel
-        if not checksum or not target.is_file():
+        if not _inside_root(root, target) or not target.is_file():
             continue
-        expected = str(checksum).split(":", 1)[-1].strip()
-        actual = sha256_of(target)
-        if expected and actual and expected != actual:
+        expected = checksum[len("sha256:"):]
+        actual = sha256_of(target, root)
+        if actual is None:
+            findings.append(
+                Finding(
+                    "error", "artifact-read-error", rel,
+                    "The listed artifact exists but its checksum could not be read safely.",
+                    "Restore readable in-root content before accepting reconciliation.",
+                )
+            )
+        elif expected != actual:
             findings.append(
                 Finding(
                     "warn",
                     "checksum-drift",
                     rel,
-                    "File content differs from the manifest checksum (edited since "
-                    "generation).",
-                    "Expected if you intentionally edited it; otherwise re-run the "
-                    "plugin to refresh the manifest.",
+                    "File content differs from the manifest checksum (edited since generation).",
+                    "Expected if intentionally edited; otherwise refresh the manifest.",
                 )
             )
 
-    # Missing stamps on agent files.
     for path in agent_files:
-        rel = path.relative_to(root).as_posix()
-        if read_stamp_version(path) is None:
+        rel = _rel(root, path)
+        if read_stamp_version(path, root) is None:
             findings.append(
                 Finding(
                     "warn",
                     "missing-stamp",
                     rel,
                     "Agent file has no agents-system-setup:generated-by stamp.",
-                    "Re-run the plugin (update/upgrade) to stamp it, or confirm it "
-                    "is intentionally hand-authored.",
+                    "Regenerate or confirm that it is intentionally hand-authored.",
                 )
             )
 
-    # Manifest version vs AGENTS.md stamp.
     manifest_version = manifest.get("plugin_version")
-    agents_md = root / "AGENTS.md"
-    agents_md_version = read_stamp_version(agents_md) if agents_md.is_file() else None
-    if manifest_version and agents_md_version and manifest_version != agents_md_version:
+    agents_md = root / ROOT_MEMORY_NAME
+    agents_md_version = read_stamp_version(agents_md, root) if agents_md.is_file() else None
+    if manifest_version and agents_md_version and re.sub(r"^v", "", manifest_version) != re.sub(r"^v", "", agents_md_version):
         findings.append(
             Finding(
                 "warn",
                 "manifest-version-drift",
-                "AGENTS.md",
-                "AGENTS.md stamp ({0}) does not match the manifest version "
-                "({1}).".format(agents_md_version, manifest_version),
+                ROOT_MEMORY_NAME,
+                "AGENTS.md stamp ({0}) does not match the manifest version ({1}).".format(
+                    agents_md_version, manifest_version
+                ),
                 "Run the plugin in upgrade mode to reconcile versions.",
             )
         )
     return findings
 
 
-def run(root: Path) -> tuple[list[Finding], bool]:
-    """Return (findings, manifest_present)."""
-    agent_files = discover_agent_files(root)
+def _run(root: Path, memory_only: bool = False) -> tuple[list[Finding], bool, dict]:
     findings: list[Finding] = []
-    findings.extend(check_orchestrator_files(root, agent_files))
-    findings.extend(check_operational_state(root))
+    agent_files = discover_agent_files(root, findings)
+    discover_skill_files(root, findings)
+    if not memory_only:
+        findings.extend(check_orchestrator_files(root, agent_files))
+        findings.extend(check_operational_state(root))
+    try:
+        manifest = load_manifest(root)
+        manifest_present = manifest is not None
+    except ManifestError as exc:
+        manifest = None
+        manifest_present = True
+        findings.append(
+            Finding(
+                "error",
+                "invalid-manifest",
+                f"{OPERATIONAL_STATE_DIR}/{MANIFEST_NAME}",
+                str(exc),
+                "Review the manifest structure and paths; no repair is applied automatically.",
+            )
+        )
+    if not memory_only and not manifest_present:
+        return findings, False, {}
+    memory_findings, report = check_memory(root, manifest)
+    findings.extend(memory_findings)
+    if not memory_only and manifest is not None:
+        findings.extend(check_reconciliation(root, manifest, agent_files))
+    return findings, manifest_present, report
 
-    manifest = load_manifest(root)
-    if manifest is None:
-        return findings, False
 
-    findings.extend(check_reconciliation(root, manifest, agent_files))
-    return findings, True
+def run(root: Path, memory_only: bool = False) -> tuple[list[Finding], bool]:
+    """Return (findings, manifest_present); memory_only is additive for callers."""
+    findings, manifest_present, _report = _run(root, memory_only)
+    return findings, manifest_present
 
 
 def sort_findings(findings: list[Finding]) -> list[Finding]:
@@ -300,20 +1144,50 @@ def sort_findings(findings: list[Finding]) -> list[Finding]:
     )
 
 
-def emit_human(findings: list[Finding], manifest_present: bool, root: Path) -> None:
+def emit_human(
+    findings: list[Finding],
+    manifest_present: bool,
+    root: Path,
+    memory_report: dict | None = None,
+    memory_only: bool = False,
+) -> None:
     manifest_path = (root / OPERATIONAL_STATE_DIR / MANIFEST_NAME).as_posix()
     errors = [f for f in findings if f.severity == "error"]
     warns = [f for f in findings if f.severity == "warn"]
+    infos = [f for f in findings if f.severity == "info"]
     if not findings:
         headline = "ok"
     else:
-        headline = "{0} error(s), {1} warning(s)".format(len(errors), len(warns))
+        headline = "{0} error(s), {1} warning(s), {2} info".format(
+            len(errors), len(warns), len(infos)
+        )
     print("agents-doctor: {0}".format(headline))
     print("manifest: {0}".format(manifest_path if manifest_present else "MISSING"))
-    if not manifest_present:
+    if memory_only:
+        print("mode: memory-only (manifest absence is expected)")
+    elif not manifest_present:
         print(
             "  (no manifest: only orchestrator + operational-state checks ran; "
-            "run the plugin to generate one)"
+            "use --memory-only to assess a pre-manifest draft)"
+        )
+    if memory_report:
+        if memory_report.get("present"):
+            print(
+                "memory: {0} lines, {1} bytes (hard <= {2} lines and <= {3} bytes)".format(
+                    memory_report["lines"],
+                    memory_report["bytes"],
+                    ROOT_MAX_LINES,
+                    ROOT_MAX_BYTES,
+                )
+            )
+        else:
+            print("memory: AGENTS.md missing")
+        overhead = memory_report.get("controlled_adapter_overhead", {})
+        print(
+            "context: adapter-file overhead={0} bytes across {1} file(s); "
+            "import expansion/effective runtime context=unknown; token count=unavailable".format(
+                overhead.get("bytes", 0), len(overhead.get("files", []))
+            )
         )
     if not findings:
         return
@@ -327,17 +1201,27 @@ def emit_human(findings: list[Finding], manifest_present: bool, root: Path) -> N
         print("      fix: {0}".format(finding.suggested_action))
 
 
-def emit_json(findings: list[Finding], manifest_present: bool, root: Path) -> None:
+def emit_json(
+    findings: list[Finding],
+    manifest_present: bool,
+    root: Path,
+    memory_report: dict | None = None,
+    memory_only: bool = False,
+) -> None:
     payload = {
         "ok": not any(f.severity == "error" for f in findings),
         "manifest_present": manifest_present,
+        "memory_only": memory_only,
         "root": root.as_posix(),
         "counts": {
             "error": sum(1 for f in findings if f.severity == "error"),
             "warn": sum(1 for f in findings if f.severity == "warn"),
+            "info": sum(1 for f in findings if f.severity == "info"),
         },
         "findings": [f.as_dict() for f in sort_findings(findings)],
     }
+    if memory_report:
+        payload["memory"] = memory_report
     print(json.dumps(payload, indent=2))
 
 
@@ -356,21 +1240,31 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Treat warning-severity findings as failures (exit 1).",
     )
+    parser.add_argument(
+        "--memory-only",
+        action="store_true",
+        help="Assess canonical AGENTS.md and controlled adapters without requiring a manifest.",
+    )
     args = parser.parse_args(argv)
 
     if args.root is not None:
         root = Path(args.root).resolve()
     else:
-        # The script is emitted at <root>/.agents-system-setup/agents-doctor.py.
         root = Path(__file__).resolve().parent.parent
 
-    findings, manifest_present = run(root)
+    findings, manifest_present, memory_report = _run(root, args.memory_only)
 
     if args.json:
-        emit_json(findings, manifest_present, root)
+        emit_json(findings, manifest_present, root, memory_report, args.memory_only)
     else:
-        emit_human(findings, manifest_present, root)
+        emit_human(findings, manifest_present, root, memory_report, args.memory_only)
 
+    if args.memory_only:
+        if any(f.severity == "error" for f in findings):
+            return 1
+        if args.strict and any(f.severity == "warn" for f in findings):
+            return 1
+        return 0
     if not manifest_present:
         return 2
     if any(f.severity == "error" for f in findings):

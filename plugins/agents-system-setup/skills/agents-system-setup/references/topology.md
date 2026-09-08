@@ -2,9 +2,18 @@
 
 > **The orchestrator is the host CLI session reading `AGENTS.md`**, not a subagent file. `@orchestrator` is a routing alias for that host/root session (Copilot CLI / Claude Code / OpenCode / Codex / Gemini). No runtime emits a separate `orchestrator.agent.md`, `.claude/agents/orchestrator.md`, `.opencode/agents/orchestrator.md`, `.codex/agents/orchestrator.toml`, or `.gemini/agents/orchestrator.md`. Subagent files in the table below are for **specialized roles only**; orchestration responsibilities (planning, delegation, integration, approval gates) live in `AGENTS.md` › Orchestration Operating Model.
 
-Subagent count scales with project scope (3 minimum, no fixed maximum — small projects ~3, large monorepos may legitimately need 20+). The host orchestrator is always present (it is the host session); subagent file counts do not include it.
+Subagent count scales with durable responsibilities and actual delegation
+benefit. Zero specialists is valid when the host can satisfy all required
+responsibilities and independence constraints; large systems may still justify
+many specialists. The host orchestrator is always present and is not counted as
+a subagent.
 
-## Universal Subagents (consider for every project)
+## Responsibility Catalog
+
+These are logical responsibilities, not a mandatory process roster. Merge them
+into the host or another role when scope is small and independence is not
+required. Emit a specialist only when the concern is durable, discoverable,
+and likely to benefit from separate context or permissions.
 
 Each row also names the **owned paths** that feed into AGENTS.md › Directory Architecture.
 
@@ -27,11 +36,13 @@ Each row also names the **owned paths** that feed into AGENTS.md › Directory A
 | `architecture-reviewer` | Preserve boundaries, ADRs, quality attributes, and design-pattern rationale; when `advisory_supervision` is on, also own the cross-session premise verdict | read-only + docs write if ADRs approved | `docs/adr/**`, architecture docs |
 | `design-pattern-reviewer` | Check implementation against selected patterns and anti-patterns | read-only | *(none — read-only)* |
 
-## Software-Dev Universal Subagents (Build Gate)
+## Software-Development Build Gate Responsibilities
 
-These three roles are added when Phase 1.7 classifies the project as
-`software-dev` AND Q9d Build Gate strictness is not `Skip`. They follow the
-SDLC quality bar from [SDLC build gate](./sdlc-build-gate.md).
+When the Build Gate is enabled, all required gates need explicit logical
+owners. Reuse project roles or the host where independence is not required;
+create a specialist only when its task benefits from isolation, repeatability,
+or a restricted execution profile. Review must remain independent of the
+writer.
 
 | Subagent | Responsibility | Tool restrictions | Owned paths (Directory Architecture) |
 |---|---|---|---|
@@ -39,57 +50,80 @@ SDLC quality bar from [SDLC build gate](./sdlc-build-gate.md).
 | `change-bug-hunter` | Diff-scoped logic, regression, integration sniff + lightweight security check | read-only + bounded local search | *(none — read-only)* |
 | `change-validator` | Aggregate gate evidence; emit final pre-merge integration report; enforce required approvals | read-only + aggregate | *(none — read-only; integrates evidence emitted by gate owners)* |
 
-`change-validator` is an **evidence integrator**, not a correctness
-authority. `@reviewer`, `@tester`, and security/architecture owners remain
-authoritative on their gates. When Q9d strictness is `Light`,
-`change-validator` merges into `@reviewer` and is not emitted as a separate
-subagent.
+`change-validator` is a logical **evidence integration responsibility**, not a
+correctness authority. Reviewer, tester, and security/architecture owners remain
+authoritative on their gates. It may be performed by the host or merged into a
+review role where permitted; it never overrides independent evidence.
 
 `change-bug-hunter` and `vulnerability-researcher` follow the
 mutual-exclusion routing rule documented in
 [sdlc-build-gate.md](./sdlc-build-gate.md#mutual-exclusion-routing-change-bug-hunter-vs-vulnerability-researcher).
 Do not duplicate scope.
 
-## Per-Project-Type Recommendations
+## Per-Project-Type Candidate Responsibilities
+
+These examples are menus, not required rosters. Start with the host, map
+required responsibilities and gates, then emit only specialists that add
+material value.
 
 ### Documentation site (mkdocs/docusaurus/astro)
-Orchestrator + `content-writer`, `link-checker`, `style-reviewer`, `build-runner`.
+Possible specialists: `content-writer`, `link-checker`, `style-reviewer`,
+`build-runner`.
 
 ### Web — .NET
-Orchestrator + `planner`, `implementer`, `reviewer`, `tester`, `security-auditor`, `architecture-reviewer`, `dotnet-build-runner`, `ef-migrations`, `api-designer`. Add `azure-deployer` if Azure.
+Possible specialists: `implementer`, `reviewer`, `tester`,
+`security-auditor`, `architecture-reviewer`, `dotnet-build-runner`,
+`ef-migrations`, `api-designer`; add `azure-deployer` only for Azure scope.
 
 ### Web — Node.js/TypeScript
-Orchestrator + `planner`, `implementer`, `reviewer`, `tester`, `security-auditor`, `architecture-reviewer`, `frontend-ui`, `api-designer`, `db-schema`, `playwright-e2e`. Add `next-app-router-expert` if Next.js.
+Possible specialists: `implementer`, `reviewer`, `tester`,
+`security-auditor`, `architecture-reviewer`, `frontend-ui`, `api-designer`,
+`db-schema`, `playwright-e2e`; add framework roles only when relevant.
 
 ### Web — Python
-Orchestrator + `planner`, `implementer`, `reviewer`, `security-auditor`, `architecture-reviewer`, `pytest-runner`, `api-designer`, `db-schema`, `type-checker` (mypy/pyright).
+Possible specialists: `implementer`, `reviewer`, `security-auditor`,
+`architecture-reviewer`, `pytest-runner`, `api-designer`, `db-schema`,
+`type-checker`.
 
 ### Web — Go
-Orchestrator + `planner`, `implementer`, `reviewer`, `security-auditor`, `architecture-reviewer`, `go-test-runner`, `api-designer`, `goroutine-auditor`.
+Possible specialists: `implementer`, `reviewer`, `security-auditor`,
+`architecture-reviewer`, `go-test-runner`, `api-designer`,
+`goroutine-auditor`.
 
 ### iOS
-Orchestrator + `swiftui-implementer`, `appkit-interop`, `xcode-build-runner`, `xctest-runner`, `signing-entitlements`, `accessibility-auditor`. Add `app-intents-designer` if Shortcuts/Siri scope.
+Possible specialists: `swiftui-implementer`, `appkit-interop`,
+`xcode-build-runner`, `xctest-runner`, `signing-entitlements`,
+`accessibility-auditor`; add `app-intents-designer` only for Shortcuts/Siri.
 
 ### Android
-Orchestrator + `compose-implementer`, `gradle-runner`, `instrumentation-tester`, `play-store-publisher`, `accessibility-auditor`.
+Possible specialists: `compose-implementer`, `gradle-runner`,
+`instrumentation-tester`, `play-store-publisher`, `accessibility-auditor`.
 
 ### CLI tool
-Orchestrator + `implementer`, `reviewer`, `tester`, `security-auditor`, `architecture-reviewer`, `release-publisher`, `man-page-writer`.
+Possible specialists: `implementer`, `reviewer`, `tester`,
+`security-auditor`, `architecture-reviewer`, `release-publisher`,
+`man-page-writer`.
 
 ### Library / SDK
-Orchestrator + `api-designer`, `implementer`, `reviewer`, `tester`, `security-auditor`, `architecture-reviewer`, `semver-guardian`, `docs-writer`, `release-publisher`.
+Possible specialists: `api-designer`, `implementer`, `reviewer`, `tester`,
+`security-auditor`, `architecture-reviewer`, `semver-guardian`,
+`docs-writer`, `release-publisher`.
 
 ### Monorepo
-Orchestrator + per-package subagents derived from workspace members + `dependency-graph-analyst`, `affected-tests-runner`, `security-auditor`, `architecture-reviewer`, `release-publisher`.
+Possible specialists: selected package owners plus
+`dependency-graph-analyst`, `affected-tests-runner`, `security-auditor`,
+`architecture-reviewer`, `release-publisher`.
 
 ### Data / ML
-Orchestrator + `notebook-runner`, `data-validator`, `model-trainer`, `evaluator`, `pipeline-deployer`.
+Possible specialists: `notebook-runner`, `data-validator`, `model-trainer`,
+`evaluator`, `pipeline-deployer`.
 
 ### Infrastructure / DevOps
-Orchestrator + `terraform-planner`, `terraform-applier`, `policy-checker`, `secret-scanner`, `cost-analyst`.
+Possible specialists: `terraform-planner`, `terraform-applier`,
+`policy-checker`, `secret-scanner`, `cost-analyst`.
 
 ### Security team / Bug hunting
-Orchestrator + `security-lead` (or orchestrator-owned lead in compact setups),
+Possible specialists: `security-lead` (or host-owned lead),
 `threat-modeler`, `vulnerability-researcher`, `validation-reproducer`,
 `attack-path-analyst`, `remediation-verifier`. Add `bug-bounty-triage`,
 `supply-chain-security`, `cloud-infra-security`, `incident-response-liaison`, or
@@ -99,7 +133,9 @@ cloud/infra, incident response, or compliance coverage. See
 
 ## Governance Sizing Rule
 
-Security, audit, architecture, and design-pattern ownership is mandatory, but roles may be merged for small repositories:
+Security, audit, architecture, and design-pattern ownership is mandatory, but
+ownership does not require a separate process. Responsibilities may be assigned
+to the host or merged roles where independence is not required:
 
 | Signal | Topology decision |
 |---|---|
@@ -112,10 +148,10 @@ Security, audit, architecture, and design-pattern ownership is mandatory, but ro
 
 ## Requirements Triage Sizing Rule
 
-`requirements-triage` is **default-on recommended**. Generate it as a separate
-subagent for normal, ambiguous, cross-runtime, security-sensitive, release, MCP,
-replication, or multi-wave setups. For tiny direct setups, merge the
-responsibility into `planner` and record `requirements_triage_status = merged`.
+Requirements triage is default-on as a **responsibility**. Use a separate
+read-only worker only when ambiguity, scale, or risk makes isolated intake
+valuable. Otherwise the host or planner performs it and records the merged
+owner.
 
 The triage agent never replaces the orchestrator. It returns an intake brief,
 task classification, ambiguity list, `question_request` items, risk flags, and
@@ -124,11 +160,10 @@ final plan decisions, and delegation.
 
 ## Content Quality Sizing Rule
 
-`agent-quality-curator` is **universal recommended** for generated agent systems.
-Generate it as a separate read-only subagent for normal, complex, cross-runtime,
-audit, improve, replication, MCP, release, skill-heavy, or multi-wave setups.
-For tiny direct setups, merge the responsibility into `reviewer` and record
-`content_quality_curator = merged`. Skip only with explicit rationale.
+Content-quality review is required when generated prose changes, but a separate
+`agent-quality-curator` is optional. Use one when independent focused review
+adds value; otherwise assign the responsibility to an independent reviewer or
+the host when independence is not required.
 
 The quality curator uses the signal taxonomy in
 [content quality](./content-quality.md): `generic-description`,
@@ -140,8 +175,8 @@ replaces reviewer, tester, security, architecture, or validator roles.
 
 ## Code Quality Sizing Rule
 
-`code-quality-reviewer` is **default-on for software-dev projects** (it rides the
-Phase 1.7 classification, like the Build Gate). It owns the maintainability,
+Code-quality review is default-on for software-dev projects (it rides the Phase
+1.7 classification, like the Build Gate). The logical owner covers maintainability,
 project-convention-conformance, and code-smell verdict for source-code changes —
 distinct from `@reviewer` (correctness), `architecture-reviewer` (boundaries),
 and `change-bug-hunter` (diff-scoped bugs). It is **read-only** and never
@@ -149,7 +184,7 @@ substitutes for the Build Gate.
 
 | Signal | Topology decision |
 |---|---|
-| `code_quality_strictness` is `standard` or `strict` | Generate `code-quality-reviewer` as a separate read-only subagent. |
+| `code_quality_strictness` is `standard` or `strict` | Assign an independent read-only reviewer; use a separate `code-quality-reviewer` only when it adds value. |
 | `code_quality_strictness` is `light` or `advisory`, or a tiny direct setup | Merge the responsibility into `@reviewer` and record `code_quality_reviewer = merged`. |
 | `code_quality_strictness` is `skipped` or `n/a` (non-software / no source code) | Do not emit the role; render the `n/a` rationale in `AGENTS.md`. |
 
@@ -174,7 +209,7 @@ the host to pre-assemble the comparison it exists to perform.
 |---|---|
 | `advisory_supervision` is `plan-gate` or `standard` | `architecture-reviewer` also owns the cross-session premise verdict. |
 | `architecture-reviewer` is merged into `@reviewer` / `api-designer` (tiny setup) | The merged role carries the verdict; record `advisory_verdict_owner = merged`. |
-| `advisory_supervision` is `off` or `parallel_safe_units < 3` | Do not mention it in the roster. |
+| `advisory_supervision` is `off` or the user did not opt in | Do not mention it in the roster. |
 
 The verdict owner is **read-only** and never calls `respond_to_session_plan` or
 `send_session_message` — subagents never orchestrate sessions (hard rule #33/#36).
@@ -201,7 +236,8 @@ unless the plan explicitly grants narrow owned paths and approvals.
 
 ## Sizing Rule
 
-> One subagent per **durable concern** (lasts beyond a single task). One-shot procedures are **skills**, not subagents.
+> At most one subagent per **durable concern**. One-shot procedures are skills,
+> not subagents; host-owned responsibilities need no agent file.
 
 If the user requests 50, support it — generate one agent file per concern they list.
 
@@ -213,13 +249,16 @@ For every chosen subagent, derive a row in AGENTS.md › Directory Architecture:
 |---|---|---|---|
 | (from subagent's "Owned paths") | (subagent's responsibility) | `@<subagent-name>` | `owned` (or `additive-only` for docs/tests) |
 
-Add **always-present** rows regardless of project type. `@orchestrator` is the host CLI session reading `AGENTS.md` (no subagent file emitted); the remaining owners are real subagents.
+Add applicable control rows regardless of specialist count. `@orchestrator` is
+the host CLI session reading `AGENTS.md`; other owner labels may name a
+specialist or a logical responsibility merged into the host/reviewer.
 
 | Path glob | Purpose | Owner | Edit rule |
 |---|---|---|---|
 | `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` | Agent project memory (host orchestrator + pointer files) | `@orchestrator` (host session) | `owned` |
+| `{{PROJECT_POLICY_PATH}}` (normally `docs/agents/project-policy.md`) | Full human-input, governance, capability, review/triage, and instruction-memory policy | `@orchestrator` + applicable governance owners | `owned` |
 | `.github/agents/**`, `.claude/agents/**`, `.opencode/agents/**`, `.codex/agents/**`, `.gemini/agents/**` | Specialized subagent definitions (never an orchestrator file) | `@orchestrator` (host session) | `owned` |
-| `.github/skills/**`, `.claude/skills/**`, `.opencode/skills/**`, `.gemini/skills/**` | Skill packages | `@orchestrator` (host session) | `additive-only` |
+| `.github/skills/**`, `.claude/skills/**`, `.opencode/skills/**`, `.agents/skills/**`, `.gemini/skills/**` | Skill packages | `@orchestrator` (host session) | `additive-only` |
 | `.mcp.json`, `opencode.json` | MCP / runtime config (incl. OpenCode root-session `permission.task` gate) | `@orchestrator` (host session) | `owned` (gated by approval) |
 | `.env*`, secret/config files | Secrets and local config | `@security-auditor` | `read-only` |
 | `docs/security/**`, `security-reports/**` | Security team findings, threat models, and approved audit artifacts | `@security-lead` / `@security-auditor` | `additive-only` unless the plan grants update ownership |

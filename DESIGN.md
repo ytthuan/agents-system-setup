@@ -4,6 +4,37 @@ This document explains **why** each phase and hard rule of `agents-system-setup`
 
 Public runtime support spans **Copilot CLI**, **Claude Code**, **OpenCode**, **OpenAI Codex (CLI + App)**, and **Gemini CLI** artifact layouts. Plugin installation is documented only for runtimes with supported plugin/install surfaces; Gemini CLI remains artifact-first.
 
+## Native-first contract (current source)
+
+Native initialization and canonical memory are separate stages. Harnesses have
+different command surfaces and output filenames; native output provides project
+facts, not permission to alter configuration or overwrite user instructions.
+Copilot prefers an explicit root-`AGENTS.md` request, falling back only with a
+disclosed, approved choice. Reusing output avoids vendored internal prompt drift.
+
+Always-loaded memory now has a complete-file **150-line AND 12,288-byte** limit.
+The root keeps exact commands, ownership, critical controls, gate triggers and a
+skill-loading index. Full matrices and procedures live in local project policy
+or skills. All profiles share the limit; it is a plugin contract rather than a
+vendor line/token requirement. Native imports and audience tags do not make
+context free, and unknown global context is not zero.
+
+The existing read-only doctor enforces deterministic output properties; reviewed
+proposals handle semantic conflicts and redundancy. A procedural skill cannot
+guarantee arbitrary model behavior by prose alone. Whole-file sizes, approved
+preimages, local references, and actual runtime observations are distinct evidence.
+
+`task-delegation` preserves the assignment contract while choosing the smallest
+useful execution topology and available model/effort within explicit constraints.
+Responsibilities are mandatory when applicable, not separate processes by
+default. Independent review remains independent; a parent load marker never
+stands in for context that a child did not receive.
+
+The historical rationale below predates this contract. In particular, mandatory
+worker counts, unconditional parallelism, full inline root matrices, and
+symlink/copy defaults are superseded by the current skill and its
+[context policy](./plugins/agents-system-setup/skills/agents-system-setup/references/context-optimization.md).
+
 ## Hard rules — reasoning
 
 | Rule | Why it exists | What it prevents |

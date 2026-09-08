@@ -1,8 +1,13 @@
 # Skill Format (Agent Skills — multi-platform)
 
-Source: https://docs.github.com/en/copilot/concepts/agents/about-agent-skills · open standard at https://github.com/agentskills/agentskills
+Sources:
+<https://docs.github.com/en/copilot/concepts/agents/about-agent-skills> ·
+<https://github.com/agentskills/agentskills> ·
+<https://learn.chatgpt.com/docs/build-skills>
 
-Skills use the **same SKILL.md format across platforms** — only the *location* differs.
+Skills share the core **SKILL.md** format across platforms, but locations and
+runtime extensions differ. Keep runtime-specific frontmatter and loading
+semantics strict; portability does not authorize copying unsupported keys.
 
 ## Locations (per platform)
 
@@ -12,15 +17,25 @@ Skills use the **same SKILL.md format across platforms** — only the *location*
 | `.claude/skills/<name>/SKILL.md` | Claude Code | Project |
 | `.opencode/skills/<name>/SKILL.md` | OpenCode | Project |
 | `.gemini/skills/<name>/SKILL.md` | Gemini CLI | Project |
-| `.agents/skills/<name>/SKILL.md` | Gemini CLI / Universal | Project |
+| `.agents/skills/<name>/SKILL.md` | OpenAI Codex / Gemini-compatible universal root | Project or ancestor |
 | `~/.copilot/skills/<name>/SKILL.md` | Copilot CLI | Personal |
 | `~/.claude/skills/<name>/SKILL.md` | Claude Code | Personal |
+| `~/.agents/skills/<name>/SKILL.md` | OpenAI Codex / Universal | Personal |
+| `/etc/codex/skills/<name>/SKILL.md` | OpenAI Codex | Admin |
 | `~/.gemini/skills/<name>/SKILL.md` | Gemini CLI | Personal |
-| `~/.agents/skills/<name>/SKILL.md` | Universal fallback | Personal |
 
 Folder name MUST equal `name` in frontmatter.
 
-> When emitting to multiple platforms, write the **same** `SKILL.md` to each platform's path. Skills are portable.
+> Codex currently discovers project skills from `.agents/skills/` in the
+> project or an ancestor, user skills from `~/.agents/skills/`, and admin skills
+> from `/etc/codex/skills/`. Treat `.codex/skills/` as legacy migration input:
+> preserve and offer migration rather than erasing it, but do not use it for new
+> Codex emission.
+>
+> Skill bodies are portable, but discovery roots can overlap across runtimes.
+> Plan one intended copy per effective loader path and audit duplicate names
+> before emission. Do not blindly copy to `.agents/skills/`, `.gemini/skills/`,
+> and `.claude/skills/` and assume the active harness de-duplicates them.
 
 ## Activation & Invocation
 
@@ -30,15 +45,15 @@ Folder name MUST equal `name` in frontmatter.
 | Claude Code | Auto-loads when relevant | `/<name>` slash command | Same frontmatter |
 | OpenCode | Loaded on demand through the `skill` tool | No direct `/<name>` shortcut; use commands for slash UX | Gated by `permission.skill` |
 | Gemini CLI | Model activates via skill loading/tooling | `/skills` to list/manage; no `/<name>` slash command | No direct per-skill slash command |
-| Codex CLI | Model activates via skill loading | `$skill-name` selects a skill | `$` prefix is Codex-specific — not universal syntax |
+| Codex CLI + App | Model activates via skill loading | `$skill-name` or `/skills` in CLI; Skills UI in App | `$` prefix is Codex-specific — not universal syntax |
 
 > **Gemini note:** Gemini does not expose a `/<skill-name>` shortcut. Users browse available skills with `/skills` and the model applies them automatically. Do not document `/<name>` invocation for Gemini.
 > **Codex note:** `$skill-name` is Codex's selection syntax. Do not use `$` as a cross-platform skill invocation pattern.
 
 ## Structure
 
-```
-.github/skills/<name>/
+```text
+<runtime-skill-root>/<name>/
 ├── SKILL.md          # required, < 500 lines
 ├── references/       # docs loaded on demand
 ├── assets/           # templates / boilerplate
@@ -77,8 +92,13 @@ Every generated `SKILL.md` carries a kind marker on its own line so `improve` /
 
 | Kind | Owner | Body authored by | Upgrade behavior |
 |---|---|---|---|
-| `host-handoff`, `host-audit`, `host-doctor`, `sdlc-build-gate`, `code-quality` | plugin | plugin | Regenerated from the plugin's templates. |
+| `host-delegation`, `host-audit`, `host-doctor`, `sdlc-build-gate`, `code-quality` | plugin | plugin | Regenerated from the plugin's templates. |
 | `domain` | project | **the user** | **Never overwritten.** Scaffold only; `improve`/`upgrade` may propose additions, never replace the body. |
+
+New generated task-assignment skills use `name: task-delegation` with
+`skill-kind: host-delegation`. Recognize `task-handoff` and `host-handoff` only
+for migration, import, manifest history, and references to genuine handoff
+records; do not grant both active names by default.
 
 `domain` skills hold project business rules, regulatory or compliance constraints,
 and this repo's own coordination conventions — the knowledge that is specific to
@@ -108,6 +128,11 @@ restates an `AGENTS.md` row as redundancy, not coverage.
 - `./references/*` and `./assets/*` load only when explicitly referenced
 
 Keep SKILL.md focused. Push depth into `references/`.
+
+Discovery, host activation, and child availability are separate states. A host
+loading `task-delegation` does not prove a delegated child received its body.
+Pass the relevant minimum or use a runtime-supported child preload mechanism;
+keep a compact fail-closed intake/reporting contract in every worker.
 
 ## Anti-patterns
 

@@ -10,7 +10,10 @@ This skill can replicate an agent system from one runtime to another (and back) 
 
 Every agent, skill, and MCP server is parsed into a single in-memory record. Every emitter renders from this — never from another platform's serialized form.
 
-For generated output, apply [context optimization](./context-optimization.md): preserve IR fidelity, but render compact governance summaries inline and link overflow details when the selected profile is `Balanced` or `Compact`.
+For every output profile, apply [context optimization](./context-optimization.md):
+preserve meaning and explicit constraints while synthesizing the complete root
+within 150 physical lines AND 12,288 UTF-8 bytes. Full detail stays in local
+project policy or skills; approved relocation is not permission to drop a rule.
 
 ### 1a. AgentIR
 ```yaml
@@ -19,8 +22,13 @@ description: "Use when ..."           # discovery surface — required
 role_prompt: |                        # full markdown body after frontmatter
   ...
 model:
-  family: sonnet | haiku | opus | gpt-5 | inherit | unspecified
-  vendor: anthropic | openai | google | unspecified
+  id: <exact source model value|null>  # preserve explicit pins verbatim
+  family: <descriptive hint|null>      # not a closed model catalog or a pin
+  vendor: <provider id|null>
+  pinned: true|false
+  effort: <exact source effort|null>  # model-advertised string, not a fixed enum
+  effort_pinned: true|false
+  selection_policy: adaptive-balanced | inherit | pinned
 source_scope: managed | session | project | user | plugin | extension | unknown
 agent_invocation:
   explicit: "@agent | /agent | cli-flag | task-tool | none"
@@ -73,6 +81,10 @@ gemini:
 name: <kebab-case>
 description: "Use when ..."
 argument_hint: "<...>"
+kind: <source skill-kind>              # task-delegation uses host-delegation
+body_owner: plugin | user              # domain skill bodies stay user-owned
+locations: {<runtime>: <native-path>}   # inspect overlapping discovery before emit
+discovery_status: unobserved           # target discovery/load evidence is not inherited
 body: |                               # full markdown body
   ...
 assets:                               # optional bundled files
@@ -91,6 +103,36 @@ env:
 enabled: true
 ```
 
+### 1d. ProjectMemoryIR
+
+```yaml
+canonical_path: AGENTS.md
+memory_contract: native-compact-v1
+budget: {max_lines: 150, max_utf8_bytes: 12288}
+profile: balanced | compact | full
+model_selection_policy: adaptive-balanced | inherit | pinned
+native_initialization:
+  runtime: <active harness>
+  source: native | existing | user-supplied | fallback
+  requested_path: <path|null>
+  observed_paths: []
+  reason: <fallback or conflict reason|null>
+user_content: {preimage_sha256: <digest>, approved_relocations: []}
+policy_path: <approved local project-policy path>
+adapters: [{runtime: <runtime>, path: <native-memory-path>, imports: AGENTS.md}]
+skills: [{name: <skill>, trigger: <concrete task>, locations: {<runtime>: <path>}}]
+```
+
+Keep full facts, governance and skill bodies in their existing IR records.
+`requested_path` is the actual approved native invocation target, not the final
+canonical path; use `null` if no initializer ran and `[]` when no native output
+was produced. Preserve wrong-destination evidence instead of rewriting history.
+Separate root summaries from on-demand detail; preserving an IR field does not
+require serializing its full prose into every always-loaded file. Native-init
+provenance is source evidence, never target loader evidence. Do not run `/init`
+for each replication target. Copilot's preferred root request and disclosed
+fallback follow [native initialization](./native-initialization.md).
+
 ## 2. Field-Mapping Matrix (lossless / lossy markers)
 
 | IR field | Copilot CLI | Claude Code | OpenCode | OpenAI Codex (CLI + App) | Gemini CLI |
@@ -98,7 +140,7 @@ enabled: true
 | `name` | frontmatter `name:` ✅ | frontmatter `name:` ✅ | filename only (no `name:`) ⚠️ derive from basename | TOML `name` in `.codex/agents/<name>.toml` ✅ (orchestrator only as `## <Name>` in `AGENTS.md`; `name` is source of truth) | frontmatter `name:` ✅; filename should match basename |
 | `description` | `description:` ✅ | `description:` ✅ | `description:` ✅ | TOML `description` ✅ | `description:` ✅; drives automatic delegation |
 | `role_prompt` | body ✅ | body ✅ | body ✅ | TOML `developer_instructions` (triple-quoted) ✅ | Markdown body system prompt ✅ |
-| `model.family` | `model: claude-sonnet-4.6` ✅ | `model: sonnet` ✅ | `model: anthropic/claude-sonnet-4-5` ✅ | TOML `model = "gpt-5.4"` ✅ + optional `model_reasoning_effort = "low\|medium\|high"` | `model: gemini-...` ✅ plus `temperature:` |
+| `model.id`, explicit effort | Approved available model ID | Approved ID or supported alias | Approved `provider/model-id` | Exact approved `model` and model-supported `model_reasoning_effort` | Approved model ID; supported settings only |
 | `tools.*` (bool map) | `tools: [vscode, execute, read, agent, edit, search, todo]` aliases ✅ (apply [Standard Tool Profile](./platforms.md#copilot-cli-standard-tool-profiles) per role; reviewers narrow to `[read, search]`) | `tools: Read, Grep, ...` (comma string allowlist) + optional `disallowedTools:` denylist — map names | `permission: { edit, bash, webfetch }` ✅ (legacy `tools: { ... }` map is **deprecated**) | model `sandbox_mode` (`read-only`\|`workspace-write`); fine-grained tool list not enforced — drop with warning ⚠️ | `tools:` allowlist ✅; map only known Gemini tool names and warn on unknown/discovered-only tools |
 | `mcp_refs` | per-agent `mcp-servers:` *or* central `.mcp.json` | central `.mcp.json` only ⚠️ | central `opencode.json` › `mcp` only ⚠️ | central `.mcp.json` ✅ **and/or** per-agent `[mcp_servers.<id>]` table inside the agent's TOML ✅ | per-agent `mcp_servers:` ✅; extension `mcpServers` import/package surface ⚠️ |
 | `permission.edit` | n/a — drop with warning ❌ | n/a — drop with warning ❌ | `permission.edit:` ✅ | mapped to `sandbox_mode` (read-only ↔ no edits) ✅ | map to narrower `tools:` and/or policy-engine guidance ⚠️ |
@@ -114,11 +156,20 @@ enabled: true
 | `nicknames` | n/a — drop ❌ | n/a — drop ❌ | n/a — drop ❌ | TOML `nickname_candidates = ["Atlas", "Delta"]` ✅ (Codex-only IR field; presentation in CLI + App activity views) | map one display value to `display_name` ⚠️ |
 | `security_controls`, `audit_requirements`, `architecture_decisions`, `quality_gates`, `sensitive_paths` | body + `AGENTS.md` managed governance sections ✅ | body + `AGENTS.md` / `CLAUDE.md` memory ✅ | body + `AGENTS.md` / `opencode.json` notes ✅ | TOML `developer_instructions` + `AGENTS.md` managed governance sections ✅ | body + `GEMINI.md`/`AGENTS.md` governance summary ✅ |
 
-> Replication preserves explicit `model:` overrides only. When the source agent left `model:` blank, emit `model: inherit` (or omit it where the target runtime treats absence as inherit). Never invent ids — see [models](./models.md) for accepted formats per target.
+> Preserve explicit model/effort pins, provider restrictions and budgets. Omit
+> static fields when unpinned; use adaptive-balanced selection only through
+> available per-call controls. Never override a user pin just because the native
+> call has higher precedence. Unknown or unavailable pins require a visible
+> constraint/lossiness decision, not a silent downgrade to inheritance. See [models](./models.md).
 >
 > **Orchestrator role is RootRoleIR, not AgentIR.** When parsing a source runtime, any agent named `orchestrator` (or any file whose role is "host coordinator / planner / delegator with no owned implementation paths") is classified as `RootRoleIR` rather than `AgentIR`. Its content is merged into the target's `AGENTS.md` › Orchestration Operating Model — never emitted as a subagent file in the target. Runtime-specific frontmatter (e.g. OpenCode `mode: primary`, OpenCode `permission.task` block, Copilot `tools:` profile, Claude `tools:` comma-string) is dropped with a lossiness entry; the `permission.task` rules migrate to `opencode.json` for OpenCode targets. Verify round-trip by checking that no target emits a `*/orchestrator.*` agent file.
 >
-> **Task Assignment preservation:** replication preserves the full Task Assignment Contract structure ([handoff.md](./handoff.md#delegation-packet-canonical-schema)). Required-minimum fields are 1:1 across runtimes; expansion blocks (Goal & Definition of Done, Scope, Context Packet, Allowed Capabilities, Skills Referenced, Instructions / Workflow, Verification Protocol, Reporting Protocol, Stop / Escalation Conditions, etc.) must be carried into the target agent body. Codex TOML keeps the structure inside `developer_instructions`; never silently drop expansion blocks during replication. Surface any drop in the lossiness report and preserve the `Task assignment quality` reporting marker.
+> **Task Assignment preservation:** keep the canonical twelve-field contract
+> and task-specific expansion values in scoped packets and `task-delegation`.
+> Workers retain their inline intake, safety and reporting; do not paste the full
+> workflow into every target body. Host-loaded `Skills Referenced` evidence is
+> not child content: deliver required excerpts or supported child loads. Preserve
+> the `Task assignment quality` marker and report any actual loss.
 >
 > **Memory & Learning preservation:** replication preserves the runtime-neutral Memory & Learning System ([learning-memory.md](./learning-memory.md)). Target runtimes may render the Learning Check in Markdown body or TOML `developer_instructions`, but they must keep the same storage profile, memory owner, no-secrets rule, and update policy: overwrite requires host-orchestrator approval (formerly "overwrite requires orchestrator approval" — same gate, the host CLI session is now the explicit orchestrator).
 
@@ -247,8 +298,13 @@ Common improve targets:
 - Subagent `description` lacks trigger keywords → re-write with concrete verbs.
 - `tools:` omitted on a read-only agent → restrict to read+grep+glob.
 - MCP server in `.mcp.json` not referenced by any agent → flag for removal.
-- `AGENTS.md` missing Directory Architecture or Capability Matrix → regenerate sections inside managed block.
-- `AGENTS.md` missing Context Loading Policy, Security & Audit Matrix, Threat Model, Architecture / Design Pattern Matrix, ADR Index, or Quality Gates → regenerate sections inside managed block.
+- Missing ownership or critical control/gate summary → propose a root repair;
+  full Capability Matrix/ADR Index belongs in linked local project policy.
+- Oversized root, broken policy/skill links, eager workflow copies, or stale
+  `task-handoff` name → run [memory audit](./instruction-memory-audit.md), propose
+  current compact/delegation migration, and require approval before rewriting.
+- Missing source-backed governance detail → restore its approved local target,
+  not obsolete root headings or mandatory empty tables.
 - Agent can write secrets/MCP/CI/release/dependency paths without a security owner → downgrade tools or require orchestrator/security review.
 - Plugin/MCP/skill recommendation has no source URL or untrusted source → remove or replace with a tiered marketplace candidate.
 - Design-pattern guidance is absent or contradictory → add architecture reviewer delta and ADR plan.
@@ -265,6 +321,10 @@ Common improve targets:
 - **Skipping the round-trip verify.** A successful emit isn't success — re-parse and diff IR.
 - **Markdown-format replication ledger inside an agents/ directory.** A `.md` file named like `agent-replication.md` placed in `.claude/agents/`, `.codex/agents/`, `.opencode/agents/`, or `.github/agents/` will be parsed as a malformed agent by the runtime and either silently ignored *or* corrupt the agent list. Always write the ledger as `.agents-system-setup/replication.jsonl` (JSON Lines, never `.md`, never inside an agents tree). Same rule applies to any other operational log this skill writes.
 - **Dropping governance metadata silently.** Security controls, audit requirements, architecture decisions, quality gates, and sensitive paths must either round-trip or appear in the lossiness report.
+- **False target capability evidence.** Reset discovery/load observations on
+  target emission; source host loads and known source paths do not prove target
+  skill discovery. Current Codex skills use `.agents/skills`; legacy paths
+  require reviewed migration, not blind copying.
 
 ## 6. References
 

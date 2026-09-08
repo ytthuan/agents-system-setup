@@ -2,6 +2,42 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [1.14.0] - 2026-09-08
+
+### Added
+
+- Native-first initialization guidance for all five harnesses, with distinct
+  commands/files, explicit Copilot root-`AGENTS.md` preference, approval-safe
+  existing-memory handling, and disclosed fallback.
+- Complete-file memory enforcement through the existing read-only doctor,
+  including pre-manifest `--memory-only` assessment and behavioral fixtures.
+- Local project-policy template for on-demand governance, ADRs, capability
+  coverage and review detail.
+
+### Changed
+
+- Canonical `AGENTS.md` synthesis targets 80-120 physical lines and must fit
+  150 lines AND 12,288 UTF-8 bytes in every profile. Full expands on-demand
+  material, not root memory; skills have concrete triggers and native paths.
+- Rename `task-handoff` to `task-delegation` (`host-delegation`), with coordinated
+  approval-safe migration of paths, pointers, manifests and exact permissions.
+- Default to adaptive-balanced model/effort selection and task-based delegation,
+  preserving explicit pins, budgets, provider limits and independent gates.
+  Remove mandatory minimum-worker counts and forced fan-out.
+- Use thin Claude/Gemini native import adapters; memory helpers no longer
+  overwrite existing content or fall back to full policy copies.
+
+### Fixed
+
+- Host-loaded skill evidence and context freshness no longer imply a child
+  received the body. Required excerpts or native child loading remain explicit.
+- Current Codex skill discovery uses `.agents/skills`; legacy `.codex/skills`
+  is migration input. Model effort and concurrency guidance uses advertised
+  capabilities rather than a closed effort enum or an invented fixed default.
+- Doctor reconciliation requires manifest schema 1 and per-artifact SHA-256
+  checksums, reports unreadable or unindexed generated outputs, and rejects
+  out-of-root runtime surfaces without reading external targets.
+
 ## [1.13.0] - 2026-07-28
 
 Two subsystems ship in this release: **child-session supervision** (the in-flight counterpart to v1.11.0's dispatch model) and the **`skill-kind: domain`** project-knowledge layer. They were developed as separate `1.12.0` and `1.13.0` work; `1.12.0` was never published as its own tag, so both are released here.

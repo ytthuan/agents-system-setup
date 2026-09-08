@@ -10,10 +10,10 @@ subagent in the user's roster.
 
 | Runtime | Native explorer | Invocation | Model/profile | Documentation URL |
 |---|---|---|---|---|
-| GitHub Copilot CLI | `task` tool, `agent_type: "explore"` | Tool call from host session | Haiku (fast, low-latency) | Copilot CLI tool definition (no canonical public URL; defined by Copilot CLI runtime) |
-| Claude Code | `Explore` built-in subagent | Auto-delegated; read-only; skips CLAUDE.md to keep research fast | Haiku, read-only | `https://docs.claude.com/en/docs/claude-code/sub-agents` |
+| GitHub Copilot CLI | `task` tool, `agent_type: "explore"` | Tool call from host session | Runtime-advertised model; no fixed cheap-model assumption | Copilot CLI tool definition (no canonical public URL; defined by Copilot CLI runtime) |
+| Claude Code | `Explore` built-in subagent | Native read-only exploration; supply required scoped context | Inspect current native model/controls | `https://code.claude.com/docs/en/sub-agents` |
 | OpenCode | `explore` built-in subagent | `@explore` mention OR auto-invoked by Build/Plan primary | Read-only; cannot modify files | `https://opencode.ai/docs/agents/` |
-| OpenAI Codex (CLI + App) | `explorer` built-in agent | Codex orchestration; max_threads default 6; max_depth default 1 | Read-heavy | `https://developers.openai.com/codex/subagents` |
+| OpenAI Codex (CLI + App) | `explorer` built-in agent | Advertised spawn controls and configured concurrency/recursion limits | Read-heavy; model/effort chosen within pins and budget | `https://learn.chatgpt.com/docs/agent-configuration/subagents` |
 | Gemini CLI | `codebase_investigator` built-in subagent | `@codebase_investigator` mention OR auto for complex code questions | Default-enabled in 0.10.0-preview+; runs in own context window | `https://geminicli.com/docs/core/subagents/` |
 
 ## When to delegate to native explorer
@@ -22,8 +22,9 @@ Delegate when broad reconnaissance would consume more budget than the final plan
 or generated artifacts. Native explorers are useful when independent concerns can
 be investigated in parallel and then merged into one compact recon card.
 
-Trigger native explorer when ANY of: `source_files > 50` OR `top_level_dirs > 8`
-OR `frameworks_detected > 3` OR `recon_threads_requested > 2`.
+Signals such as `source_files > 50`, `top_level_dirs > 8`,
+`frameworks_detected > 3`, or `recon_threads_requested > 2` suggest considering
+separate context; they do not mandate an explorer or fan-out.
 
 Calculate this trigger after Phase 0a captures the project purpose, but before
 Phase 1 footprint detection writes a full recon. The plugin should fan out
@@ -32,8 +33,9 @@ recon would dominate the budget. Tiny projects should stay in the host session.
 
 ## 5-thread parallel recon recipe
 
-Run one read-only explorer per thread and fan out the five calls in a single host
-turn. Return JSON-ish output so the host can merge by key.
+The five concerns below are a menu, not a quota. Choose only substantial
+independent work not already covered; merge related small concerns or read them
+directly in the host. Return compact structured results for selected threads.
 
 ### Thread 1 — Source code structure
 
@@ -108,12 +110,12 @@ five templates above.
 
 ### GitHub Copilot CLI invocation
 
-Use the `task` tool from the host session. Fan out all five calls in one response
-when the threads are independent:
+Use the native task surface from the host. Batch justified independent threads;
+use background only when there is other independent work to do:
 
 ```text
 task(agent_type: "explore", mode: "background", name: "recon-source-structure", prompt: "...")
-# Repeat for recon-tests, recon-configuration, recon-documentation, and recon-agent-artifacts.
+# Select only justified independent concerns; use sync when there is no parallel work.
 ```
 
 ### Claude Code invocation
@@ -135,18 +137,18 @@ Mention the built-in read-only explorer from the primary agent message:
 Return key facts, counts, candidate frameworks, and anomalies.
 ```
 
-Build/Plan primaries may also auto-invoke `explore`; still preserve the five
-thread boundaries in the host request so fan-in remains deterministic.
+Build/Plan primaries may also auto-invoke `explore`; preserve the selected scope
+boundaries so integration remains clear.
 
 ### OpenAI Codex invocation
 
-Ask Codex orchestration to spawn one explorer per recon concern. Keep max depth at
-the default one unless the user approved deeper recursion:
+Use an advertised spawn surface for justified concerns. Preserve configured
+limits and the plugin's non-recursive safety boundary; do not claim a fixed
+concurrency default or change limits for a routine task:
 
 ```text
-Spawn one explorer per recon thread and summarize. Threads: source structure,
-tests, configuration, documentation, existing agent artifacts. Return one compact
-JSON-ish result per thread.
+Inspect the selected independent recon concern with a scoped explorer.
+Return compact facts and source paths; respect model pins and resource limits.
 ```
 
 ### Gemini CLI invocation
@@ -166,8 +168,9 @@ the root Gemini session.
 
 The host session collects N explorer results, spot-checks representative files,
 and writes a single recon card. Do not paste all explorer output into `AGENTS.md`.
-Use the existing `AGENTS.md.template` `{{RECON_SNAPSHOT}}` placeholder, whose
-first line must be `- Purpose: <headline | exploring>` per hard rule #32.
+Keep temporary recon evidence in the plan/operational state. Synthesize only
+durable purpose/stack/commands into root memory; do not recreate the removed
+`RECON_SNAPSHOT` placeholder or a second lifecycle manual.
 
 Merge order:
 1. Normalize each explorer result into `thread`, `key_facts`, `counts`,
@@ -183,12 +186,11 @@ Merge order:
 
 ## Fallback when explorer is disabled or unavailable
 
-All five supported runtimes have native explorers, but users can disable them or
-set limits that make delegation impossible, such as Gemini settings overrides or
-Codex `agents.max_threads = 0`. In that case, the host session falls back to
-parallel `glob` and `view` calls in a single turn.
+Native explorers may be disabled, unavailable, or outside the approved budget.
+Use direct read-only tools for the selected concerns instead; do not invent a
+configuration value to force enablement or relax permissions.
 
-Use the same five threads as the explorer recipe:
+Select relevant concerns from the same menu:
 1. Source code structure — `glob` top-level directories, language files, and
    build manifests; `view` representative manifests.
 2. Tests — `glob` test directories and runner config; `view` package or runner
@@ -207,8 +209,8 @@ change is who performs the read-only discovery.
 
 - Spawning explorer for tiny projects with fewer than 50 files, where startup and
   synthesis overhead exceeds the benefit.
-- Spawning a single giant explorer thread for the whole codebase. That defeats
-  parallelism; fan out per concern.
+- Treating every recon concern as a required worker or repeating already-known
+  facts in several explorers.
 - Treating explorer output as authoritative without reading the actual files.
   Explorers summarize, but they can miss anomalies; spot-check one or two files
   per thread.

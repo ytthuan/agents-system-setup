@@ -1,50 +1,66 @@
 <#
 .SYNOPSIS
-  Keep CLAUDE.md in sync with AGENTS.md on Windows.
-  Tries a symlink first (requires Developer Mode or admin); falls back to copy
-  with a regenerable header so re-running the script keeps them in sync.
+  Create a thin Claude import adapter without replacing existing files or symlinks.
 #>
 [CmdletBinding()]
 param()
 
 $ErrorActionPreference = 'Stop'
+$root = (Get-Location).Path
+$source = Join-Path $root 'AGENTS.md'
+$target = Join-Path $root 'CLAUDE.md'
+$sourceItem = Get-Item -LiteralPath $source -Force
+if ($sourceItem.PSIsContainer -or ($sourceItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+  throw 'AGENTS.md must be an existing regular file; review symlinks before proceeding.'
+}
+$utf8 = New-Object Text.UTF8Encoding($false, $true)
+$sourceBytes = [IO.File]::ReadAllBytes($source)
+$sourceText = $utf8.GetString($sourceBytes)
+$versions = [regex]::Matches(
+  $sourceText,
+  '(?m)^<!-- agents-system-setup:generated-by: (v?\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.+-]+)?) -->\r?$'
+)
+if ($versions.Count -ne 1) {
+  throw 'AGENTS.md must have exactly one valid generated-by stamp.'
+}
+$content = "<!-- agents-system-setup:generated-by: $($versions[0].Groups[1].Value) -->`n" +
+  "<!-- agents-system-setup:memory-adapter: claude-code -->`n`n@AGENTS.md`n"
+$bytes = $utf8.GetBytes($content)
 
-if (-not (Test-Path -LiteralPath 'AGENTS.md')) {
-  Write-Error 'AGENTS.md not found in current directory — generate it first.'
-  exit 1
+if (Test-Path -LiteralPath $target) {
+  $existing = Get-Item -LiteralPath $target -Force
+  if (-not $existing.PSIsContainer -and
+      -not ($existing.Attributes -band [IO.FileAttributes]::ReparsePoint) -and
+      $existing.Length -eq $bytes.Length -and
+      [Convert]::ToBase64String([IO.File]::ReadAllBytes($target)) -eq [Convert]::ToBase64String($bytes)) {
+    Write-Host 'CLAUDE.md already contains the current import adapter.'
+    exit 0
+  }
+  throw 'CLAUDE.md already exists; propose and approve its migration instead of overwriting it.'
 }
 
-# If existing CLAUDE.md is a symlink to AGENTS.md, we're done.
-$existing = Get-Item -LiteralPath 'CLAUDE.md' -ErrorAction SilentlyContinue
-if ($existing -and $existing.LinkType -eq 'SymbolicLink' -and $existing.Target -contains 'AGENTS.md') {
-  Write-Host '✅ CLAUDE.md already symlinked to AGENTS.md.'
-  exit 0
-}
-
-# Back up an existing real file before replacing.
-if ($existing -and -not $existing.LinkType) {
-  Copy-Item -LiteralPath 'CLAUDE.md' -Destination 'CLAUDE.md.bak' -Force
-  Write-Host 'ℹ️  Existing CLAUDE.md backed up to CLAUDE.md.bak'
-  Remove-Item -LiteralPath 'CLAUDE.md' -Force
-}
-
-# Try symlink (Developer Mode or admin).
-$symlinked = $false
+$temp = Join-Path $root ('.claude-adapter-' + [IO.Path]::GetRandomFileName())
+$tempCreated = $false
 try {
-  New-Item -ItemType SymbolicLink -Path 'CLAUDE.md' -Target 'AGENTS.md' | Out-Null
-  $symlinked = $true
-  Write-Host '✅ CLAUDE.md → AGENTS.md (symlink).'
-} catch {
-  Write-Host 'ℹ️  Symlink not permitted — falling back to copy with header.'
+  $stream = [IO.File]::Open($temp, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+  $tempCreated = $true
+  try {
+    $stream.Write($bytes, 0, $bytes.Length)
+    $stream.Flush()
+  } finally {
+    $stream.Dispose()
+  }
+  $currentSource = Get-Item -LiteralPath $source -Force
+  if (($currentSource.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+      [Convert]::ToBase64String([IO.File]::ReadAllBytes($source)) -ne [Convert]::ToBase64String($sourceBytes)) {
+    throw 'AGENTS.md changed while preparing the adapter; review the new content first.'
+  }
+  # The two-argument move fails if another writer created the destination.
+  [IO.File]::Move($temp, $target)
+  $tempCreated = $false
+} finally {
+  if ($tempCreated) {
+    [IO.File]::Delete($temp)
+  }
 }
-
-if (-not $symlinked) {
-  $header = '<!-- generated from AGENTS.md by agents-system-setup — re-copied on every update. Do not edit directly. -->' + [Environment]::NewLine
-  $body   = Get-Content -LiteralPath 'AGENTS.md' -Raw
-  [IO.File]::WriteAllText(
-    (Join-Path (Get-Location) 'CLAUDE.md'),
-    ($header + $body),
-    (New-Object Text.UTF8Encoding($false))
-  )
-  Write-Host '✅ CLAUDE.md copied from AGENTS.md (with regen header).'
-}
+Write-Host 'Created CLAUDE.md importing @AGENTS.md; no policy copy or symlink.'

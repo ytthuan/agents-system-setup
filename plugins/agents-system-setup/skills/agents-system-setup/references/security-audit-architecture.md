@@ -2,7 +2,10 @@
 
 This reference is mandatory for `init`, `update`, `improve`, and `replicate` flows. The goal is not to make every project heavy-weight; it is to ensure every generated agent system has explicit ownership, boundaries, audit evidence, and architecture rationale.
 
-Use [context optimization](./context-optimization.md) when rendering this baseline. The sections below are mandatory as concerns, not always exhaustive inline tables. In `Balanced` and `Compact` profiles, keep the owner/control/gate summaries in `AGENTS.md` and move long rationale or full checklists to linked references.
+Use [context optimization](./context-optimization.md) for every profile. These
+concerns are mandatory, not exhaustive inline tables: keep control/owner/approval/
+gate summaries in `AGENTS.md`, with full matrices, rationale and ADRs in approved
+local project policy. Full obeys the same 150-line/12-KiB root cap.
 
 ## 1. Source-backed framework map
 
@@ -46,7 +49,9 @@ Ask only what is not already detectable. Use one `ask_user` call per question.
 
 Every plan must include these sections before file writes:
 
-For generated `AGENTS.md`, cap each table to the rows needed for safe routing and verification. If the source analysis has more detail, add an overflow link such as `docs/agents/security-audit.md`.
+For generated `AGENTS.md`, retain only rows needed for safe routing and gates.
+Full detail lives in an approved local path such as `docs/agents/project-policy.md`;
+a proposed but unwritten reference cannot satisfy a required control.
 
 ### Security & Audit Matrix
 
@@ -111,7 +116,7 @@ The governance baseline is mandatory; dedicated agents are adaptive.
 
 | Project signal | Required ownership |
 |---|---|
-| Any software project | Security and architecture review must be owned by either dedicated subagents or merged into `@reviewer` with explicit responsibilities. |
+| Any software project | Name security/architecture responsibilities on existing, host or specialist owners; required independent review cannot be owned by the writer. |
 | Regulated data, PII, payments, health, credentials | Add `security-auditor`; consider `compliance-auditor`. |
 | MCP servers or external tool calls | Add or merge `threat-modeler`; MCP approval gate remains mandatory. |
 | CI/release/package publishing | Add supply-chain responsibilities to `release-publisher` or `security-auditor`. |
@@ -119,7 +124,10 @@ The governance baseline is mandatory; dedicated agents are adaptive.
 | User asks for patterns/architecture | Add `design-pattern-reviewer` or merge into `architecture-reviewer`. |
 | User asks for security team, bug hunting, vulnerability research, disclosure triage, or security analysis | Use [security team](./security-team.md) to generate a dedicated read-mostly security roster and evidence contract. |
 
-Small repositories may merge roles into one `security-architecture-reviewer`, but the generated plan must still show the security, audit, architecture, and design-pattern responsibilities.
+Merge logical responsibilities when valid; create separate workers only when
+specialization or independence requires them. Existing role names in this table
+are examples, not minimum roster counts. Always show actual security, audit,
+architecture and design-pattern ownership.
 
 ## 5. Improve-mode scoring
 

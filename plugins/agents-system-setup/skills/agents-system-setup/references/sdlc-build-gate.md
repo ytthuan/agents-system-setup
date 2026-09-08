@@ -30,9 +30,9 @@ Generate the Build Gate when **all** of these are true:
   replicate).
 - The user did not pick `Skip` for the Build Gate question (Q9d).
 
-For non-software-dev projects (documentation site, security-team-only,
-research), render `Build Gate (SDLC): n/a — non-software project` in the
-AGENTS.md placeholder and skip role/skill emission.
+For non-software-dev projects or `Skip`, emit no full Build Gate section,
+matrix, or role roster. A compact conditional status may say `n/a` where an
+existing template requires a value.
 
 ## Diff bucket model
 
@@ -77,8 +77,9 @@ fires together with another `L` or with security-team scope, escalate to `XL`.
 
 ## Gate matrix
 
-Each bucket maps to a required gate set. The Build Gate is **fail-closed**:
-missing evidence for a required gate blocks change-validator sign-off.
+Each bucket maps to a required gate set. The Build Gate is **fail-closed**: missing/denied canonical skill context or
+missing evidence for a required gate blocks the affected code action and
+validation sign-off.
 
 | Bucket | Build | Unit test | E2E test | Code review | Change bug hunt | Validation | Notes |
 |---|---|---|---|---|---|---|---|
@@ -100,20 +101,20 @@ aggregates.
 
 | Gate | Owner | Evidence shape |
 |---|---|---|
-| Build | `@build-runner` | command, exit status, build artifact paths, log summary |
-| Unit test | `@tester` (or language-specific runner) | command, pass/fail counts, coverage delta if available, failing test names |
-| E2E test | `@playwright-e2e` or runtime equivalent | command, scenarios run, pass/fail, screenshots/traces stored path |
-| Code review | `@reviewer` | reviewed file paths, signed-off-by, blocking comments resolved (or rationale waived) |
-| Change bug hunt | `@change-bug-hunter` | scanned paths, candidate count, suspicion list, severity, link to evidence |
-| Validation | `@change-validator` | aggregated gate status, required-approval status, residual risk note |
+| Build | project `build_owner` | command, exit status, build artifact paths, log summary |
+| Unit test | project `unit_test_owner` | command, pass/fail counts, coverage delta if available, failing test names |
+| E2E test | project `e2e_owner` | command, scenarios run, pass/fail, screenshots/traces stored path |
+| Code review | project `review_owner`, independent of writer | reviewed file paths, signed-off-by, blocking comments resolved (or rationale waived) |
+| Change bug hunt | project `bug_hunt_owner` | scanned paths, candidate count, suspicion list, severity, link to evidence |
+| Validation | project `change_validator_owner` | aggregated gate status, required-approval status, residual risk note |
 
 The **Code review** gate includes the maintainability / project-convention /
 code-smell verdict from [code-quality](./code-quality.md), owned by
 `@code-quality-reviewer` (or `@reviewer` when merged) and reported as
 `Code quality: ok|warn|fail|n/a; signals=<list|none>`. That standard is the
 *authoring* craft applied while the code is written; this Build Gate is the
-*verification* that the change holds together. `@change-validator` folds the
-`Code quality:` line into the review evidence and never overrides the verdict.
+*verification* that the change holds together. The validation owner folds the
+`Code quality:` line into review evidence and never overrides the verdict.
 
 ## Strictness
 
@@ -123,20 +124,23 @@ User picks one in Q9d:
 |---|---|
 | Standard (default) | Use the matrix as written. `🟡` gates can be waived with rationale. |
 | Strict | Promote all `🟡` to `✅`. XL requires two reviewer approvals and a release-validator sign-off. |
-| Light | `change-validator` merges into `@reviewer`; XS keeps only build + review; M demotes e2e to `🟡`. Suitable for small teams or library code with thin runtime. |
+| Light | Validation merges into the independent review owner; XS keeps only build + review; M demotes e2e to `🟡`. Suitable for small teams or library code with thin runtime. |
 | Skip | Do not generate Build Gate roles, snippet, or skill. Render `n/a — user skipped` in AGENTS.md. |
 
 ## Roles
 
-The Build Gate adds at most three new universal-conditional subagents:
+The Build Gate defines logical responsibilities. Map them to existing project
+roles or the host where independence is not required; emit a specialist only
+when separate context, permissions, repeatability, or independent review
+justifies it.
 
 | Role | Read/Write | Owns | Boundary |
 |---|---|---|---|
-| `build-runner` | read + execute build commands | build invocation, build-output evidence | does not change source; may run formatters listed in plan |
-| `change-bug-hunter` | read-only + bounded local search | diff-scoped logic, regression, integration sniff + lightweight security check | does not duplicate `vulnerability-researcher`; if a dedicated security team exists, only flags suspicions and hands findings to `vulnerability-researcher` |
-| `change-validator` | read-only + aggregate | final pre-merge integration report | is an **evidence integrator**, not a correctness authority; reviewer/tester/security owners remain authoritative on their gates; merges into `@reviewer` when strictness = `Light` |
+| Build owner | read + execute build commands | build invocation, build-output evidence | host or `build-runner`; does not change source except approved formatter output |
+| Bug-hunt owner | read-only + bounded local search | diff-scoped logic, regression, integration sniff + lightweight security check | host/reviewer or `change-bug-hunter`; does not duplicate `vulnerability-researcher` |
+| Validation owner | read-only + aggregate | final integration report | host/reviewer or `change-validator`; evidence integrator only |
 
-If the project already has roles that cover a gate, reuse them:
+Reuse project roles before creating specialists:
 
 - `tester` / `pytest-runner` / `go-test-runner` / `xctest-runner` etc. → unit test gate.
 - `playwright-e2e` (or runtime equivalent) → e2e gate; add only if not present.
@@ -160,29 +164,23 @@ through the owning implementer per the architecture/security ownership rules.
 
 ## Wave assignment
 
-The Build Gate respects the existing wave/parallelism rules:
+The Build Gate respects dependencies and adaptive delegation:
 
-- `build-runner` and `tester` are parallel-safe in the same wave when build
-  output is not a dependency of tests (most language toolchains build before
-  test as a single step; emit them sequentially in those cases).
-- `change-bug-hunter`, `reviewer`, and `playwright-e2e` are parallel-safe with
-  each other once the build/unit tests pass; place them in the same wave.
-- `change-validator` always runs last in its own wave; it waits for every
-  preceding gate before emitting the integration report.
+- Build and unit test follow actual toolchain dependencies.
+- E2E, independent review, and change bug hunt may run concurrently after their
+  prerequisites only when doing so materially helps.
+- Validation waits for every required gate, whether evidence was produced by
+  the host or a worker.
 
 ## AGENTS.md placement
 
-The plugin renders the Build Gate in two places:
+The plugin renders the enabled Build Gate in two places:
 
-1. **`AGENTS.md` › `## Build Gate (SDLC)`** — compact mandatory inline
-   checklist with the matrix snippet. This is the **fail-closed enforcement
-   surface**: the host orchestrator runs the gate even if the skill is never
-   invoked. The compact form lists bucket → required gates → evidence and
-   tells the host to delegate per the routing table.
-2. **`code-change-build-gate` skill** (per runtime, including Codex) — the
-   expanded procedure: how to compute the bucket, criticality markers, how
-   to gather evidence per gate, escalation paths, anti-patterns. Loaded on
-   demand when the host needs depth.
+1. **`AGENTS.md` › `## Build Gate (SDLC)`** — compact enabled-only trigger,
+   strictness, logical owners, fail-closed rule, and pointer.
+2. **`code-change-build-gate` skill** (per runtime, including Codex) — the one
+   canonical matrix and procedure. It must be loaded before affected code work
+   or sign-off; missing/denied loading blocks that action.
 
 ## Anti-patterns
 
@@ -191,24 +189,25 @@ The plugin renders the Build Gate in two places:
 - Letting `change-bug-hunter` duplicate full threat-model analysis when a
   security team is present.
 - Adding the Build Gate to documentation-only or security-team-only projects.
-- Generating Build Gate roles without the AGENTS.md inline checklist (silent
-  skill = silent gate).
+- Duplicating the full matrix in root memory or treating root as the conflict
+  authority.
+- Generating role processes solely to satisfy a fixed roster.
 - Pinning concrete LOC counts inside generated AGENTS.md — use bucket labels
   and link to this reference.
-- **Routing required Build Gate evidence through native task-class built-ins** (Copilot `task`, Claude `general-purpose`, OpenCode `general`). Build, unit test, e2e, code review, change bug hunt, and validation evidence MUST be owned by `@build-runner` / `@tester` / `@playwright-e2e` / `@reviewer` / `@change-bug-hunter` / `@change-validator`. Native task-class output is `non-gate evidence` — usable for ad-hoc orchestrator checks only. See [host-builtins-routing](./host-builtins-routing.md).
+- Treating ad-hoc native task-class output as gate evidence. It is
+  `non-gate evidence` unless assigned through the established owning-gate
+  workflow with the correct evidence and independence requirements.
 
 ## Verification
 
 After generation, the plugin verifier confirms:
 
-1. `AGENTS.md` contains `## Build Gate (SDLC)` with a non-empty matrix or
-   an `n/a — non-software project | user skipped` rationale.
+1. Enabled projects have a compact root trigger/strictness/owner/fail-closed
+   pointer; skipped/non-development projects have no full gate section/roles.
 2. For software-dev + not-skipped: `code-change-build-gate` skill exists at
    each selected runtime's skills path (including Codex).
-3. Roster includes `build-runner`, `change-bug-hunter`, and
-   `change-validator` (or `change-validator merged into reviewer` for
-   `Light`).
-4. Wave plan places `change-validator` last with `waits_for` covering every
-   preceding gate.
+3. Every required gate has a named logical owner; review is independent of the
+   writer. Specialist files exist only when justified.
+4. Validation waits for every required preceding gate.
 5. Routing table contains the `change-bug-hunter` vs `vulnerability-researcher`
    mutual-exclusion rule when both are present.

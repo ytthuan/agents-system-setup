@@ -26,7 +26,7 @@ Every executable bundled with this skill ships in **two forms**:
 | Purpose | POSIX | Windows native |
 |---|---|---|
 | Init git repo | `scripts/git-init.sh` | `scripts/git-init.ps1` |
-| Link project memory | `scripts/link-project-memory.sh` | `scripts/link-project-memory.ps1` |
+| Create a thin Claude memory adapter | `scripts/link-project-memory.sh` (Python 3) | `scripts/link-project-memory.ps1` |
 
 **Selection logic (the agent runs this, not the user):**
 
@@ -47,10 +47,19 @@ Every executable bundled with this skill ships in **two forms**:
 - Bundle a `.gitattributes` (see `assets/gitattributes.template`) with `* text=auto eol=lf` for source and `*.ps1 text eol=crlf` for PowerShell.
 - Without this, Windows users will silently get CRLF in `.sh` and break execution.
 
-## Symlink Caveats (Windows)
+## Project memory adapters
 
-- `ln -s` is unreliable on Windows: requires Developer Mode or admin, and Git for Windows often replaces symlinks with text-stub copies.
-- **Strategy**: on Windows, never symlink — always **copy with regenerable header**. The `link-project-memory.*` scripts already implement this branching.
+Use regular UTF-8 files containing the native `@AGENTS.md` import on every OS,
+not symlinks or policy copies. The `link-project-memory.*` helpers create a
+Claude adapter only when absent, or accept an identical existing adapter.
+They require a stamped canonical `AGENTS.md`, publish without replacing a
+raced destination, and refuse other existing files or symlinks. Approved legacy
+replacement belongs in the normal reviewed migration path, not a force flag.
+
+Gemini uses its separate minimal `GEMINI.md` template and supported import.
+Copilot, Codex, and OpenCode can consume root `AGENTS.md` directly. Preserve
+existing overrides and inspect actual loader behavior; imports are eager.
+See [native initialization](./native-initialization.md).
 
 ## File Modes
 

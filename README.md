@@ -9,6 +9,50 @@
 
 - A multi-runtime plugin/skill package that **bootstraps**, **updates**, **improves**, **upgrades**, or **replicates** a complete multi-agent system across five supported runtimes: **GitHub Copilot CLI**, **Claude Code**, **OpenCode**, **OpenAI Codex (CLI + App)**, and **Gemini CLI** artifact layouts — from a single skill, with a Canonical IR for bidirectional replication, parallel-aware orchestration, mandatory security/audit/architecture governance, version-stamped artifacts, and compact-by-default context output baked in.
 
+## Native-first compact memory (current source)
+
+New setups reuse the active harness's native initialization **output**, then
+synthesize one canonical `AGENTS.md`. Existing instructions are audited and
+repaired only after approval; the plugin does not rerun initialization over
+customized memory to force a replacement.
+
+| Harness | Native command | Documented default file |
+|---|---|---|
+| Codex CLI TUI | `/init` | `AGENTS.md` |
+| Copilot CLI | `/init` or `copilot init` | `.github/copilot-instructions.md` |
+| Claude Code | `/init` | `CLAUDE.md` |
+| OpenCode | `/init` | `AGENTS.md` |
+| Gemini CLI | `/init` | `GEMINI.md` |
+
+For Copilot, the plugin prefers this root-target request in the native
+interactive command surface:
+
+```text
+/init generate AGENTS.md at root instead of .github/copilot-instructions.md
+```
+
+Ask about another draft location only if unsupported or conflicting. The request
+is not a guaranteed filename-switch API; record actual output and disclose any
+fallback. Claude/Gemini use thin native imports; Copilot/Codex/OpenCode can read
+root memory directly. See [native initialization](./plugins/agents-system-setup/skills/agents-system-setup/references/native-initialization.md).
+
+The complete synthesized root is capped at **150 physical lines AND 12 KiB**,
+targeting 80-120 lines in **every** profile. This is plugin policy, not an OpenAI
+line/token mandate. Full expands local on-demand policy, not always-loaded memory.
+The read-only doctor's `--memory-only` mode enforces output budgets before
+compliant completion; declined repairs leave user content untouched.
+
+The Skills index gives concrete triggers and native paths. `task-delegation`
+replaces `task-handoff`, keeps the assignment contract, and selects direct work
+or useful specialists with adaptive-balanced model/effort choice. Explicit pins,
+provider/budget limits, required independent review and approval gates prevail.
+No minimum worker count or forced fan-out; a host skill load is not child context.
+
+**Legacy notes below:** references to Copilot-only `/init`, 3-50 mandatory
+workers, full root matrices, symlink/copy adapters, or inherited context describe
+earlier behavior. This section and the current skill/references supersede those
+details; tagged release behavior remains documented in the changelog.
+
 ## Relationship to Copilot `/init` and native `AGENTS.md` support
 
 This plugin **complements** Copilot's built-in `/init` and native `AGENTS.md` interop — it does not duplicate them. `/init` analyzes a repo and seeds a single Copilot guidance file, which Copilot (and other agents) then read natively. That single-file, single-runtime bootstrap is the *starting point* this plugin builds on, not what it competes with — an `/init`-seeded `AGENTS.md` is a valid input to `update`/`improve` mode.

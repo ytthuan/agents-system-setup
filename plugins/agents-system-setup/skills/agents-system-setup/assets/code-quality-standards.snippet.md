@@ -1,5 +1,8 @@
 <!-- agents-system-setup:code-quality-standards:start -->
 
+<!-- On-demand standards only: use in local skill/policy detail, not full root memory.
+     Root CODE_QUALITY_ROOT_BLOCK contains the conventions-first load trigger. -->
+
 > **Coding agents apply these standards while writing code — not only at review.**
 > The Build Gate verifies a change; this is the craft applied during authoring.
 > Full procedure: the host-loaded `code-quality` skill. Reference:

@@ -1,40 +1,56 @@
 #!/usr/bin/env bash
-# link-project-memory.sh — keep CLAUDE.md in sync with AGENTS.md.
-# - macOS/Linux: symlink CLAUDE.md → AGENTS.md (zero drift).
-# - Windows / non-POSIX: copy with a generated header (re-run on update).
-# Idempotent: safe to run repeatedly.
+# Create a thin Claude import adapter; existing content requires reviewed migration.
 set -euo pipefail
 
-if [ ! -f AGENTS.md ]; then
-  echo "❌ AGENTS.md not found in $(pwd) — generate it first." >&2
+command -v python3 >/dev/null 2>&1 || {
+  echo "Python 3 is required to create the memory adapter safely." >&2
   exit 1
-fi
+}
 
-OS="$(uname -s 2>/dev/null || echo Unknown)"
+python3 - <<'PY'
+import os
+from pathlib import Path
+import re
+import sys
+import tempfile
 
-case "$OS" in
-  Darwin|Linux)
-    if [ -L CLAUDE.md ] && [ "$(readlink CLAUDE.md)" = "AGENTS.md" ]; then
-      echo "✅ CLAUDE.md already symlinked to AGENTS.md."
-      exit 0
-    fi
-    if [ -e CLAUDE.md ]; then
-      cp CLAUDE.md CLAUDE.md.bak
-      echo "ℹ️  Existing CLAUDE.md backed up to CLAUDE.md.bak"
-      rm CLAUDE.md
-    fi
-    ln -s AGENTS.md CLAUDE.md
-    echo "✅ CLAUDE.md → AGENTS.md (symlink)."
-    ;;
-  *)
-    if [ -f CLAUDE.md ] && ! grep -q "generated from AGENTS.md" CLAUDE.md; then
-      cp CLAUDE.md CLAUDE.md.bak
-      echo "ℹ️  Existing CLAUDE.md backed up to CLAUDE.md.bak"
-    fi
-    {
-      echo "<!-- generated from AGENTS.md by agents-system-setup — re-copied on every update. Do not edit directly. -->"
-      cat AGENTS.md
-    } > CLAUDE.md
-    echo "✅ CLAUDE.md copied from AGENTS.md (Windows/non-POSIX path)."
-    ;;
-esac
+source = Path("AGENTS.md")
+target = Path("CLAUDE.md")
+if source.is_symlink() or not source.is_file():
+    sys.exit("AGENTS.md must be an existing regular file; review symlinks before proceeding.")
+source_bytes = source.read_bytes()
+try:
+    source_text = source_bytes.decode("utf-8")
+except UnicodeDecodeError:
+    sys.exit("AGENTS.md is not valid UTF-8.")
+versions = re.findall(
+    r"(?m)^<!-- agents-system-setup:generated-by: "
+    r"(v?\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.+-]+)?) -->\r?$",
+    source_text,
+)
+if len(versions) != 1:
+    sys.exit("AGENTS.md must have exactly one valid generated-by stamp.")
+content = (
+    f"<!-- agents-system-setup:generated-by: {versions[0]} -->\n"
+    "<!-- agents-system-setup:memory-adapter: claude-code -->\n"
+    "\n@AGENTS.md\n"
+).encode("utf-8")
+
+if target.exists() or target.is_symlink():
+    if not target.is_symlink() and target.is_file() and target.read_bytes() == content:
+        print("CLAUDE.md already contains the current import adapter.")
+        sys.exit(0)
+    sys.exit("CLAUDE.md already exists; propose and approve its migration instead of overwriting it.")
+
+with tempfile.NamedTemporaryFile(prefix=".claude-adapter-", dir=".") as draft:
+    draft.write(content)
+    draft.flush()
+    if source.is_symlink() or source.read_bytes() != source_bytes:
+        sys.exit("AGENTS.md changed while preparing the adapter; review the new content first.")
+    try:
+        # Linking publishes a complete file atomically and never replaces a raced destination.
+        os.link(draft.name, target)
+    except FileExistsError:
+        sys.exit("CLAUDE.md appeared during generation; it was not replaced.")
+print("Created CLAUDE.md importing @AGENTS.md; no policy copy or symlink.")
+PY

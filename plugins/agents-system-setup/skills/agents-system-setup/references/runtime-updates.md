@@ -1,6 +1,8 @@
 # Runtime Update Audit
 
-> Last verified: 2026-05-06. This file records upstream runtime drift that affects generation, replication, and validation. It is source material for the supported-runtime docs, not a generated user artifact.
+> Last verified: 2026-09-07. This file records upstream runtime drift that
+> affects generation, replication, and validation. It is source material for
+> the supported-runtime docs, not a generated user artifact.
 
 ## Support policy
 
@@ -19,7 +21,7 @@ Current supported runtimes are **Copilot CLI**, **Claude Code**, **OpenCode**, *
 | Copilot CLI | Concept docs: <https://docs.github.com/en/copilot/concepts/agents/copilot-cli/about-custom-agents>; how-to docs: <https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/create-custom-agents-for-cli>; config reference: <https://docs.github.com/en/copilot/reference/custom-agents-configuration>; VS Code custom agents (shared `.github/agents/*.agent.md` surface): <https://code.visualstudio.com/docs/copilot/customization/custom-agents>; `/fleet`: <https://docs.github.com/en/copilot/concepts/agents/copilot-cli/fleet> | Filename docs drift + richer tool aliases + standardized tool profile | Keep emitting `.github/agents/<name>.agent.md` while recognizing `.github/agents/<name>.md` as an import signal. Use source-backed tool aliases (`vscode`, `execute`, `read`, `edit`, `search`, `agent`, `web`, `todo`) instead of product-specific internal names. Apply [Copilot CLI Standard Tool Profiles](./platforms.md#copilot-cli-standard-tool-profiles) at emit time: `standard` for orchestrator/edit-capable, `read-only` for reviewers, `runner`/`research` for narrower roles, `inherit` only for explicit opt-out. Document `/fleet` as optional parent-orchestrated fan-out for independent subtasks. |
 | Claude Code | Subagents: <https://docs.claude.com/en/docs/claude-code/sub-agents>; agent teams: <https://docs.claude.com/en/docs/claude-code/agent-teams>; plugins: <https://docs.claude.com/en/docs/claude-code/plugins> | Schema split + two parallelism primitives | Distinguish subagent definitions, the tool invocation surface that runs a subagent in one session, and experimental agent teams (separate Claude instances with peer-to-peer messaging). Project/user/session agents may use richer fields such as `mcpServers`, `hooks`, and `permissionMode`; plugin-shipped agents must not rely on unsupported plugin fields. Agents with `background: true` must not rely on `AskUserQuestion`; they return `question_request`. |
 | OpenCode | Agents: <https://opencode.ai/docs/agents/>; MCP: <https://opencode.ai/docs/mcp-servers/> | Additive schema + deprecation | Prefer `permission:` over deprecated `tools:`. Document primary vs subagent modes, `@` mention invocation, child-session navigation, Markdown agents, and top-level `opencode.json` `agent` import/update config. Permission keys: `read`, `edit`, `glob`, `grep`, `list`, `bash`, `task`, `external_directory`, `todowrite`, `webfetch`, `websearch`, `codesearch`, `lsp`, `skill`, `question`, `doom_loop`. Generated primary agents use `permission.task` with wildcard deny/ask plus named roster allows or an explicit skipped-roster marker. |
-| OpenAI Codex (CLI + App) | Subagents: <https://developers.openai.com/codex/subagents>; plugins build: <https://developers.openai.com/codex/plugins/build>; plugins use: <https://developers.openai.com/codex/plugins> | Additive schema | Keep the shared-artifact model: `AGENTS.md`, `.codex/agents/*.toml`, `.codex/config.toml`, and approved `.mcp.json`. Document `agents.max_threads`, `agents.max_depth`, `job_max_runtime_seconds`, `spawn_agents_on_csv`, richer `.codex-plugin/plugin.json` component references (`skills`, `mcpServers`, `apps`, interface assets), `.app.json`, `.mcp.json`, and marketplace metadata guidance. |
+| OpenAI Codex (CLI + App) | Subagents: <https://developers.openai.com/codex/subagents>; skills: <https://learn.chatgpt.com/docs/build-skills>; plugins build: <https://developers.openai.com/codex/plugins/build>; plugins use: <https://developers.openai.com/codex/plugins> | Initialization, skill discovery, effort, and concurrency drift | Keep `AGENTS.md`, `.codex/agents/*.toml`, `.codex/config.toml`, and approved `.mcp.json`. Emit skills to `.agents/skills/`, retaining `.codex/skills/` as legacy migration input. Validate `model_reasoning_effort` as a supported model-advertised nonempty string. Document `agents.max_concurrent_threads_per_session`, accept `max_threads` as a legacy alias, and preserve configured concurrency/recursion limits rather than claiming six threads as an upstream default. |
 | Gemini CLI | Subagents: <https://github.com/google-gemini/gemini-cli/blob/main/docs/core/subagents.md>; loader schema: <https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/agents/agentLoader.ts>; extensions: <https://github.com/google-gemini/gemini-cli/blob/main/docs/extensions/index.md> | Promoted supported runtime + docs/schema naming drift | Emit local project subagents at `.gemini/agents/<name>.md` using YAML frontmatter and Markdown body prompt. Required fields: `name`, `description`; default `kind: local`. Optional fields: `display_name`, `tools`, `mcp_servers`, `model`, `temperature`, `max_turns`, `timeout_mins`. Normalize imported `mcpServers` docs examples to loader-valid `mcp_servers` on emission. Preserve recursion protection: Gemini subagents cannot call other subagents, even with wildcard tools. Treat remote A2A agents as import/advanced only. |
 
 ## Drift-handling rules
@@ -31,6 +33,40 @@ Current supported runtimes are **Copilot CLI**, **Claude Code**, **OpenCode**, *
 5. **Emit loader-valid Gemini frontmatter.** Use `mcp_servers:` for Gemini agent-local MCP config even when upstream prose shows `mcpServers`; importers may accept and normalize the docs spelling but must warn on emission.
 6. **Never bypass MCP approval gates.** Copilot `mcp-servers:`, Claude `.mcp.json`/`mcpServers`, OpenCode `opencode.json` › `mcp`, Codex `.mcp.json`/TOML `[mcp_servers.*]`, Gemini `mcp_servers:`, and extension/plugin MCP manifests all require the Phase 3.5 gate.
 7. **Generated memory is artifact policy and complements runtime-native memory.** The Memory & Learning System is rendered into `AGENTS.md`, runtime agent bodies, and approved memory artifacts. Use native memory only where source docs confirm it, and keep plugin-managed learning explicit, approval-safe, and no-secrets.
+8. **Native initialization is active-harness-only and post-approval.** Follow
+   [native initialization](./native-initialization.md). Preserve customized
+   memory through the existing audit path; never initialize every replication
+   target or claim unsupported command dispatch.
+9. **Static model fields require explicit pins.** Adaptive balanced selection
+   happens per call within user, organization, provider, and budget constraints.
+   Inheritance means "use the active configuration," not "use a cheap model."
+10. **Current delegation skill naming is explicit.** New output uses
+    `task-delegation` with `skill-kind: host-delegation`. Keep `task-handoff`
+    and `host-handoff` only as migration/import/history identifiers; do not
+    remove genuine HandoffIR or result-handoff terminology.
+
+## Native initialization audit — 2026-09-07
+
+| Runtime | Documented native surface and default | Plugin handling |
+|---|---|---|
+| OpenAI Codex CLI TUI | `/init` produces `AGENTS.md` in the current directory. The current public bundled prompt asks for 200-400 words and says not to modify an existing file; that is prompt behavior, not a transactional filesystem guarantee. No documented standalone `codex init` or scaffold RPC was found. | Dispatch only when the active TUI exposes `/init`; otherwise use a user-supplied draft or approved fallback. Reuse output, not the versioned prompt. |
+| GitHub Copilot CLI | Interactive `/init` and terminal `copilot init` default to `.github/copilot-instructions.md`. | Prefer interactive `/init generate AGENTS.md at root instead of .github/copilot-instructions.md`. Treat it as a requested target, not a guaranteed switch API or terminal argument. Record documented default, request, and observed output separately; ask only if unsupported or conflicting. |
+| Claude Code | `/init` creates or improves `CLAUDE.md`; current sessions may advertise `init` through the native Skill tool. | Use only an advertised surface. Skills, hooks, or `CLAUDE.local.md` proposed by enhanced init require separate file-plan/config approvals. |
+| OpenCode | `/init` creates or improves `AGENTS.md`. | Confirm interactive availability; do not invent an `opencode init` shell command. |
+| Gemini CLI | `/init` analyzes the current directory and writes `GEMINI.md`. | Honor configured context filenames and inspect observed writes; upstream does not promise transactional update behavior. |
+
+Run native initialization only after artifact tracking and file-plan approval,
+and only for the active harness. Existing/customized memory goes through the
+instruction-memory audit instead. Unexpected paths, symlink collisions, or
+concurrent edits stop integration.
+
+Canonical synthesis targets 80-120 physical lines and enforces no more than 150
+lines and 12,288 UTF-8 bytes on the complete merged `AGENTS.md` in every
+profile. These are plugin limits, not OpenAI limits. Codex documents a 32 KiB
+default combined instruction-chain budget; Claude recommends fewer than 200
+lines for `CLAUDE.md`. Imports and audience tags are eager accounting concerns,
+not lazy context savings. New memory or skills may need a documented reload or
+new session; file existence alone is not live-load evidence.
 
 ## Human input, self-update, and native-learning audit — 2026-05-06
 

@@ -1,118 +1,83 @@
-# OpenAI Codex custom agent — project-scoped at .codex/agents/{{NAME}}.toml
-# Compatible with Codex CLI and Codex App surfaces that load repo artifacts.
-# Spec: https://developers.openai.com/codex/subagents
-#
+# Project-scoped Codex custom agent: .codex/agents/{{NAME}}.toml
 # agents-system-setup:generated-by: {{PLUGIN_VERSION}}
 # agents-system-setup:tool-catalog-version: {{PLUGIN_VERSION}}
 # agents-system-setup:generated-at: {{GENERATED_AT}}
 # agents-system-setup:platform: codex-cli
 # agents-system-setup:replicated-from: {{REPLICATION_SOURCE}}
-#
-# Required: name, description, developer_instructions
-# Optional: model, model_reasoning_effort, sandbox_mode, nickname_candidates,
-#           [mcp_servers.<id>], [[skills.config]]
-# Global `.codex/config.toml` may also set [agents].job_max_runtime_seconds.
-# Advanced fan-out workflows may use spawn_agents_on_csv; keep that explicit.
 
 name = "{{NAME}}"
 description = "Use when {{TRIGGER_PHRASES}}. {{ONE_LINE_RESPONSIBILITY}}."
+{{OPTIONAL_MODEL_LINE}}
+{{OPTIONAL_REASONING_EFFORT_LINE}}
+{{OPTIONAL_SANDBOX_MODE_LINE}}
 
-# Optional — omit to inherit from the parent session.
-# model = "{{MODEL}}"
-# model_reasoning_effort = "{{REASONING_EFFORT}}"   # low | medium | high
-# sandbox_mode = "{{SANDBOX_MODE}}"                  # read-only | workspace-write
-# The renderer MUST emit sandbox_mode = "read-only" for reviewer/auditor/security/architect/governance roles or empty Owned paths.
-# nickname_candidates = ["Atlas", "Delta", "Echo"]  # presentation hint in CLI/App activity
-
-# developer_instructions MUST include: Directory Boundaries, Security & Audit
-# Boundaries, Architecture & Design Expectations, Quality Gates, and required
-# audit evidence. Keep sensitive paths read-only unless the plan explicitly
-# grants write ownership. Keep instructions concise; load referenced project
-# details only when the task needs them. Do not require CLI-only commands such
-# as /agent or codex exec for Codex App behavior.
 developer_instructions = """
 <!-- subagent-digest:managed:start v=<auto-computed-hash> -->
 Project standard digest (managed by agents-system-setup):
 - Boundary: least privilege; no secrets in code; MCP approval gate.
-- Handoff: consult `task-handoff` skill when host says loaded=true; never re-delegate.
-- See `AGENTS.md` rows for project-wide context.
+- Delegation: never re-delegate; host-loaded skills are not child context.
+- Context: use supplied gates or load matching AGENTS.md rows before writes.
 <!-- subagent-digest:managed:end -->
 
 {{DEVELOPER_INSTRUCTIONS}}
 
-# Codex TOML summary + pointer rule:
-# keep this prompt compact and point to AGENTS.md rows by name.
-
-Context Load Order:
-1. AGENTS.md Read First.
-2. My Directory Boundaries and relevant Security & Audit / Quality Gates rows.
-3. Task-specific files and referenced detail docs only when needed.
-
-Plan Handoff:
-- Source plan: {{HANDOFF_SOURCE}}
-- Triage: {{HANDOFF_TRIAGE_STATUS}}
-- Content quality: {{HANDOFF_CONTENT_QUALITY_STATUS}}
-- Runtime format target: {{RUNTIME_FORMAT_TARGET}}
-- Dependencies / wave: {{HANDOFF_DEPENDENCIES}}
-- Context freshness: {{HANDOFF_CONTEXT_FRESHNESS}}
-- Required approvals: {{HANDOFF_APPROVALS}}
-
-Assignment Intake / Preflight:
-- Classify the assignment as short or full.
-- Confirm the twelve Required Minimum fields from AGENTS.md > Plan Handoff Contract.
-- Confirm Context freshness is explicit: recent, AGENTS.md revision, or reload.
-- Check Context Packet, Allowed Capabilities, Skills Referenced, expected output, and Stop / Escalation Conditions.
-- For security-team tasks, confirm authorization scope, validation status, counterevidence, severity rationale, remediation verification need, and proof-gap reporting.
-- Use AGENTS.md > Plan Handoff Contract and handoff.md > Acceptance Checklist for the full checklist.
-- Safe, reversible short-form gaps may continue with Task assignment quality: warn.
-- Blocking gaps, gated writes, unclear ownership, or runtime-schema ambiguity return one consolidated question_request and stop before writes.
-
-Task Assignment Acceptance Checklist: use AGENTS.md / handoff.md / the task-handoff skill at .codex/skills/task-handoff/SKILL.md (loaded via $task-handoff or /skills). Do not duplicate the full checklist here. Inline minimum above is fail-closed; the skill is the canonical version. Never use the skill to delegate to another subagent; if scope exceeds Owned paths, return to the host CLI session.
-
-Security & Audit Boundaries:
-- Use AGENTS.md rows by name instead of duplicating long policy prose.
+Role and boundaries:
+- Project policy: {{PROJECT_POLICY_PATH}} (load only relevant sections).
+- Owned paths: {{OWNED_PATHS}}
+- Read-only paths: {{READONLY_PATHS}}
 - Sensitive paths: {{SENSITIVE_PATHS}}
 - Forbidden actions: {{FORBIDDEN_ACTIONS}}
 - Approval required before: {{APPROVAL_REQUIRED_FOR}}
 - Evidence to return: {{AUDIT_EVIDENCE}}
-Architecture & Design Expectations:
-- Relevant ADRs: {{RELEVANT_ADRS}}
-- Patterns to preserve: {{PATTERNS_TO_PRESERVE}}
-- Anti-patterns to avoid: {{ANTI_PATTERNS_TO_AVOID}}
-- Code Quality & Maintainability: for source-code edits or reviews, conform to existing project conventions first, then apply the AGENTS.md > Code Quality & Maintainability standards (and the .codex/skills/code-quality skill); report Code quality:.
+- Relevant ADRs/patterns: {{RELEVANT_ADRS}}; {{PATTERNS_TO_PRESERVE}}
+- Anti-patterns: {{ANTI_PATTERNS_TO_AVOID}}
+- Never re-delegate. Return cross-boundary work to the host CLI session.
 
-Codex Rules:
-- Do not require CLI-only commands such as /agent or codex exec for Codex App behavior.
-- Do not add unsupported TOML question fields or `memory` fields.
-- Plan-mode parents may ask with request_user_input; child/default/exec agents return question_request.
-- Do not invent missing skills, MCP servers, tools, approvals, files, or runtime fields.
+Task Assignment intake:
+- Require Task, Source plan, Owned paths, Read-only paths, Relevant gates,
+  Constraints, Dependencies / wave, Required approvals, Runtime format target,
+  Expected output, Context freshness, and Lossiness.
+- Context freshness is snapshot age only, not inherited parent context.
+- Verify writes stay in Owned paths and every gated action has approval.
+- Full-form is required for MCP, secrets, CI/release, dependencies, generated
+  scripts, security writes, replication, release, and Build Gate work.
+- Security-team intake requires authorization, validation, counterevidence,
+  severity rationale, remediation verification, and proof gaps.
+- Host `task-delegation loaded=true` proves only host loading. Use
+  `.agents/skills/task-delegation/SKILL.md` only when child-loaded/preloaded;
+  otherwise require the needed excerpt. Missing or denied context blocks the
+  affected action.
+- Code edits/reviews conform to project conventions and child-visible standards;
+  host `code-quality loaded=true` alone is insufficient.
+- Do not invent skills, tools, approvals, files, or runtime fields.
+- On a blocking gap, return one consolidated question_request before writing.
+
+Codex rules: static model/effort only for explicit runtime-supported pins.
+- Do not rewrite this file mid-task to change a call; inherit or escalate.
+- Plan-mode parents may use request_user_input; children return question_request.
+- Do not add unsupported question, memory, or delegation fields.
 
 Learning Check:
-- Report: Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>.
-- Updating or overwriting prior learning requires orchestrator approval and evidence.
-- Never store secrets or raw credentials; summarize and point to evidence.
-- Do not write memory unless Owned paths explicitly include the memory path.
+- Emit none, proposed_new:<id>, proposed_update:<id>, or deferred:<reason>.
+- No secrets or raw logs; own memory paths; overwrite requires orchestrator approval.
 
-Output Contract:
-- Outcome first.
-- Files changed: list with relative paths.
-- Evidence: only for gates touched, per Reporting Protocol.
-- Task assignment quality: ok | warn | fail; form=<short|full>; missing=<fields|none>; questions=<count>.
-- Content quality: ok | warn | fail | n/a; signals=<list|none>.
-- Code quality: ok | warn | fail | n/a; signals=<list|none>.
-- Security analysis: n/a | scope=<diff|repository|report|remediation|program>; authorization=<owned-code|approved-target|needs-approval>; validation=<confirmed|likely|needs-info|duplicate|not-reproducible|out-of-scope|mitigated|deferred>; severity=<P0|P1|P2|P3|n/a>; proof_gaps=<none|summary>.
-- Risks/escalations: only when present; always emit `In bounds: yes | no; escaped=<paths|none>`.
-- Question requests: none | <id>.
-- Handoff status: accepted | completed | blocked | returned-to-orchestrator; Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>.
-- Build gate: omit unless I own a build-gate role; when I do, emit `Build gate: bucket=<XS|S|M|L|XL>; gate=<...>; status=<pass|fail|waived>; evidence=<summary>` per .codex/skills/code-change-build-gate/SKILL.md.
+Reporting minimum:
+- Outcome; Files changed; Evidence; Gates touched.
+- Task assignment quality: ok|warn|fail; form=<short|full>;
+  missing=<fields|none>; questions=<count>.
+- Content quality: ok|warn|fail|n/a; signals=<list|none>.
+- Code quality: ok|warn|fail|n/a; signals=<list|none>.
+- Security analysis: when assigned, report scope, authorization, validation,
+  counterevidence, severity, remediation verification, and proof_gaps.
+- Build gate: when assigned, bucket=<XS|S|M|L|XL>; gate=<...>; status=<pass|fail|waived>; evidence=<summary>.
+- Risks/escalations; In bounds: yes|no; escaped=<paths|none>.
+- Question requests; Handoff status; Learning Check.
 """
 
-# Optional per-agent MCP server allowlist (also reads repo-root .mcp.json).
 # {{OPTIONAL_MCP_APPROVAL_COMMENT}}
 # [mcp_servers.{{MCP_ID}}]
 # url = "{{MCP_URL}}"
 
-# Optional per-agent Skill toggles.
 # [[skills.config]]
 # path = "{{SKILL_PATH}}"
 # enabled = true

@@ -154,7 +154,7 @@ craft from verification so "skip the gate" never means "skip clean code":
 | Role | Read/Write | Responsibility (no overlap) |
 |---|---|---|
 | `implementer` (and edit-capable roles) | edit | Apply Rule 0 and the authoring standards **while writing**; emit `Code quality:` evidence. |
-| `code-quality-reviewer` | read-only | The maintainability / convention / code-smell verdict only. Separate role for `standard`/`strict`; merges into `@reviewer` otherwise. |
+| `code-quality-reviewer` | read-only | The maintainability / convention / code-smell verdict only. Separate worker only when useful; otherwise merge into the assigned independent reviewer. |
 | `@reviewer` | read-only | Functional correctness, regressions, integration. Owns the code-quality verdict when the reviewer role is merged. |
 | `architecture-reviewer` | read-only | Boundaries, patterns, ADR alignment — not line-level craft. |
 | `change-bug-hunter` | read-only | Diff-scoped latent bugs / lightweight security sniff — not style/maintainability. |
@@ -166,9 +166,11 @@ craft from verification so "skip the gate" never means "skip clean code":
 1. The host loads the `code-quality` skill before delegating any `code-edit`,
    `bug-fix`, `refactor`, or code review assignment and passes
    `Skills Referenced: code-quality loaded=true` in the delegation packet.
+   This records a host load only. Supply required standards as excerpts or via
+   supported child loading; missing required child context blocks the action.
 2. Edit-capable and reviewer subagent templates carry a one-line pointer to
-   `AGENTS.md` › Code Quality & Maintainability plus the `Code quality:`
-   reporting line — not the full standards prose (context-optimization safe).
+   root conventions/ownership and the indexed local skill plus the `Code quality:`
+   reporting line. Pass task-relevant standards rather than duplicate the manual.
 3. Subagents emit the `Code quality:` marker; `change-validator` aggregates it
    into the Build Gate review evidence.
 
@@ -176,17 +178,18 @@ craft from verification so "skip the gate" never means "skip clean code":
 
 The plugin renders code quality in two places:
 
-1. **`AGENTS.md` › `## Code Quality & Maintainability`** — the compact inline
-   standards (Rule 0 + the authoring standards + the output marker) from
-   [code-quality-standards snippet](../assets/code-quality-standards.snippet.md).
-   `**Audience:** all`. This is the always-on surface every agent reads.
+1. **`AGENTS.md` › `## Code Quality & Maintainability`** — a compact
+   conventions-first trigger to load the indexed local skill before writing or
+   reviewing source, preserving required review ownership. Do not inline the
+   full [standards snippet](../assets/code-quality-standards.snippet.md).
 2. **`code-quality` skill** (per runtime, including Codex) — the expanded
    procedure, examples, and the full smell→fix table, loaded on demand before
    implementation.
 
-For non-software-dev projects with no source code, the section renders
-`Code quality: n/a — non-software project` and no `code-quality-reviewer` is
-emitted.
+Without source code, omit the empty root section/skill and record
+`Code quality: n/a — non-software project` in the report. No separate worker is
+required merely because strictness is standard or strict; required independent
+review remains independent.
 
 ## Anti-patterns
 
@@ -206,15 +209,16 @@ emitted.
 
 After generation, the plugin verifier confirms:
 
-1. `AGENTS.md` contains `## Code Quality & Maintainability` with the inline
-   standards (Rule 0 + authoring standards) or an `n/a — non-software project`
-   rationale.
+1. Code-bearing projects retain the compact root trigger and a resolvable local
+   skill with the full standards; inapplicability is recorded in the report.
 2. For software-dev with strictness != `skipped`: the `code-quality` skill exists
    at each selected runtime's skills path (including Codex).
-3. The roster includes `code-quality-reviewer` (or `code-quality merged into
-   reviewer` for `light`/`advisory`/tiny).
+3. An actual owner holds the maintainability verdict, separately or merged into
+   the existing reviewer; independent review is never assigned to the writer.
 4. Edit-capable and reviewer subagent templates carry the `Code quality:`
    reporting marker, and the host packet evidence uses
    `Skills Referenced: code-quality loaded=true`.
+   Child context is supplied or independently loaded; that host marker is not
+   proof of inheritance.
 5. The Build Gate review gate references this standard so the maintainability
    verdict is part of code review, not a separate silent step.

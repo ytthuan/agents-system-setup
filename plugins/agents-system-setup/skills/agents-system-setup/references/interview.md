@@ -94,7 +94,10 @@ path for non-gated questions:
 - Record as `artifact_tracking`: `project-tracked`, `project-local`, or `personal-global`.
 
 ## 9. Subagent Topology
-- Show the suggestion derived from project type via [topology.md](./topology.md).
+- Show justified responsibilities/owners via [topology.md](./topology.md).
+  Zero specialists is valid; do not create a minimum roster or require fan-out.
+  Explain a separate worker only when specialization, context isolation, or
+  required independence warrants it.
 - Q: "Suggested subagents: <list>. Accept, add, or remove?"
 - Freeform with the suggested list pre-printed.
 
@@ -127,10 +130,10 @@ content projects.
 - Choices: `["Standard (Recommended)", "Strict (promote recommended gates to required; XL needs two reviewers + release-validator)", "Light (merge change-validator into reviewer; XS=build+review only)", "Skip"]`
 - Record as `build_gate_strictness`: `standard | strict | light | skipped`.
 
-If `skipped`, the plugin renders `Build Gate (SDLC): n/a — user skipped` in
-`AGENTS.md` and does not emit `build-runner`, `change-bug-hunter`,
-`change-validator`, the `code-change-build-gate` skill, or the matrix
-snippet. If `standard|strict|light`, the plugin emits the Build Gate per
+If `skipped`, record `Build Gate (SDLC): n/a — user skipped` in the report;
+emit no gate skill or empty root section. If `standard|strict|light`, keep a
+fail-closed root trigger, put the matrix in the local skill, and assign required
+gate responsibilities without forcing extra workers. Emit the Build Gate per
 [sdlc-build-gate.md](./sdlc-build-gate.md). Default is `standard` when the
 user accepts the recommendation.
 
@@ -153,15 +156,17 @@ are omitted everywhere unless the user opts in (see below).
 ### Per-Agent Model Override policy (optional opt-in only)
 
 **Default: skip this question entirely.** Record
-`model_overrides_policy = skipped` and emit no `model:` lines in any generated
-agent. Platform defaults are intentional: they avoid rate-limit fragility,
-preserve portability, and let users upgrade models without regenerating.
+`model_selection_policy = adaptive-balanced`, `model_overrides_policy = skipped`,
+and omit static model/effort fields. At delegation, use advertised runtime
+controls to balance quality, difficulty, risk, total cost/retries and latency,
+within explicit pins, approved providers and budgets. If per-call controls are
+absent, inherit or propose an approved change; inheritance is not necessarily
+cheap. Never rewrite worker configuration during execution.
 
 Ask the opt-in question only when **at least one** signal indicates the user is
 aware of and wants model overrides:
 
-- The user spontaneously named a model (e.g. "use Sonnet 4.5", "gpt-5-mini",
-  "haiku for review agents") in the brief, prior turns, or any earlier
+- The user spontaneously named a model or model tier in the brief, prior turns, or any earlier
   interview answer.
 - The user explicitly asked for model overrides, BYOK, multi-model routing,
   cost/perf tuning, or per-role model selection.
@@ -170,15 +175,14 @@ aware of and wants model overrides:
 
 When any signal is present, ask the meta gate first:
 
-- Q: "You mentioned models — want to configure per-agent model overrides? Most
-  setups should skip and use platform defaults."
-- Choices: `["Skip — use platform defaults (Recommended)", "Yes — show me override options"]`
-- On `Skip`, record `model_overrides_policy = skipped` and stop.
-- On `Yes`, then ask the scope question below.
+- Q: "Keep adaptive model selection within your constraints, or pin agent models?"
+- Choices: `["Keep adaptive balanced (Recommended)", "Configure explicit pins"]`
+- On `Keep adaptive balanced`, record `model_overrides_policy = skipped` and stop.
+- On `Configure explicit pins`, ask the scope question below.
 
 Scope question (only after the user opts in):
 
-- Q: "How should agent model overrides work? Defaults avoid rate-limit and portability issues."
+- Q: "Which scope should the explicit model pins apply to?"
 - Choices: `["One model for all agents", "By role/profile", "Exceptions only"]`
 - Load [models](./models.md) and prompt only for the chosen scope. Do not loop
   over every agent unless the user explicitly picks per-agent exceptions. Warn
@@ -224,6 +228,31 @@ add-on — never as a required step.
 - Q: "How much detail should generated agent files include?"
 - Choices: `["Balanced (Recommended)", "Compact", "Full"]`
 - Record as `output_profile`. If the user is unsure, choose `Balanced`.
+- Explain that all profiles share the whole-root **150-line AND 12,288-byte**
+  cap, targeting 80-120 lines; Full expands on-demand detail, not root memory.
+  This is plugin policy, not an OpenAI line/token requirement.
+
+### Native initialization destination
+
+Use [native initialization](./native-initialization.md) in the approved file
+plan. Do not run an initializer during the interview or rerun it over existing
+custom memory to force replacement.
+
+For Copilot, default to the native interactive request:
+
+```text
+/init generate AGENTS.md at root instead of .github/copilot-instructions.md
+```
+
+Do not ask everyone to choose a destination. Ask only if that request is
+unsupported, produces another path, or conflicts with existing content:
+
+- Q: "The root AGENTS.md initialization request cannot be applied as planned. Which draft path should I use?"
+- Choices: `["Review the existing/root draft (Recommended)", "Use Copilot's .github/copilot-instructions.md draft", "Use the disclosed compact fallback"]`
+
+Keep one canonical `AGENTS.md` after approved synthesis. Choosing the default
+Copilot draft does not authorize silently retaining a second full policy copy.
+Record requested versus observed output; do not invent a portable output flag.
 
 ### 11i. Memory & Learning profile
 

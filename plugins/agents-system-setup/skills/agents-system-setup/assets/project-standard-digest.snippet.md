@@ -15,8 +15,8 @@ instructions. The body between the markers is the hash input.
 **Project standard digest** (read-by: subagent self)
 - Purpose: <auto-filled from AGENTS.md Project Snapshot>
 - Security boundary: <auto-filled — least privilege, no secrets in code, MCP approval gate>
-- Validator gate: bash scripts/validate.sh; markdownlint via npx --yes markdownlint-cli2
-- Handoff: consult `task-handoff` skill when host packet says `task-handoff loaded=true`; never re-delegate
+- Validator gate: <exact required checks and owners from project Quality Gates>
+- Delegation: never re-delegate; host `task-delegation loaded=true` is not child context
 - Return-to-orchestrator if scope exceeds owned paths
 <!-- subagent-digest:managed:end -->
 ```
@@ -38,26 +38,29 @@ The non-Codex digest contains exactly these five required bullet lines:
 ```text
 - Purpose: <auto-filled from AGENTS.md Project Snapshot>
 - Security boundary: <auto-filled — least privilege, no secrets in code, MCP approval gate>
-- Validator gate: bash scripts/validate.sh; markdownlint via npx --yes markdownlint-cli2
-- Handoff: consult `task-handoff` skill when host packet says `task-handoff loaded=true`; never re-delegate
+- Validator gate: <exact required checks and owners from project Quality Gates>
+- Delegation: never re-delegate; host `task-delegation loaded=true` is not child context
 - Return-to-orchestrator if scope exceeds owned paths
 ```
 
 Keep the title line above the bullets unchanged unless the validator and upgrade
 patcher are updated together. Do not add environment-specific secrets, personal
 paths, or long policy prose.
+Resolve checks from verified project commands and evidence owners. Never copy
+this plugin repository's validator/linter commands into unrelated projects, or
+invent a command when the gate requires non-command evidence.
 
 ## Codex variant
 
-Codex `developer_instructions` has a 65-line soft target and a 75-line hard
+Codex `developer_instructions` has a 65-line target and an 80-line hard
 target. For Codex, emit this smaller body inside the same managed markers within
 the TOML `developer_instructions` string:
 
 ```text
 Project standard digest (managed by agents-system-setup):
 - Boundary: least privilege; no secrets in code; MCP approval gate.
-- Handoff: consult `task-handoff` skill when host says loaded=true; never re-delegate.
-- See `AGENTS.md` rows for project-wide context.
+- Delegation: never re-delegate; host-loaded skills are not child context.
+- Context: use supplied gates or load matching AGENTS.md rows before writes.
 ```
 
 The Codex renderer should keep the managed block near the top of

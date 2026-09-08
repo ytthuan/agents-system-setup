@@ -32,7 +32,7 @@ user selected in Phase 0. Use this table as the canonical mapping:
 | Artifact | Copilot CLI | Claude Code | OpenCode | OpenAI Codex | Gemini CLI | Notes |
 |---|---|---|---|---|---|---|
 | Agents | `.github/agents/<name>.agent.md` | `.claude/agents/<name>.md` | `.opencode/agents/<name>.md` | `.codex/agents/<name>.toml` | `.gemini/agents/<name>.md` | File-based |
-| Skills | `.github/skills/<name>/SKILL.md` | `.claude/skills/<name>/SKILL.md` | `.opencode/skills/<name>/SKILL.md` (loaded via `skill` tool, gated by `permission.skill`) | `.codex/skills/<name>/SKILL.md` (project) or `~/.codex/skills/<name>/SKILL.md` (user); activates via Codex skill loader | `.gemini/skills/<name>/SKILL.md` | File-based folder |
+| Skills | `.github/skills/<name>/SKILL.md` | `.claude/skills/<name>/SKILL.md` | `.opencode/skills/<name>/SKILL.md` (loaded via `skill` tool, gated by `permission.skill`) | `.agents/skills/<name>/SKILL.md` (project) or `~/.agents/skills/<name>/SKILL.md` (user); legacy `.codex/skills` requires reviewed migration | `.gemini/skills/<name>/SKILL.md` | File-based folder |
 | Hooks | `.github/hooks/*.json` | `.claude/settings.json` › `"hooks"` (config-embedded) | `.opencode/hooks/` | not supported | `.gemini/settings.json` › `"hooks"` (config-embedded) | Mixed |
 | Commands | plugin `commands/<cmd>.md` under plugin root | `.claude/commands/<cmd>.md` | `.opencode/commands/<name>.md` | not a standard surface | extension-bundled `commands/*.md` only | File-based |
 | Prompts | `.github/prompts/<name>.prompt.md` (VS Code Chat surface) | not standard | not standard | not standard | not standard | File-based |
@@ -191,7 +191,7 @@ Different artifact types behave differently across runtimes:
 - **Skills are portable.** When the user has multiple runtimes selected,
   default to `Copy to all selected supported runtimes` (one target per
   runtime that supports skills natively, including Codex which loads
-  `.codex/skills/<name>/SKILL.md`). One ledger entry per target with the
+  `.agents/skills/<name>/SKILL.md`). One ledger entry per target with the
   same `source` and shared `migration_id`.
 - **Agents, hooks, commands, plugins, prompts are not portable.** Their
   schema differs per runtime. Ask the user via `ask_user` which target
@@ -415,6 +415,92 @@ do NOT include them in the proposed snippet.
   first; preserve allows, asks, and named entries unless they are
   unsafe (e.g., wildcard `allow`).
 
+## Current Native Memory & Delegation Contract
+
+Target `native-compact-v1` during every improve/upgrade, even when the plugin
+version stamp already matches. The historical playbooks below explain old
+artifacts; they do not require reintroducing obsolete layouts before applying
+the current contract. Preserve historical ledger names and HandoffIR terminology.
+
+| Delta | Detect | Approved destination / behavior |
+|---|---|---|
+| Compact root | Oversized complete file, repeated lifecycle/packet prose, or missing current contract marker | Synthesize <=150 physical lines AND <=12,288 UTF-8 bytes in every profile; retain critical controls/owners/gates and explicit skill triggers. |
+| On-demand policy | Full matrices, ADR bodies or workflow libraries in always-loaded memory | Approved local project policy and skills; update every affected anchor/path. Full is not an exception to the root cap. |
+| Native adapters | Copied policy, stale imports, configured filename mismatch | Thin native imports/pointers after reviewed replacement; preserve custom overrides and diagnose actual loading. Copilot needs no extra file when root `AGENTS.md` suffices. |
+| Delegation identity | `task-handoff`, `host-handoff`, or `TASK_HANDOFF_*` in active plugin-owned artifacts | `task-delegation`, `host-delegation`, and `TASK_DELEGATION_*`, coordinated with worker pointers, manifest, discovery and exact permissions. |
+| Codex skill path | Legacy project/user `.codex/skills` | Current `.agents/skills` / `~/.agents/skills`, subject to destination/overlapping-discovery review. Do not copy blindly or remove a working source first. |
+| Context inheritance claim | Host `loaded=true` or `recent` treated as child content | Preserve worker inline guards; supply excerpts or supported child loads and block missing required context. |
+| Forced topology/model | Minimum worker counts, mandatory fan-out, or inheritance described as cheap | Task-based responsibilities and adaptive-balanced selection; preserve explicit pins, budgets, providers, and required independent review. |
+
+### Coordinated repair sequence
+
+1. Classify ownership from markers, manifest and reviewed content. A familiar
+   skill name is not proof of plugin ownership. Preserve domain skill bodies;
+   unmarked/customized collisions require manual review.
+2. Record live source/destination preimages and proposed paths. Show before/after
+   root sizes, retained rules, local relocations, exact permission changes, and
+   unresolved conflicts. Existing memory is audit input; never rerun native
+   initialization over it just to force a fresh draft.
+3. Obtain content and separate runtime-permission approvals. A user-created
+   `task-delegation` destination, divergent legacy body, denied permission,
+   symlink, or concurrent edit blocks the affected migration for review.
+4. Prepare the replacement skills, project policy and worker consumers. Retain
+   the existing twelve-field assignment contract and inline worker safety.
+   Do not transiently re-add old root matrices, audience markers, or a
+   Self-Contained Notice simply because an older version required them.
+5. Propose exact OpenCode `permission.skill` changes for `task-delegation`
+   separately from `permission.task` and MCP. Preserve custom denies/asks;
+   do not silently allow both names or use wildcard allow. A denied required
+   load remains blocked, not successful via pointer-only fallback.
+6. Apply approved changes only against unchanged preimages, with non-overwriting
+   backups and `prepared` / `applied` ledger records. Make the new skill and its
+   consumers ready before retiring the approved legacy artifact. Never delete
+   source first or restore stale backups over newer user changes.
+7. Run the read-only doctor `--memory-only` over the complete synthesized root
+   and required local references. Confirm actual available native discovery
+   separately; source load evidence does not prove a new target loaded anything.
+8. After successful integration, update artifact paths/checksums/kinds and the
+   current contract metadata in the manifest, then run normal reconciliation.
+   Append `verified` only with evidence. Declined/incomplete repairs remain
+   nonconforming; never stamp them clean.
+
+### Current manifest metadata
+
+Add these fields to the existing schema rather than replacing its artifact
+records or historical migration events. This example reuses existing memory
+without invoking an initializer:
+
+```json
+{
+  "memory_contract": "native-compact-v1",
+  "model_selection_policy": "adaptive-balanced",
+  "native_initialization": {
+    "runtime": "<active harness>",
+    "source": "existing",
+    "requested_path": null,
+    "observed_paths": [],
+    "reason": "Existing instructions reused; no initializer invoked"
+  },
+  "memory_budget": {
+    "max_lines": 150,
+    "max_utf8_bytes": 12288,
+    "evidence": "<read-only doctor result reference>"
+  }
+}
+```
+
+These fields describe intent/provenance; the doctor measures live files and
+does not trust cached size claims. Set `source` to `native`, `existing`,
+`user-supplied`, or `fallback`. For an actual native invocation, record its
+approved requested path, not the canonical destination: for example `CLAUDE.md`
+or `GEMINI.md`, or Copilot's root request. Without an invocation use `null`;
+`observed_paths` records only actual native outputs, or `[]` if none. Keep
+Copilot's requested and observed paths distinct even when they differ.
+Use `kind: skill` for the renamed skill and
+its body marker `host-delegation`; retain the existing engine `kind: other`.
+See [native initialization](./native-initialization.md) and
+[instruction-memory audit](./instruction-memory-audit.md).
+
 ## Version Stamp Detection & Migration Playbook
 
 Every artifact emitted by this plugin carries a `generated-by` stamp so
@@ -476,17 +562,22 @@ question.
    as authoritative.
 2. Otherwise, scan every generated artifact for the inline stamp and take the
    highest version found.
-3. If neither manifest nor stamp is present, treat as `pre-stamp` and assume
-   `v1.3.0` (the last version before stamping was introduced).
+3. Without a reliable manifest or stamp, record unknown provenance. Inspect
+   structural and ownership evidence; require manual review before selecting
+   a version-specific playbook. Never assume a plugin version or claim custom
+   artifacts as generated merely because their filenames match.
 4. Compare detected version against the current plugin version from
    `plugin.json`. If the detected version is older, run the migration playbook
-   below.
+   below. Also check the current contract and structural drift regardless of
+   version equality; a matching stamp does not prove current content.
 
 ### Per-version migration playbook
 
-Each row describes the **minimum content delta** for a major/minor bump. The
-playbook is additive — running `improve` from `v1.2.0` to `v1.4.0` applies the
-`v1.2.0 → v1.3.0` row, then the `v1.3.0 → v1.4.0` row, in order.
+Each row records a historical version delta. Classify these in order, then
+synthesize the approved current target using the
+[current contract](#current-native-memory--delegation-contract). Preserve the
+concerns, not superseded root layouts or legacy skill names. Historical rollback
+instructions require review of current preimages; never restore over newer work.
 
 | From → To | Required deltas |
 |---|---|
@@ -712,18 +803,18 @@ before any write.
 | Signal | What it catches | Detection rule |
 |---|---|---|
 | `stale-stamp` | Old version stamp | Per-file stamp or central manifest `plugin_version` < current `plugin.json` `version`. |
-| `missing-section` | Required `AGENTS.md` section absent | Required sections by current version: `Plan Handoff Contract`, `Context Loading Policy`, `Instruction Memory Audit`, `Memory & Learning System`, `Task-Type Routing Map`, `Security & Audit Matrix`, `Threat Model`, `Architecture & Design Pattern Decisions`, `ADR Index`, `Quality Gates`, plus `Build Gate (SDLC)` for software-dev or its `n/a` rationale. Match section headings literally (the exact `&`, not `/`). |
-| `missing-skill` | Required skill not emitted | `task-handoff` skill missing at any selected runtime's skills path (Codex included); `code-change-build-gate` skill missing for software-dev projects with strictness != `skipped`. |
-| `missing-role` | Required roster role missing | For software-dev with strictness != `skipped`: `build-runner`, `change-bug-hunter`, `change-validator` (or `change-validator merged into @reviewer` for `Light`). |
+| `missing-section` | Required concern/trigger absent | Check current root ownership, controls, architecture, quality gates, Skills and Context Loading Policy; full contract/ADR/capability/audit detail belongs in the referenced skill/project policy, not obsolete root headings. |
+| `missing-skill` | Required skill not discoverable | `task-delegation` missing for a selected runtime; enabled `code-change-build-gate` / `code-quality` missing, mislocated or denied. Inspect current Codex `.agents/skills` and overlapping discovery. |
+| `missing-role` | Required responsibility or independent gate unowned | Assign actual host/existing/specialist owners; do not add workers just to recreate an old minimum roster. |
 | `deprecated-artifact` | File should no longer exist | `orchestrator.agent.md`, `.claude/agents/orchestrator.md`, `.opencode/agents/orchestrator.md`, `.gemini/agents/orchestrator.md`, `.codex/agents/orchestrator.toml`, anything under `.agents-system-setup/{agents,skills,hooks,commands,prompts,plugins}/`. |
-| `stale-prose` | Generated prose contradicts current plugin truth | "Codex → no native skills" in AGENTS.md skills table, `permission.task` block in an OpenCode subagent file (must be in `opencode.json`), subagent templates missing the `task-handoff` pointer, subagent Reporting Template missing the `Build gate:` line. |
+| `stale-prose` | Generated prose contradicts current plugin truth | Active legacy delegation identity/path, "Codex → no native skills", forced minimum workers, false host-to-child skill inheritance, or missing fail-closed/reporting guards. |
 | `unsupported-runtime-field` | Field that the runtime never loaded | Codex agent TOML `memory` or `request_user_input`, Gemini `mcpServers` (must be `mcp_servers`), Copilot custom-agent `tools:` containing `ask_user`, OpenCode `mcp-servers:` in agent frontmatter. |
-| `adapter-drift` | `CLAUDE.md` / `GEMINI.md` no longer mirrors `AGENTS.md` | Hash mismatch when adapter was originally a copy; resolve via [instruction-memory-audit](./instruction-memory-audit.md). |
+| `adapter-drift` | Native adapter is stale or loads unintended content | Inspect actual import/override graph and legacy copies; do not require an adapter hash to equal canonical content. Resolve via [instruction-memory-audit](./instruction-memory-audit.md). |
 | `missing-overflow-link` | Long section moved to references with no pointer | `AGENTS.md` references a moved section by name but the Overflow Details link is missing. |
 
-- `missing-audience-tag` — AGENTS.md `## Section` heading lacks a visible `**Audience:** <value>` line when conditions warrant (subagent_count >= 2, profile balanced/full). Classify: `patch` (insert marker via section-header rewrite).
+- `obsolete-audience-layout` — repeated markers or Self-Contained Notice bloat the root. Classify as a reviewed compact-repair candidate; missing labels are not current errors.
 - `non-self-contained-subagent` — subagent file lacks the `<!-- subagent-digest:managed:start v=<hash> -->` block or has hash mismatch. Classify: `patch` (inject block or update body+hash).
-- `missing-native-runtime-agents-subsection` — AGENTS.md has no `### Native Runtime Agents` subsection AND subagent_count >= 2 (regardless of profile: Balanced/Full → full variant; Compact → compact variant). Classify: `add`.
+- `missing-native-runtime-agents-subsection` — an approved useful native-routing policy lacks its short root trigger/local skill details. Do not add it solely because a roster has two workers; all profiles use the compact variant.
 - `missing-host-builtins-anchor` — AGENTS.md has the heading but no `<!-- agents-system-setup:host-builtins-routing -->` anchor. Classify: `patch` (insert anchor before the heading).
 - `unmanaged-host-routing-prose` — AGENTS.md outside any managed block contains the conflict-scan terms from the v1.6.0 → v1.7.0 procedure. Classify: `manual-review` (never auto-modify).
 - `missing-tool-catalog-stamp` — generated file has no `<!-- agents-system-setup:tool-catalog-version: ... -->` marker AND has a `generated-by` stamp ≥ 1.8.0. Classify: `audit-needed` (informational; user may add stamp at next regeneration).
@@ -744,19 +835,21 @@ before any write.
    plan, citing the version playbook row(s) that justify each delta. Wait
    for `ask_user` approval. Approval is per-group (all `delete`s together,
    all `add`s together, etc.) — the user may decline individual groups.
-4. **Backup.** `cp <file> <file>.bak` for every artifact about to be touched.
-   For directories that will be removed, copy contents into
-   `.agents-system-setup/migration-backup/<timestamp>/`.
-5. **Apply.** Execute approved deltas in order: `delete` → `add` → `patch`
-   → `replace`. Preserve user-authored content outside managed blocks at
-   all times.
+4. **Backup.** Capture approved live preimages and create non-overwriting backups
+   under `.agents-system-setup/migration-backup/<timestamp>-<migration_id>/`.
+   An existing `<file>.bak` is not permission to replace an older backup.
+5. **Apply.** Follow the current coordinated repair sequence: prepare and verify
+   replacements/consumers before retiring legacy sources. Recheck live preimages
+   before writes; stop for conflicts. Preserve user-authored content at all times.
 6. **Ledger.** Append one JSONL entry to `.agents-system-setup/migration.jsonl`
    per touched artifact (old version, new version, signal, classification,
    backup path, decision).
-7. **Manifest.** Update `.agents-system-setup/generated.json` atomically
-   after all artifact writes succeed (write-temp + rename).
-8. **Verify.** Re-run the structural diff. Remaining signals must be either
-   `informational` or explicitly deferred with a recorded rationale.
+7. **Verify.** Re-run the structural diff and pre-manifest memory checker.
+   Remaining signals must be informational or explicitly deferred; an unresolved
+   hard budget, required-skill or approval failure is nonconforming, not clean.
+8. **Manifest.** Only after successful integration, update
+   `.agents-system-setup/generated.json` atomically (write-temp + rename),
+   retaining explicit deferred/nonconforming status where applicable.
 
 ### Mismatch report shape
 
@@ -788,33 +881,36 @@ Approve groups: [REQUIRED · delete] [REQUIRED · add] [RECOMMENDED · patch]
 
 - Applying upgrade deltas without showing the mismatch report to the user.
 - Treating `informational` signals as actionable without explicit user
-  approval (especially `adapter-drift` — `CLAUDE.md` / `GEMINI.md` are
-  expected to be copies/symlinks).
-- Skipping the per-version playbook in favor of jumping to the latest
-  expected state — intermediate version deltas may have to handle data
-  shapes the current code no longer produces.
+  approval. Legacy copies/symlinks are audit input; new adapters are thin
+  imports, not expected byte-identical policy copies.
+- Ignoring historical artifact shapes, or re-emitting obsolete intermediate
+  layouts instead of the current native-memory/delegation contract.
 - Deleting deprecated artifacts without backup. Always copy to
   `.agents-system-setup/migration-backup/<timestamp>/` first.
 - Updating the manifest before all artifact writes succeed.
 
 ### Migration safety rules
 
-- **Always backup before editing.** `cp <file> <file>.bak` before any in-place
-  rewrite of a generated artifact.
+- **Always backup before editing.** Record a non-overwriting backup and approved
+  preimage before an in-place rewrite. Do not reuse an existing `.bak` filename
+  or restore it over concurrent user changes.
 - **Diff custom content first.** Compare the existing managed block against the
   stock template from the detected version. If any non-template prose lives
   inside the managed block, surface a `custom orchestration / handoff additions
   found, review required` report and require explicit user approval before
   replacement.
-- **Preserve user content outside the managed block.** The plugin never edits
-  content outside `<!-- agents-system-setup:managed:start -->` / `:end` markers.
+- **Preserve user content outside the managed block.** Do not edit outside
+  `<!-- agents-system-setup:managed:start -->` / `:end` markers unless the user
+  approved an explicit whole-file memory replacement/relocation diff. Domain
+  skill bodies remain protected; a generated filename is not ownership evidence.
 - **Update the stamp atomically with content.** Never write a new stamp without
   also writing the corresponding content delta.
 - **Manifest is updated last.** Write artifact changes first, verify, then
   rewrite `.agents-system-setup/generated.json` atomically (write-temp + rename).
-- **Pre-stamp detection is conservative.** When no stamp or manifest exists,
-  assume the most recent legacy version (`v1.3.0`) and prompt the user to
-  confirm before applying any migration.
+- **Pre-stamp detection is conservative.** Without a reliable stamp/manifest,
+  record unknown provenance and inspect structural evidence. Do not invent a
+  version or classify custom content as plugin-owned; ambiguous cases require
+  manual review before migration.
 
 ### Stamp anti-patterns
 
