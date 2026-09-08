@@ -1,15 +1,15 @@
-# Prompt Guidelines for Main-to-Subagent Handoff
+# Prompt Guidelines for Host-to-Worker Delegation
 
 Audience: orchestrators, generators, replication logic, and prompt-quality
 reviewers. Runtime subagents should not load this reference by default; in other
 words, do not load this reference by default from generated runtime subagents.
-They use the compact **Plan Handoff Contract** and **Assignment Intake** embedded
-in their generated agent files.
+They use the compact **Task Assignment Contract** and **Assignment Intake**
+embedded in their generated agent files.
 
-Use this guide to compose high-signal Task Assignments from a main agent to a
-subagent. The goal is not a longer prompt. The goal is a smaller, clearer
-subtask slice that includes the decisions, boundaries, and expected output a
-specialist needs to act safely.
+Use this guide after the host has decided delegation is beneficial. Small
+lookups and tightly coupled work should stay with the host. For delegated work,
+compose a smaller, clearer subtask slice containing the decisions, boundaries,
+child-visible context, and expected output a specialist needs to act safely.
 
 ## Source-backed principles
 
@@ -21,6 +21,7 @@ specialist needs to act safely.
 | Stable output | Require a compact reporting block so the orchestrator can integrate results without re-deriving scope, evidence, or risks. | Copilot task subagent summaries; Claude subagent result summaries; Codex consolidated results |
 | Human escalation | Missing user input becomes one `question_request`; gated writes stop before risk instead of silently assuming approval. | Provider-native question tools and plugin human-input policy |
 | App-compatible artifacts | Codex project artifacts must not require CLI-only slash commands to be useful in Codex App surfaces that load repo artifacts. | OpenAI Codex subagent docs |
+| Honest context delivery | Host skill-loading evidence never proves the child received the skill body; pass excerpts or use a supported child load. | Runtime skill/subagent loading surfaces |
 
 ## Orchestrator Assignment Format
 
@@ -76,6 +77,8 @@ Allowed Capabilities:
 Skills Referenced:
   allowed:
     - <existing skill name or "none">
+  host_load_evidence: <skill loaded=true | none>
+  child_delivery: <child-loaded | child-preloaded | excerpt-passed | unavailable | denied>
   invocation_notes: <runtime-correct skill behavior>
   do_not_invent: true
 
@@ -134,9 +137,10 @@ The orchestrator extracts the per-subtask slice. It must not paste:
 - full platform schemas when only one runtime row is needed;
 - full marketplace research when a selected candidate summary is enough.
 
-Use `Context freshness: recent` or `AGENTS.md@<sha>` when the orchestrator has
-already loaded project memory in the current turn. Use `reload` for replication,
-update mode, or stale context.
+Use `Context freshness: recent` or `AGENTS.md@<sha>` when the host's source
+snapshot is current. This field describes snapshot age only; it does not prove
+that a child inherited parent memory, files, or loaded skill bodies. Use
+`reload` for replication, update mode, stale context, or a changed source.
 
 ## Allowed capabilities and skills
 
@@ -147,8 +151,11 @@ Use provider-neutral wording in the Task Assignment:
 - **Approval-gated actions** means actions that still require user/security
   approval before write.
 - **Skills referenced** means existing, installed, or generated skills only.
-  Never invent skill names or invocation syntax to make an assignment look
-  complete.
+  `loaded=true` records a host load, not child delivery. Pass required excerpts
+  or use a supported child preload/load mechanism. Missing or denied required
+  child context blocks the affected action.
+- Apply the same rule to `code-quality`: code-editing and reviewing children
+  need the standards in their own context before editing or signing off.
 
 Runtime mapping happens in [platforms](./platforms.md) and
 [agent-format](./agent-format.md). The prompt contract never asks a subagent to
@@ -182,8 +189,11 @@ security plugins or copy proprietary plugin guidance into the task packet.
 
 - Delegating a bare prompt for normal or risky work.
 - Sending the whole plan to every worker.
+- Delegating a small lookup that the host can complete with less overhead.
 - Hiding approval-gated actions inside generic "use tools as needed" wording.
 - Listing skills or MCP servers that were not installed, generated, or approved.
+- Claiming host `loaded=true` evidence means the child received a skill body.
+- Treating `Context freshness: recent` as content inheritance.
 - Treating assignment quality as a substitute for tests, security review,
   content quality, architecture review, or provider schema validation.
 - Asking a security subagent to scan, exploit, disclose, or write fixes outside

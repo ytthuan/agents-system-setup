@@ -108,8 +108,12 @@ this skill and includes in the packet:
 
 - task tag (`code-edit` / `bug-fix` / `refactor`)
 - `Skills Referenced: code-quality loaded=true`
-- the relevant `AGENTS.md` › Code Quality & Maintainability standards
+- the relevant project conventions and standards from this skill, as excerpts
+  or through a supported child preload/load mechanism
 - the expected `Code quality:` evidence line
+
+`loaded=true` is host evidence, not child content. If required standards are
+missing or loading is denied, stop the affected action; do not fabricate a load.
 
 ## Output Contract
 
@@ -134,7 +138,7 @@ integrates the verdict and never overrides it.
   style and local patterns).
 - New behaviour has tests; a bug fix has a regression test.
 - The `Code quality:` line is present wherever source code changed.
-- Codex (CLI + App) loads this skill at `.codex/skills/code-quality/SKILL.md`
+- Codex (CLI + App) loads this skill at `.agents/skills/code-quality/SKILL.md`
   via the skill loader (`$code-quality` or `/skills`); other runtimes use their
-  per-runtime skills path. The `AGENTS.md` inline standards are the always-on
-  source of truth.
+  per-runtime skills path. Root `AGENTS.md` keeps the conventions-first trigger
+  and ownership; this local skill contains the full authoring standards.

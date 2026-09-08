@@ -1,0 +1,251 @@
+---
+name: task-delegation
+description: 'Use when the host CLI session decides whether to execute work directly or delegate a scoped task, then composes a safe runtime-native assignment. USE FOR: direct-vs-delegated routing, adaptive model/effort selection, the 12-field Task Assignment Contract, child-context delivery, acceptance checks, and result integration. DO NOT USE FOR: subagent-to-subagent delegation.'
+---
+
+<!-- agents-system-setup:generated-by: {{PLUGIN_VERSION}} -->
+<!-- agents-system-setup:generated-at: {{GENERATED_AT}} -->
+<!-- agents-system-setup:skill-kind: host-delegation -->
+
+# Task Delegation
+
+## Hard Rules
+
+1. The host CLI session owns routing, delegation, integration, and approvals.
+   Workers execute their assignment and never re-delegate; scope gaps return
+   `return-to-orchestrator`.
+2. Decide **direct execution versus delegation first**. Use the host for small
+   lookups, tightly coupled edits, and work where delegation overhead exceeds
+   the benefit. Delegate only a substantial, bounded task that benefits from
+   separate context, specialization, independence, or verbose-output isolation.
+3. Every delegated assignment keeps the 12 required-minimum fields unchanged:
+   `Task`, `Source plan`, `Owned paths`, `Read-only paths`, `Relevant gates`,
+   `Constraints`, `Dependencies / wave`, `Required approvals`, `Runtime format
+   target`, `Expected output`, `Context freshness`, and `Lossiness`.
+4. `Skills Referenced: task-delegation loaded=true` proves only that the
+   **host** loaded this skill. It does not prove the child received this body.
+   Pass required excerpts in the assignment or use a runtime-supported child
+   preload/load mechanism. If required context is missing or loading is denied,
+   block the affected action.
+5. Apply the same rule to `code-quality`: host load evidence is not child
+   content. A code-editing or reviewing child receives the needed standards by
+   excerpt or supported child loading; missing required standards blocks that
+   edit or sign-off.
+6. `Context freshness: recent` or `AGENTS.md@<revision>` describes snapshot
+   age only. It never claims that parent context, memory, or skill bodies were
+   inherited by a child.
+7. Required independent review remains independent of the writer. Active
+   writers have nonoverlapping owned paths. Security, MCP, secrets, runtime
+   config, CI/release, and other approval gates remain fail-closed.
+
+## 1. Choose Direct or Delegated Execution
+
+Prefer direct host execution when the work is a small lookup, a short
+single-surface edit, a tightly coupled investigation, or cannot be separated
+without duplicating context. Delegation is appropriate when at least one
+concrete benefit outweighs startup and integration cost:
+
+- isolated context protects the host's working set;
+- a specialist has materially better tools or domain instructions;
+- command output is verbose but the host needs only a compact result;
+- independent, nonoverlapping work can run concurrently within limits;
+- a required independent review must be performed by someone other than the
+  writer.
+
+Zero specialists is valid when the host can satisfy all required logical
+responsibilities and independence requirements. Do not create a worker merely
+to satisfy a count, and do not split a continuous chain into artificial tasks.
+
+## 2. Select Worker, Model, and Effort
+
+The default policy is `adaptive-balanced`. After choosing delegation:
+
+1. Apply explicit user and organization provider/model/effort pins first.
+   Pins prevail even when a per-call override might otherwise perform better.
+2. Enumerate only models and effort values advertised and allowed by the active
+   runtime, provider, entitlement, policy, and budget.
+3. Choose for task difficulty, risk, required quality, total expected cost,
+   retries, cache/startup behavior, and latency. Inheritance is not necessarily
+   cheap, and maximum effort is not a universal default.
+4. Prefer a per-call model/effort override when the runtime supports it. If it
+   does not, inherit the current worker configuration or propose a separately
+   approved configuration change. Never rewrite worker files mid-task merely
+   to alter one call.
+5. If no allowed model can meet a mandatory quality or gate requirement,
+   escalate the constraint. Do not exceed the approved budget or silently
+   lower required quality.
+
+Keep generated static `model` and effort fields omitted unless explicitly
+pinned. Do not embed newest-model catalogs, permanent price claims, or live
+quota numbers.
+Unknown cost is not zero. Use verified metadata or an approved existing choice
+with disclosed uncertainty; if a hard spending cap cannot be assessed, block
+the launch and escalate instead of assuming inheritance is affordable.
+
+Resolution notes:
+
+- **Codex:** an explicit spawn choice resolves before `[agents]` defaults and
+  parent inheritance, but an explicitly selected custom-agent file may itself
+  pin `model` or `model_reasoning_effort`. Use only advertised values.
+- **Claude Code:** per-call model selection precedes subagent frontmatter,
+  `CLAUDE_CODE_SUBAGENT_MODEL`, then parent selection; explicit `inherit`
+  chooses the parent model.
+- **Other runtimes:** use only documented, currently available call/config
+  controls. Preserve provider and budget constraints.
+
+## 3. Compose the Task Assignment
+
+### Required Minimum
+
+```text
+Task: <one sentence>
+Source plan: <user request | VS Code plan | Spec-Kit plan | other>
+Owned paths: <paths from Directory Architecture>
+Read-only paths: <paths for context only>
+Relevant gates: <quality/security gates>
+Constraints: <security/architecture/runtime constraints>
+Dependencies / wave: <wave and waits_for, or none>
+Required approvals: <mcp | secrets | ci | user-scope | none>
+Runtime format target: <none | platform path + schema>
+Expected output: <files changed, evidence, risks>
+Context freshness: <snapshot age: recent | AGENTS.md@revision | reload>
+Lossiness: <fields dropped or mapped, or none>
+```
+
+Add only task-relevant expansion blocks: Goal & Definition of Done, Scope,
+Context Packet, File Inventory, Reproduction, Security Analysis, Assumptions,
+Allowed Capabilities, Skills Referenced, Workflow, Acceptance Criteria, Known
+Risks, Verification Protocol, Reporting Protocol, Coordination, Size &
+Timebox, Clarification Protocol, Stop / Escalation Conditions, and Output
+Schema.
+
+Use full-form for normal or risky multi-file work and always for MCP, secrets,
+CI/release, dependency manifests, generated scripts, security writes,
+replication, release, or Build Gate assignments. Safe tiny work may use
+short-form, but all 12 required-minimum fields remain present.
+
+### Task-Type Routing Map
+
+This maps responsibilities, not mandatory processes. The host may execute an
+item directly when it can preserve ownership, quality, and independence.
+
+| Task type | Preferred responsibility | Form / required context |
+|---|---|---|
+| Small lookup or tightly coupled edit | Host | Short; relevant files and gates |
+| Broad read-only research | Host or explore-class worker | Short; bounded sources and reporting |
+| Code edit, bug fix, refactor | Owning implementer or host | Full when risky/multi-file; child-visible code-quality standards |
+| Code review | Independent reviewer | Scope, diff, quality standards, evidence |
+| Build Gate | Configured logical gate owner | Full; canonical Build Gate skill/excerpt |
+| Security analysis/write | Security owner; writes stay with approved path owner | Full; authorization, evidence, approvals |
+| MCP/runtime config | Host/config owner | Full; explicit approval before write |
+| Docs/content | Host or docs owner | Short unless CI/release gates apply |
+| Replication/release | Runtime or release owner | Full; lossiness, approvals, verification |
+
+### Child Context Delivery
+
+For each referenced skill or policy, record one of:
+
+- `host-loaded`: useful as host composition evidence only;
+- `child-preloaded` or `child-loaded`: supported runtime evidence that the
+  child received the body;
+- `excerpt-passed`: the assignment contains the exact required subset;
+- `unavailable` or `denied`: the affected action is blocked.
+
+Pass the smallest sufficient excerpt. Do not paste full project memory, full
+plans, unrelated logs, or every runtime's schema. A fresh snapshot avoids
+redundant re-reading; it does not transfer content.
+
+## 4. Schedule and Invoke
+
+Use one worker for one durable, bounded responsibility. Concurrent invocation
+is optional and beneficial only when tasks are substantial, independent,
+nonoverlapping, and within runtime/user limits. Await and reconcile every
+dispatched result before dependent work.
+
+Runtime-native surfaces:
+
+| Runtime | Delegation and model notes |
+|---|---|
+| Copilot CLI | Use the Task/agent surface; choose an available agent/model per call when exposed. `/fleet` is optional UX, never required. |
+| Claude Code | Use `Agent`; per-call model overrides frontmatter, environment default, and parent inheritance. Agent Teams remain explicit opt-in. |
+| OpenCode | Use `task` plus `@<agent>` under approved `permission.task`; model ids use the configured provider surface. |
+| Codex CLI + App | Spawn child threads or selected custom agents. Preserve configured recursion/concurrency limits; current key is `agents.max_concurrent_threads_per_session`, with `max_threads` recognized only as a legacy alias. |
+| Gemini CLI | The root session delegates to local subagents; children cannot recursively delegate. |
+
+Native explore/task built-ins are optional. Use them for genuinely useful
+recon or ad-hoc verbose execution, not to satisfy a count. Task-class ad-hoc
+output is `non-gate evidence` unless the task was assigned through the correct
+owning gate workflow.
+
+Copilot app child sessions are an opt-in advisory only. Never create branches
+or child sessions automatically. If used, retain plan approval, one-writer
+ownership, no-polling, premise-only steering, and artifact-based reconciliation.
+
+## Acceptance Checklist
+
+Before work, the child verifies:
+
+1. All 12 required-minimum fields are present and non-empty.
+2. Context freshness is explicit and treated only as snapshot age.
+3. `File Inventory.to_modify`, when present, stays within Owned paths.
+4. Required approvals list every possible gated action, or `none`.
+5. Full-form is used for every risky category listed above.
+6. Verification and reporting requirements are concrete enough to integrate.
+7. Security-team assignments include authorization, evidence,
+   counterevidence, severity rationale, remediation verification, and proof
+   gaps.
+8. Required child context is `child-loaded`, `child-preloaded`, or
+   `excerpt-passed`; `host-loaded` alone is insufficient.
+9. Code edits/reviews have child-visible code-quality context.
+10. Missing or denied required context, unclear ownership, unsupported runtime
+    controls, or absent approvals produce one consolidated `question_request`
+    and stop before the affected action.
+
+## Reporting Template
+
+```text
+Outcome: <one sentence>
+Files changed: <relative paths or none>
+Evidence: <tests, diff summary, or gate evidence>
+Gates touched: <list with status>
+Task assignment quality: ok | warn | fail; form=<short|full>; missing=<fields|none>; questions=<count>
+Content quality: ok | warn | fail | n/a; signals=<list|none>
+Code quality: ok | warn | fail | n/a; signals=<list|none>
+Security analysis: n/a | scope=<...>; authorization=<...>; validation=<...>; severity=<...>; proof_gaps=<...>
+Build gate: n/a | bucket=<XS|S|M|L|XL>; gate=<...>; status=<pass|fail|waived>; evidence=<summary>
+Risks / escalations: <list or none>
+In bounds: yes | no; escaped=<paths|none>
+Question requests: none | <id>
+Handoff status: accepted | completed | blocked | returned-to-orchestrator
+Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>
+```
+
+The host integrates evidence without changing an established gate's meaning.
+Named gate owners remain authoritative; a host may own a substantive gate when
+independence is not required, but review stays independent of the writer.
+
+## Question Request
+
+```yaml
+question_request:
+  id: <stable-kebab-id>
+  asked_by: <worker-name>
+  reason: <why the answer is needed>
+  question: <one concise question>
+  choices: [<optional-choice-1>, <optional-choice-2>]
+  default: <safe default or "none">
+  urgency: blocking | nonblocking
+  if_unanswered: skip | use_default | stop_before_write
+```
+
+The host resolves questions through the project policy at
+`{{PROJECT_POLICY_PATH}}`. Workers continue safe reversible work when possible,
+but never cross a blocked gate.
+
+## Discovery Notes
+
+Emit this skill at each selected runtime's current skills path. For Codex,
+current discovery is `.agents/skills/task-delegation/SKILL.md` for project
+scope and `~/.agents/skills/task-delegation/SKILL.md` for user scope.
+Migration-only identifiers: `task-handoff`, `host-handoff`, `TASK_HANDOFF_*`.
+The legacy `.codex/skills/task-handoff` path is not a current emitter.

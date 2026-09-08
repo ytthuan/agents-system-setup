@@ -46,7 +46,9 @@ Then `cd` into the project and run `specify init --here --ai <runtime>`.
 
 ## What the orchestrator should know about it
 
-When Phase 1.7 records "spec-kit installed = yes", the emitted orchestrator prompt (`AGENTS.md` / `CLAUDE.md` / runtime equivalent) should add a managed block:
+When Phase 1.7 records "spec-kit installed = yes", keep a concrete load trigger
+in root memory and put the managed workflow below in approved local project
+policy. Do not copy it into every native adapter or bypass the root size cap:
 
 > ### Spec-Driven Workflow (via Spec-Kit)
 > Before fanning out to subagents, drive intent through Spec-Kit:
@@ -54,7 +56,7 @@ When Phase 1.7 records "spec-kit installed = yes", the emitted orchestrator prom
 > 2. `/plan` — turn it into a checked plan with constraints.
 > 3. Normalize the plan into the **Plan Handoff Contract** so each target runtime receives its native format.
 > 4. `/tasks` — break the plan into atomic, parallel-safe tasks.
-> 5. Hand each task to the matching subagent per the Capability Matrix.
+> 5. Assign each task to its owner; execute directly or delegate when justified.
 > 6. `/implement` only after the orchestrator has greenlit the wave.
 
 This belongs in the managed block (`<!-- agents-system-setup:managed:start -->`), not user-authored content, so future updates can refresh it without trampling user edits.

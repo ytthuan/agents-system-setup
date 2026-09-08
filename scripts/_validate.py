@@ -41,12 +41,17 @@ Usage:
 from __future__ import annotations
 
 import io
+import errno
 import json
 import os
 import re
+import shutil
 import sys
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 # Force UTF-8 on stdout/stderr so Windows cp1252 doesn't reject non-ASCII output.
 if hasattr(sys.stdout, "reconfigure"):
@@ -232,9 +237,7 @@ def is_codex_read_only_identity(*values: Any) -> bool:
     """Return True for unambiguous read-only identity surfaces.
 
     Scope this to identity surfaces (name and filename stem), not descriptions,
-    so descriptive text does not create read-only false positives. Empty Owned
-    paths are also read-only at generation time, but this validator cannot infer
-    Owned paths from TOML alone.
+    so descriptive text does not create read-only false positives.
     """
     for value in values:
         if not isinstance(value, str):
@@ -243,6 +246,17 @@ def is_codex_read_only_identity(*values: Any) -> bool:
         if READ_ONLY_IDENTITY_RE.search(normalized):
             return True
     return False
+
+
+def codex_owned_paths_empty(developer_instructions: Any) -> bool:
+    """Return whether Codex instructions declare no owned paths."""
+    if not isinstance(developer_instructions, str):
+        return False
+    match = re.search(r"(?mi)^\s*-\s*Owned paths:\s*(.*?)\s*$", developer_instructions)
+    if not match:
+        return False
+    value = match.group(1).strip().casefold()
+    return value in {"", "none", "n/a", "null", "[]", "<none>", "<paths|none>"}
 
 
 def parse_scalar(value: str) -> Any:
@@ -574,13 +588,16 @@ def check_codex_toml_agents() -> None:
                         if not CODEX_NICKNAME_RE.fullmatch(nickname):
                             err(f"{rel}: nickname `{nickname}` must be 1-32 chars, start with a letter, and use letters/digits/space/hyphen/underscore only")
             effort = data.get("model_reasoning_effort")
-            if effort and effort not in ("low", "medium", "high"):
-                err(f"{rel}: model_reasoning_effort must be low|medium|high (got `{effort}`)")
+            if effort is not None and (not isinstance(effort, str) or not effort.strip()):
+                err(f"{rel}: model_reasoning_effort must be a nonempty model-advertised string")
             sandbox = data.get("sandbox_mode")
             if sandbox and sandbox not in ("read-only", "workspace-write"):
                 warn(f"{rel}: sandbox_mode `{sandbox}` is not one of the documented values (read-only|workspace-write)")
-            if is_codex_read_only_identity(data.get("name"), toml_path.stem) and sandbox != "read-only":
-                err(f"{rel}: read-only reviewer/auditor/security/architect/governance Codex agents must set sandbox_mode = \"read-only\"")
+            read_only_scope = is_codex_read_only_identity(data.get("name"), toml_path.stem) or codex_owned_paths_empty(
+                data.get("developer_instructions")
+            )
+            if read_only_scope and sandbox != "read-only":
+                err(f"{rel}: read-only or empty-owned-path Codex agents must set sandbox_mode = \"read-only\"")
             for key in ("job_max_runtime_seconds",):
                 value = data.get(key)
                 if value is not None and (not isinstance(value, int) or isinstance(value, bool) or value <= 0):
@@ -602,10 +619,19 @@ def check_codex_toml_agents() -> None:
         if not isinstance(agents, dict):
             err(f"{rel}: missing or invalid [agents] table")
             continue
-        for key in ("max_threads", "max_depth"):
+        for key in ("max_concurrent_threads_per_session", "max_threads"):
             value = agents.get(key)
+            if value is None:
+                continue
             if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
                 err(f"{rel}: [agents].{key} must be a positive integer")
+        if "max_threads" in agents and "max_concurrent_threads_per_session" not in agents:
+            warn(f"{rel}: [agents].max_threads is a legacy concurrency alias; prefer max_concurrent_threads_per_session")
+        max_depth = agents.get("max_depth")
+        if max_depth is not None and (
+            not isinstance(max_depth, int) or isinstance(max_depth, bool) or max_depth <= 0
+        ):
+            err(f"{rel}: [agents].max_depth must be a positive integer")
 
 
 # ---------- 8: Gemini Markdown subagents (.gemini/agents/*.md, extension agents/*.md) ----------
@@ -1092,7 +1118,8 @@ def check_human_input_protocol() -> None:
         "provider-native",
     ):
         _require_aggregate_marker(label, policy_text, marker)
-    _require_aggregate_marker(label, policy_text, "non-terminating", case_sensitive=False)
+    _require_aggregate_marker(label, policy_text, "if_unanswered")
+    _require_aggregate_marker(label, policy_text, "unanswered blocking questions")
     _require_aggregate_pattern(
         label,
         policy_text,
@@ -1290,12 +1317,11 @@ def check_self_update_preflight_policy() -> None:
 
 
 def check_governance_baseline() -> None:
-    """The skill must keep security, audit, architecture, and design-pattern
-    governance as first-class generated outputs, not optional wrap-up notes.
-    """
+    """Keep governance resident as a compact root summary with on-demand detail."""
     required_files = [
         SKILL_ROOT / "references" / "security-audit-architecture.md",
         SKILL_ROOT / "assets" / "AGENTS.md.template",
+        SKILL_ROOT / "assets" / "project-policy.md.template",
         SKILL_ROOT / "assets" / "subagent.agent.md.template",
         SKILL_ROOT / "assets" / "subagent.codex.toml.template",
     ]
@@ -1311,6 +1337,7 @@ def check_governance_baseline() -> None:
             "Threat Model",
             "Architecture & Design Pattern",
             "Quality Gates",
+            "project policy",
         ),
     )
     require_contains(
@@ -1330,13 +1357,24 @@ def check_governance_baseline() -> None:
             "## Security & Audit Matrix",
             "## Threat Model",
             "## Architecture & Design Pattern Decisions",
-            "## ADR Index",
             "## Quality Gates",
-            "{{SECURITY_AUDIT_MATRIX_ROWS}}",
-            "## Orchestration Operating Model",
-            "Security & Audit Matrix",
-            "Threat Model",
-            "Architecture & Design Pattern Decisions",
+            "{{SECURITY_AUDIT_SUMMARY_ROWS}}",
+            "{{THREAT_MODEL_SUMMARY}}",
+            "{{ARCHITECTURE_DECISION_SUMMARY}}",
+            "{{PROJECT_POLICY_PATH}}",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "project-policy.md.template",
+        (
+            "## Security & Audit Matrix",
+            "## Threat Model",
+            "## Architecture & Design Pattern Decisions",
+            "## ADR Index",
+            "## Capability Matrix",
+            "## Review Responsibilities",
+            "## Instruction Memory Audit",
+            "## Human Input / Question Protocol",
         ),
     )
     require_contains(
@@ -1357,10 +1395,11 @@ def check_governance_baseline() -> None:
     require_contains(
         SKILL_ROOT / "assets" / "subagent.codex.toml.template",
         (
-            "Security & Audit Boundaries",
-            "Architecture & Design Expectations",
-            "{{AUDIT_EVIDENCE}}",
-            "{{PATTERNS_TO_PRESERVE}}",
+            "Approval required before:",
+            "Evidence to return:",
+            "Security analysis: when assigned",
+            "Build gate: when assigned",
+            "Risks/escalations;",
         ),
     )
 
@@ -1489,9 +1528,9 @@ def check_mcp_approval_gate() -> None:
     require_contains(
         SKILL_ROOT / "assets" / "AGENTS.md.template",
         (
-            ".mcp.json",
-            "opencode.json",
-            "Route security-sensitive work",
+            "MCP, runtime settings/hooks, sensitive writes",
+            "external actions",
+            "require their own approvals",
         ),
     )
     for rel in (
@@ -1683,7 +1722,7 @@ def check_requirements_triage_policy() -> None:
         (
             "requirements-triage",
             "Requirements Triage Sizing Rule",
-            "default-on recommended",
+            "default-on as a **responsibility**",
             "read-only",
             "question_request",
             "orchestrator owns user-facing questions",
@@ -1692,25 +1731,18 @@ def check_requirements_triage_policy() -> None:
     require_contains(
         SKILL_ROOT / "SKILL.md",
         (
-            "Requirements triage is default-on recommended",
-            "Phase 1.11 — Requirements Triage",
-            "requirements_triage_status",
-            "separate",
-            "merged",
-            "skipped",
+            "Triage is a responsibility, not a compulsory worker",
+            "requirements-triage",
             "question_request",
         ),
     )
     require_contains(
-        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        SKILL_ROOT / "assets" / "project-policy.md.template",
         (
-            "## Requirements Triage",
+            "## Review Responsibilities",
             "{{REQUIREMENTS_TRIAGE_STATUS}}",
             "{{REQUIREMENTS_TRIAGE_OWNER}}",
-            "{{REQUIREMENTS_TRIAGE_EVIDENCE}}",
-            "requirements-triage",
-            "question_request",
-            "read-only by default",
+            "Triage is advisory and",
         ),
     )
     require_contains(
@@ -1734,25 +1766,6 @@ def check_requirements_triage_policy() -> None:
             "Triage status",
         ),
     )
-    require_contains(
-        SKILL_ROOT / "references" / "context-optimization.md",
-        (
-            "Requirements triage output",
-            "requirements-triage",
-            "short-form intake brief",
-        ),
-    )
-    require_contains(
-        SKILL_ROOT / "assets" / "AGENTS.md.template",
-        (
-            "Requirements Triage",
-            "@requirements-triage",
-            "triage: skipped",
-            "read-mostly and advisory",
-            "I own final decisions and approval gates",
-        ),
-    )
-
     topology = (SKILL_ROOT / "references" / "topology.md").read_text(encoding="utf-8")
     triage_lines = [line for line in topology.splitlines() if "requirements-triage" in line]
     if not triage_lines or not any("read-only" in line for line in triage_lines):
@@ -1801,7 +1814,7 @@ def check_output_quality_policy() -> None:
         (
             "agent-quality-curator",
             "Content Quality Sizing Rule",
-            "universal recommended",
+            "Content-quality review is required when generated prose changes",
             "read-only",
             "Content quality: ok|warn|fail|n/a",
         ),
@@ -1817,27 +1830,13 @@ def check_output_quality_policy() -> None:
         ),
     )
     require_contains(
-        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        SKILL_ROOT / "assets" / "project-policy.md.template",
         (
-            "## Content Quality / Anti-Slop Review",
-            "{{CONTENT_QUALITY_STATUS}}",
-            "{{CONTENT_QUALITY_CURATOR}}",
+            "## Review Responsibilities",
+            "**Content quality:**",
             "{{CONTENT_QUALITY_OWNER}}",
-            "{{CONTENT_QUALITY_SIGNALS}}",
-            "{{CONTENT_QUALITY_REFERENCE}}",
-            "agent-quality-curator",
-            "Content quality: ok|warn|fail|n/a",
-            "Before final output when generated agent-system prose changes",
-        ),
-    )
-    require_contains(
-        SKILL_ROOT / "assets" / "AGENTS.md.template",
-        (
-            "Content Quality Review",
-            "@agent-quality-curator",
-            "Content quality: ok|warn|fail|n/a",
-            "read-only and advisory",
-            "I own final decisions and approval gates",
+            "{{CONTENT_QUALITY_CURATOR}}",
+            "Content quality: ok|warn|fail|n/a; signals=<list|none>",
         ),
     )
     for rel in (
@@ -1855,15 +1854,9 @@ def check_output_quality_policy() -> None:
     require_contains(
         SKILL_ROOT / "assets" / "subagent.codex.toml.template",
         (
-            "Content quality: ok | warn | fail | n/a; signals=<list|none>",
-            "Do not add unsupported TOML question fields or `memory` fields",
-        ),
-    )
-    require_contains(
-        SKILL_ROOT / "assets" / "GEMINI.md.template",
-        (
-            "Content Quality / Anti-Slop Review",
-            "Content quality before final output",
+            "Content quality: ok|warn|fail|n/a; signals=<list|none>",
+            "Code quality: ok|warn|fail|n/a; signals=<list|none>",
+            "Do not add unsupported question, memory, or delegation fields.",
         ),
     )
     require_contains(
@@ -1879,9 +1872,8 @@ def check_output_quality_policy() -> None:
     require_contains(
         SKILL_ROOT / "references" / "context-optimization.md",
         (
-            "Content quality review",
-            "content-quality-review",
-            "compact `Content quality` status",
+            "Generic craft",
+            "Direct read-only or docs work",
         ),
     )
     require_contains(
@@ -1910,7 +1902,6 @@ def check_output_quality_policy() -> None:
     )
     for path in (
         SKILL_ROOT / "references" / "topology.md",
-        SKILL_ROOT / "assets" / "AGENTS.md.template",
         SKILL_ROOT / "SKILL.md",
     ):
         rel = path.relative_to(REPO).as_posix()
@@ -1986,13 +1977,7 @@ def check_security_team_policy() -> None:
     )
     require_contains(
         SKILL_ROOT / "references" / "context-optimization.md",
-        (
-            "bug-hunting",
-            "vulnerability-validation",
-            "attack-path-analysis",
-            "remediation-verification",
-            "disclosure-triage",
-        ),
+        ("Security / MCP / release / replication",),
     )
     require_contains(
         SKILL_ROOT / "references" / "handoff.md",
@@ -2038,29 +2023,11 @@ def check_security_team_policy() -> None:
         ),
     )
     require_contains(
-        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        SKILL_ROOT / "assets" / "project-policy.md.template",
         (
-            "{{SECURITY_TEAM_DEPTH}}",
             "## Security Team Operating Model",
             "{{SECURITY_TEAM_OPERATING_MODEL}}",
-            "`bug-hunting`",
-        ),
-    )
-    require_contains(
-        SKILL_ROOT / "assets" / "GEMINI.md.template",
-        (
-            "Security Team Operating Model",
-            "Gemini subagents",
-            "Security analysis",
-        ),
-    )
-    require_contains(
-        SKILL_ROOT / "assets" / "AGENTS.md.template",
-        (
-            "Security Team Scope",
-            "Security Team Operating Model",
-            "authorization scope",
-            "read-mostly",
+            "## Human Input / Question Protocol",
         ),
     )
     require_contains(
@@ -2076,15 +2043,21 @@ def check_security_team_policy() -> None:
         "subagent.gemini.md.template",
         "subagent.codex.toml.template",
     ):
-        require_contains(
-            SKILL_ROOT / "assets" / rel,
-            (
-                "Security analysis: n/a | scope=",
-                "authorization=",
-                "validation=",
-                "proof_gaps=",
-            ),
-        )
+        if rel == "subagent.codex.toml.template":
+            require_contains(
+                SKILL_ROOT / "assets" / rel,
+                ("Security analysis: when assigned", "Build gate: when assigned"),
+            )
+        else:
+            require_contains(
+                SKILL_ROOT / "assets" / rel,
+                (
+                    "Security analysis: n/a | scope=",
+                    "authorization=",
+                    "validation=",
+                    "proof_gaps=",
+                ),
+            )
 
     forbidden = re.compile(
         r"(?:vulnerability-researcher|validation-reproducer|attack-path-analyst|bug-bounty-triage|compliance-auditor)[^\n]*(?:full file edit|edit-capable|broad write|\*\s*:\s*allow)",
@@ -2146,7 +2119,7 @@ def check_cwd_reconnaissance_policy() -> None:
             "Project recon",
             "cwd-reconnaissance",
             "Reconnaissance Card",
-            "Privacy guardrails",
+            "secret-redaction guards",
             # v1.2.0 purpose-first wiring in SKILL.md
             "Capture Purpose",
             "headline_purpose",
@@ -2393,32 +2366,18 @@ def check_no_orchestrator_subagent_emission() -> None:
         (
             "## Orchestration Operating Model",
             "host CLI session",
-            "routing alias for that host/root session",
-            "### Role and Delegation Stance",
-            "### Core Hard Rules",
-            "### Required Minimum for Every Task Assignment",
-            "### Subagent Routing",
-            "Plan Handoff Contract",
+            "Load `task-delegation` from Skills",
+            "Workers never",
+            "Missing required skills",
+            "**Model policy:**",
+            "{{HOST_BUILTINS_ROUTING_BLOCK}}",
             "Security & Audit Matrix",
             "Threat Model",
             "Architecture & Design Pattern Decisions",
-            "MCP",
-            "Reflect & Learn",
-            "Content Quality Review",
-            "@agent-quality-curator",
-            "Security Team Scope",
-            "Security Team Operating Model",
-            "authorization scope",
-            "Requirements Triage",
-            "@requirements-triage",
-            "triage: skipped",
-            "I own final decisions and approval gates",
-            "subtask slice",
-            "Task assignment quality: ok | warn | fail",
-            "agents-system-setup:wave-execution",
-            "fan out",
-            "parallel-safe",
-            "wave",
+            "Quality Gates",
+            "## Skills",
+            "## Context Loading Policy",
+            "## Memory & Learning System",
         ),
     )
 
@@ -2502,9 +2461,10 @@ def check_no_orchestrator_subagent_emission() -> None:
     require_contains(
         SKILL_ROOT / "references" / "agent-format.md",
         (
-            "Never emit a `.codex/agents/orchestrator.toml`",
-            "canonical pattern for every supported runtime as of v1.3.0",
-            "the root-session `permission.task` subagent-gating lives in `opencode.json`",
+            "**`AGENTS.md`** at the repo root",
+            "Never emit a",
+            ".codex/agents/orchestrator.toml",
+            "root-session `permission.task` subagent-gating lives in `opencode.json`",
         ),
     )
 
@@ -2576,8 +2536,8 @@ def check_no_orchestrator_subagent_emission() -> None:
     require_contains(
         SKILL_ROOT / "references" / "output-contract.md",
         (
-            "describe the task directly to the session",
-            "there is no `@orchestrator` agent to type",
+            "describe the task directly;",
+            "No emitted `@orchestrator` agent",
         ),
     )
     require_not_contains(
@@ -2609,9 +2569,9 @@ def check_pointer_files_to_agents_md() -> None:
     require_contains(
         SKILL_ROOT / "SKILL.md",
         (
-            "Project-memory linking",
+            "Project-memory adapters",
             "link-project-memory.sh",
-            "link-project-memory.ps1",
+            "or `.ps1`",
             "GEMINI.md",
             "CLAUDE.md",
         ),
@@ -2709,9 +2669,9 @@ def check_opencode_root_task_gate() -> None:
 
 def check_opencode_root_skill_gate() -> None:
     """When OpenCode is selected and the plugin emits host-loaded skills
-    (`task-handoff`, `code-change-build-gate`), the host root agent in
+    (`task-delegation`, `code-change-build-gate`), the host root agent in
     `opencode.json` must also have a `permission.skill` gate. Without it,
-    the host cannot load the skill and `Skills Referenced: task-handoff
+    the host cannot load the skill and `Skills Referenced: task-delegation
     loaded=true` packet evidence is false.
 
     This check enforces SKILL.md and CHANGELOG describe the gate; the
@@ -2723,9 +2683,9 @@ def check_opencode_root_skill_gate() -> None:
         (
             "OpenCode root-session skill gate",
             "permission.skill",
-            "Skills Referenced: task-handoff loaded=true",
+            "Skills Referenced: task-delegation loaded=true",
             "opencode_skill_gate: declined",
-            "inline fail-closed minimum",
+            "inline fail-closed Acceptance Checklist",
         ),
     )
 
@@ -2812,7 +2772,7 @@ def check_context_optimization() -> None:
             "Phase 1.9 — Output Profile & Context Budget",
             "Context Loading Policy",
             "Context profile",
-            "Context split",
+            "on-demand",
             "Task-Type Routing Map",
             "Context freshness",
             "compact-mode trimming",
@@ -2825,25 +2785,16 @@ def check_context_optimization() -> None:
             "## Context Loading Policy",
             "{{CONTEXT_PROFILE}}",
             "{{DETAIL_REFERENCES}}",
-            "Task-Type Routing Map",
-            "Context Freshness",
-        ),
-    )
-    require_contains(
-        SKILL_ROOT / "assets" / "GEMINI.md.template",
-        (
-            "agents-system-setup:platform: gemini-cli",
-            "AGENTS.md",
-            ".gemini/agents/*.md",
-            "mcp_servers",
+            "Use the active runtime's skill loader",
+            "a link alone does not load a skill",
         ),
     )
     require_contains(
         SKILL_ROOT / "assets" / "AGENTS.md.template",
         (
-            "Required Minimum for Every Task Assignment",
-            "Plan Handoff Contract",
-            "Context freshness: recent",
+            "Load [project policy](",
+            "never eagerly import the workflow library",
+            "{{DETAIL_REFERENCES}}",
         ),
     )
     require_contains(
@@ -2883,10 +2834,9 @@ def check_context_optimization() -> None:
     require_contains(
         SKILL_ROOT / "assets" / "subagent.codex.toml.template",
         (
-            "Context Load Order",
-            "Outcome first",
-            "summary + pointer rule",
-            "Task Assignment Acceptance Checklist",
+            "Task Assignment intake:",
+            "Context freshness is snapshot age only",
+            "Reporting minimum:",
             "question_request",
         ),
     )
@@ -3044,7 +2994,7 @@ def check_plan_handoff_policy() -> None:
     require_contains(
         SKILL_ROOT / "references" / "handoff.md",
         (
-            "Plan Handoff Contract",
+            "Task Assignment / Prompt Contract",
             "HandoffIR",
             "agent: Plan",
             "Copilot CLI",
@@ -3062,7 +3012,7 @@ def check_plan_handoff_policy() -> None:
         SKILL_ROOT / "SKILL.md",
         (
             "Plan handoff is normalized before emission",
-            "Plan Handoff Contract",
+            "task-delegation",
             "HandoffIR",
             "references/handoff.md",
         ),
@@ -3070,53 +3020,29 @@ def check_plan_handoff_policy() -> None:
     require_contains(
         SKILL_ROOT / "assets" / "AGENTS.md.template",
         (
-            "## Plan Handoff Contract",
-            "{{HANDOFF_SOURCES}}",
-            "Canonical required fields (12)",
-            "Task",
-            "Source plan",
-            "Owned paths",
-            "Read-only paths",
-            "Relevant gates",
-            "Constraints",
-            "Dependencies / wave",
-            "Required approvals",
-            "Runtime format target",
-            "Expected output",
-            "Context freshness",
-            "Lossiness",
-            "Expansion fields",
-            "Owning agent",
-            "Evidence",
-            "{{PLATFORM_FORMAT_NOTES}}",
-            "{{HANDOFF_EVIDENCE}}",
-        ),
-    )
-    require_contains(
-        SKILL_ROOT / "assets" / "AGENTS.md.template",
-        (
-            "Plan Handoff Contract",
             "## Orchestration Operating Model",
+            "Load `task-delegation` from Skills",
+            "{{PROJECT_POLICY_PATH}}",
+            "Required independent review",
         ),
     )
     require_contains(
         SKILL_ROOT / "assets" / "subagent.agent.md.template",
         (
-            "## Handoff Input",
+            "## Task Assignment Input",
             "{{HANDOFF_SOURCE}}",
             "{{RUNTIME_FORMAT_TARGET}}",
-            "Handoff status",
+            "task-delegation",
+            "Acceptance Checklist",
         ),
     )
     require_contains(
         SKILL_ROOT / "assets" / "subagent.claude.md.template",
         (
             "agents-system-setup:platform: claude-code",
-            "## Handoff Input",
+            "## Task Assignment Input",
             "Claude Code frontmatter schema",
-            "comma-separated string",
-            "Do not use a YAML list",
-            "Handoff status",
+            "Acceptance Checklist",
         ),
     )
     require_contains(
@@ -3127,16 +3053,16 @@ def check_plan_handoff_policy() -> None:
             "OpenCode frontmatter schema",
             "No `name:` key",
             "opencode.json",
-            "Handoff status",
+            "Acceptance Checklist",
         ),
     )
     require_contains(
         SKILL_ROOT / "assets" / "subagent.codex.toml.template",
         (
-            "Plan Handoff:",
-            "{{HANDOFF_SOURCE}}",
-            "{{RUNTIME_FORMAT_TARGET}}",
-            "Handoff status",
+            "Task Assignment intake:",
+            "Context freshness is snapshot age only",
+            "Host `task-delegation loaded=true`",
+            "question_request",
         ),
     )
     require_contains(
@@ -3161,7 +3087,7 @@ def check_prompt_handoff_quality_policy() -> None:
     require_contains(
         prompt_ref,
         (
-            "Prompt Guidelines for Main-to-Subagent Handoff",
+            "Prompt Guidelines for Host-to-Worker Delegation",
             "Orchestrator Assignment Format",
             "Context Packet",
             "Allowed Capabilities",
@@ -3192,44 +3118,20 @@ def check_prompt_handoff_quality_policy() -> None:
     require_contains(
         SKILL_ROOT / "assets" / "AGENTS.md.template",
         (
-            "Prompt assignment quality",
-            "Context packet rule",
-            "Capabilities and skills",
-            "Assignment marker",
-            "Task assignment quality: ok | warn | fail",
-            "Platform-native delegation",
-            "OpenAI Codex (CLI + App)",
-            ".codex/agents/*.toml",
-            "Codex uses this root `AGENTS.md` section",
+            "Orchestration Operating Model",
+            "Load `task-delegation` from Skills",
+            "Context Loading Policy",
         ),
     )
     require_contains(
-        SKILL_ROOT / "assets" / "GEMINI.md.template",
+        SKILL_ROOT / "assets" / "task-delegation.skill.md.template",
         (
-            "Plan Handoff Contract",
-            "subtask slice",
-            "Task assignment quality",
-            "## Lifecycle",
-            "## Delegation Packet",
-            "Requirements Triage",
-            "Content Quality / Anti-Slop Review",
-            "root session",
+            "adaptive-balanced",
+            "Runtime-native surfaces",
+            "Child Context Delivery",
+            "Acceptance Checklist",
         ),
     )
-    for name in (
-        "AGENTS.md.template",
-        "GEMINI.md.template",
-    ):
-        require_contains(
-            SKILL_ROOT / "assets" / name,
-            (
-                "## Wave Execution",
-                "agents-system-setup:wave-execution",
-                "fan out",
-                "parallel-safe",
-                "wave",
-            ),
-        )
     require_contains(
         SKILL_ROOT / "references" / "agent-format.md",
         (
@@ -3237,15 +3139,6 @@ def check_prompt_handoff_quality_policy() -> None:
             "background: true",
             "permission-task-roster: skipped",
             "named roster allows",
-        ),
-    )
-    require_contains(
-        SKILL_ROOT / "references" / "context-optimization.md",
-        (
-            "Prompt guidelines",
-            "Context Packet rule",
-            "prompt-contract-review",
-            "embedded Assignment Intake",
         ),
     )
     require_contains(
@@ -3259,29 +3152,19 @@ def check_prompt_handoff_quality_policy() -> None:
     require_contains(
         SKILL_ROOT / "references" / "replication.md",
         (
-            "Context Packet",
-            "Allowed Capabilities",
-            "Skills Referenced",
-            "Stop / Escalation Conditions",
+            "canonical twelve-field contract",
+            "task-delegation",
+            "Workers retain their inline intake",
             "Task assignment quality",
         ),
     )
     require_contains(
         SKILL_ROOT / "SKILL.md",
         (
-            "Main-to-subagent handoff is structured",
+            "Prompt assignment quality",
             "prompt-guidelines.md",
             "Orchestrator Assignment Format",
             "Task assignment quality",
-        ),
-    )
-
-    require_contains(
-        SKILL_ROOT / "assets" / "AGENTS.md.template",
-        (
-            "Required Minimum for Every Task Assignment",
-            "subtask slice",
-            "Task assignment quality: ok | warn | fail",
         ),
     )
 
@@ -3317,15 +3200,11 @@ def check_prompt_handoff_quality_policy() -> None:
     require_contains(
         codex_path,
         (
-            "Assignment Intake / Preflight",
-            "Context Packet",
-            "Allowed Capabilities",
-            "Skills Referenced",
-            "Task assignment quality: ok | warn | fail",
-            "{{HANDOFF_TRIAGE_STATUS}}",
-            "{{HANDOFF_CONTENT_QUALITY_STATUS}}",
-            "{{HANDOFF_CONTEXT_FRESHNESS}}",
-            "Confirm Context freshness is explicit",
+            "Task Assignment intake:",
+            "Context freshness is snapshot age only",
+            "Host `task-delegation loaded=true`",
+            "Task assignment quality: ok|warn|fail",
+            "question_request",
         ),
     )
     structural_toml = _strip_toml_triple_strings(codex_path.read_text(encoding="utf-8"))
@@ -3347,7 +3226,7 @@ def check_codex_cli_app_compatibility() -> None:
         SKILL_ROOT / "SKILL.md",
         (
             "OpenAI Codex (CLI + App)",
-            "CLI-only instructions",
+            "CLI-only commands",
             ".codex/agents/<kebab-name>.toml",
         ),
     )
@@ -3380,17 +3259,21 @@ def check_codex_cli_app_compatibility() -> None:
         ),
     )
     require_contains(
-        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        SKILL_ROOT / "assets" / "task-delegation.skill.md.template",
         (
-            "OpenAI Codex",
-            "CLI + App project memory",
+            "| Codex CLI + App |",
+            "agents.max_concurrent_threads_per_session",
+            "current key",
         ),
     )
     require_contains(
         SKILL_ROOT / "assets" / "subagent.codex.toml.template",
         (
-            "Compatible with Codex CLI and Codex App",
-            "Do not require CLI-only commands",
+            "Codex rules:",
+            "Plan-mode parents may use request_user_input",
+            "Do not add unsupported question, memory, or delegation fields",
+            "{{OPTIONAL_REASONING_EFFORT_LINE}}",
+            "{{OPTIONAL_SANDBOX_MODE_LINE}}",
         ),
     )
     require_contains(
@@ -3422,24 +3305,26 @@ def check_runtime_update_policy() -> None:
     require_contains(
         models_ref,
         (
-            "Per-Runtime Model Constraints",
+            "# Adaptive Model and Effort Selection",
+            "Default policy: adaptive-balanced",
             "Copilot CLI",
             "Claude Code",
             "OpenCode",
-            "OpenAI Codex (CLI + App)",
+            "Codex CLI + App",
             "Gemini CLI",
-            "Rate limits",
+            "Runtime resolution facts",
             "Sources",
-            "Decision aid",
-            "inherit",
+            "advertised effort values",
+            "Explicit pins prevail",
         ),
     )
     require_contains(
         SKILL_ROOT / "references" / "interview.md",
         (
-            "Per-Agent Model Override",
+            "Per-Agent Model Override policy",
             "(./models.md)",
-            "platform default",
+            "adaptive-balanced",
+            "omit static model/effort fields",
         ),
     )
     require_contains(
@@ -3451,7 +3336,8 @@ def check_runtime_update_policy() -> None:
     require_contains(
         SKILL_ROOT / "references" / "replication.md",
         (
-            "Replication preserves explicit `model:` overrides only",
+            "constraint/lossiness decision",
+            "surface_lossiness",
         ),
     )
     require_contains(
@@ -3468,8 +3354,9 @@ def check_runtime_update_policy() -> None:
             "Permission keys",
             "permission.task",
             "OpenAI Codex (CLI + App)",
-            "job_max_runtime_seconds",
-            "spawn_agents_on_csv",
+            "model_reasoning_effort",
+            "agents.max_concurrent_threads_per_session",
+            "max_threads",
             "Gemini CLI",
             "Supported",
             ".gemini/agents/*.md",
@@ -3502,8 +3389,9 @@ def check_runtime_update_policy() -> None:
             "background: true",
             "Permission keys",
             "permission.task",
-            "job_max_runtime_seconds",
-            "spawn_agents_on_csv",
+            "model_reasoning_effort",
+            "agents.max_concurrent_threads_per_session",
+            "max_threads",
             ".gemini/agents/<name>.md",
             "extension `agents/*.md`",
             "mcp_servers",
@@ -3519,8 +3407,8 @@ def check_runtime_update_policy() -> None:
             "Permission keys",
             "{{OPTIONAL_BACKGROUND_LINE}}",
             "permission-task-roster: skipped",
-            "job_max_runtime_seconds",
-            "spawn_agents_on_csv",
+            "model_reasoning_effort",
+            "max_concurrent_threads_per_session",
             "Gemini CLI",
             ".gemini/agents/*.md",
             "kind: local",
@@ -3575,8 +3463,10 @@ def check_runtime_update_policy() -> None:
     require_contains(
         SKILL_ROOT / "assets" / "subagent.codex.toml.template",
         (
-            "job_max_runtime_seconds",
-            "spawn_agents_on_csv",
+            "{{OPTIONAL_REASONING_EFFORT_LINE}}",
+            "{{OPTIONAL_SANDBOX_MODE_LINE}}",
+            "question_request",
+            "Task Assignment intake:",
         ),
     )
     require_contains(
@@ -3961,33 +3851,11 @@ def check_learning_memory_policy() -> None:
         SKILL_ROOT / "assets" / "AGENTS.md.template",
         (
             "Memory & Learning System",
-            "{{LEARNING_MEMORY_PROFILE}}",
-            "{{NATIVE_LEARNING_SURFACE}}",
-            "{{LEARNING_MEMORY_OWNER}}",
-            "{{LEARNING_MEMORY_PATH}}",
-            "Native vs plugin-managed",
-            "provider-native memory is complementary",
-            "plugin-managed Learning Check stays active",
-            "Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>",
+            "{{LEARNING_MEMORY_SUMMARY}}",
+            "Learning Check: `none` is valid.",
             "overwrite requires orchestrator approval",
-            "no secrets or raw credentials",
-        ),
-    )
-    require_contains(
-        SKILL_ROOT / "assets" / "GEMINI.md.template",
-        (
-            "Memory & Learning",
-            "Learning Check before done",
-            "Do not store secrets or raw credentials",
-        ),
-    )
-    require_contains(
-        SKILL_ROOT / "assets" / "AGENTS.md.template",
-        (
-            "Reflect & Learn",
-            "Learning Check",
-            "overwrite",
-            "Never store secrets or raw credentials",
+            "without secrets or raw",
+            "logs",
         ),
     )
     require_contains(
@@ -4015,9 +3883,8 @@ def check_learning_memory_policy() -> None:
         SKILL_ROOT / "assets" / "subagent.codex.toml.template",
         (
             "Learning Check:",
-            "Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>",
-            "orchestrator approval",
-            "Never store secrets or raw credentials",
+            "No secrets or raw logs",
+            "Question requests; Handoff status; Learning Check.",
         ),
     )
     require_contains(
@@ -4037,15 +3904,6 @@ def check_learning_memory_policy() -> None:
             "learning_memory_profile",
             "learning_gate_strength",
             "overwrite requires orchestrator approval",
-        ),
-    )
-    require_contains(
-        SKILL_ROOT / "references" / "context-optimization.md",
-        (
-            "Memory & learning files",
-            "Learning Index",
-            "learning-check",
-            "Memory & Learning System",
         ),
     )
     require_contains(
@@ -4138,32 +3996,31 @@ def check_instruction_memory_audit_policy() -> None:
         ),
     )
     require_contains(
-        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        SKILL_ROOT / "assets" / "project-policy.md.template",
         (
             "## Instruction Memory Audit",
-            "{{INSTRUCTION_MEMORY_AUDIT_STATUS}}",
-            "{{INSTRUCTION_MEMORY_AUDIT_SIGNALS}}",
-            "CLAUDE.md` adapter: import, symlink, or copy",
-            "adapter symlinks/copies are expected and not conflicts",
-            "instruction-memory-audit",
+            "adapter-drift",
+            "duplicate-policy",
+            "read-only `agents-doctor` skill",
         ),
     )
     require_contains(
         SKILL_ROOT / "references" / "platforms.md",
         (
             "Instruction memory adapter rule",
-            "canonical cross-runtime",
-            "runtime adapter",
-            "not duplicate-policy findings",
+            "AGENTS.md` is the canonical",
+            "small `@AGENTS.md` adapters",
+            "Audit the whole load",
         ),
     )
     require_contains(
         SKILL_ROOT / "references" / "context-optimization.md",
         (
-            "Runtime memory adapters",
-            "Instruction Memory Audit",
-            "instruction-memory-audit",
-            "adapter drift",
+            "Native memory adapters",
+            "Instruction-memory audit",
+            "read-only doctor findings",
+            "and overlapping",
+            "skill paths",
         ),
     )
 
@@ -4200,10 +4057,73 @@ def check_upgrade_mismatch_detection_policy() -> None:
         SKILL_ROOT / "SKILL.md",
         (
             "mismatch--deprecation-detection-upgrade-mode",
-            "structural diff",
-            "missing sections/skills/roles",
-            "deprecated artifacts",
-            "migration-backup",
+            "structural drift",
+            "prepared` → `applied` → `verified`",
+            "current compact contract",
+        ),
+    )
+
+
+def check_final_integration_contracts() -> None:
+    """Keep the final native-memory and handoff contracts from regressing."""
+    replication_ref = SKILL_ROOT / "references" / "replication.md"
+    require_contains(
+        replication_ref,
+        (
+            "### 1d. ProjectMemoryIR",
+            "source: native | existing | user-supplied | fallback",
+            "requested_path: <path|null>",
+            "observed_paths: []",
+            "`requested_path` is the actual approved native invocation target",
+            "use `null` if no initializer ran and `[]` when no native output",
+            "Native-init",
+            "provenance is source evidence",
+        ),
+    )
+
+    migration_ref = SKILL_ROOT / "references" / "misplaced-artifacts-migration.md"
+    require_contains(
+        migration_ref,
+        (
+            '"requested_path": null',
+            '"observed_paths": []',
+            "For an actual native invocation, record its",
+            "approved requested path, not the canonical destination",
+            "Without an invocation use `null`",
+            "`observed_paths` records only actual native outputs, or `[]` if none",
+            "record unknown provenance",
+            "require manual review before selecting",
+            "Never assume a plugin version",
+        ),
+    )
+
+    markdown_workers = (
+        "subagent.agent.md.template",
+        "subagent.claude.md.template",
+        "subagent.opencode.md.template",
+        "subagent.gemini.md.template",
+    )
+    for filename in markdown_workers:
+        require_contains(
+            SKILL_ROOT / "assets" / filename,
+            (
+                "4. The assignment uses **full-form**",
+                "Build Gate task.",
+            ),
+        )
+
+    require_contains(
+        SKILL_ROOT / "assets" / "subagent.codex.toml.template",
+        (
+            "Full-form is required for MCP, secrets",
+            "Build Gate work.",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "task-delegation.skill.md.template",
+        (
+            "Use full-form for normal or risky multi-file work",
+            "Build Gate assignments",
         ),
     )
 
@@ -4238,12 +4158,11 @@ def check_sdlc_build_gate_policy() -> None:
         (
             "agents-system-setup:build-gate-matrix:start",
             "agents-system-setup:build-gate-matrix:end",
-            "{{BUILD_GATE_STRICTNESS}}",
-            "Diff buckets",
-            "Required gates per bucket",
-            "change-bug-hunter",
-            "change-validator",
-            "Wave assignment",
+            "Enabled:",
+            "max(size_bucket, criticality_bucket)",
+            "code-change-build-gate",
+            "Logical owners",
+            "Required gates and evidence are fail-closed",
         ),
     )
     skill_path = (
@@ -4262,21 +4181,13 @@ def check_sdlc_build_gate_policy() -> None:
             "Mutual-exclusion routing",
             "Strictness modifier",
             "Build gate: bucket=",
-            ".codex/skills/code-change-build-gate/SKILL.md",
+            ".agents/skills/code-change-build-gate/SKILL.md",
         ),
     )
     require_contains(
         SKILL_ROOT / "assets" / "AGENTS.md.template",
         (
-            "## Build Gate (SDLC)",
-            "{{BUILD_GATE_STRICTNESS}}",
-            "{{BUILD_GATE_MATRIX}}",
-            "{{BUILD_GATE_REFERENCE}}",
-            "code-change-build-gate",
-            "change-bug-hunter",
-            "change-validator",
-            "max(size_bucket, criticality_bucket)",
-            "n/a — non-software project | user skipped",
+            "{{BUILD_GATE_ROOT_BLOCK}}",
         ),
     )
     require_contains(
@@ -4286,21 +4197,20 @@ def check_sdlc_build_gate_policy() -> None:
             "build_gate_strictness",
             "sdlc-build-gate",
             "code-change-build-gate",
-            "build-gate-matrix",
             "max(size_bucket, criticality_bucket)",
             "change-bug-hunter",
             "change-validator",
-            "merge `change-validator` into `@reviewer`",
+            "without forcing three gate workers",
         ),
     )
     require_contains(
         SKILL_ROOT / "references" / "topology.md",
         (
-            "Software-Dev Universal Subagents (Build Gate)",
+            "## Software-Development Build Gate Responsibilities",
             "build-runner",
             "change-bug-hunter",
             "change-validator",
-            "evidence integrator",
+            "evidence integration responsibility",
             "mutual-exclusion",
         ),
     )
@@ -4320,7 +4230,7 @@ def check_sdlc_build_gate_policy() -> None:
 def check_code_quality_policy() -> None:
     """Ensure the Code Quality & Maintainability subsystem is wired across
     reference, skill template, snippet, AGENTS.md, SKILL.md, topology, interview,
-    the Build Gate cross-link, and the subagent/task-handoff propagation markers.
+    the Build Gate cross-link, and the subagent/task-delegation propagation markers.
 
     Code quality = authoring craft for project source code; complementary to the
     Build Gate (verification) and distinct from content-quality (agent prose).
@@ -4358,7 +4268,7 @@ def check_code_quality_policy() -> None:
             "code-bearing",
             "Skills Referenced: code-quality loaded=true",
             "Code quality: ok | warn | fail | n/a; signals=<list|none>",
-            ".codex/skills/code-quality/SKILL.md",
+            ".agents/skills/code-quality/SKILL.md",
         ),
     )
     require_contains(
@@ -4374,15 +4284,7 @@ def check_code_quality_policy() -> None:
     require_contains(
         SKILL_ROOT / "assets" / "AGENTS.md.template",
         (
-            "## Code Quality & Maintainability",
-            "{{CODE_QUALITY_STRICTNESS}}",
-            "{{CODE_QUALITY_STANDARDS}}",
-            "{{CODE_QUALITY_REFERENCE}}",
-            "{{CODE_QUALITY_OWNER}}",
-            "{{CODE_QUALITY_SKILL_PATHS}}",
-            "{{CODE_QUALITY_STATUS}}",
-            "code-quality-reviewer",
-            "Code quality: n/a — non-software project",
+            "{{CODE_QUALITY_ROOT_BLOCK}}",
         ),
     )
     require_contains(
@@ -4391,12 +4293,10 @@ def check_code_quality_policy() -> None:
             "Code quality & maintainability is mandatory for software-dev",
             "conform to the project's existing conventions first",
             "code_quality_strictness",
-            "code-quality-reviewer",
-            "code-quality-standards",
-            "Code Quality & Maintainability emission",
-            "code-bearing repo → `advisory`",
-            "`code-quality` for code-bearing projects",
-            "Skills Referenced: code-quality loaded=true",
+            "Code Quality & Maintainability",
+            "conventions-first",
+            "Code quality:",
+            "code-quality",
         ),
     )
     require_contains(
@@ -4424,20 +4324,28 @@ def check_code_quality_policy() -> None:
         ),
     )
     # Propagation: the Code quality reporting marker must reach every code-writing
-    # surface (subagent templates + the host-side task-handoff skill).
+    # surface (subagent templates + the host-side task-delegation skill).
     propagation_targets = [
         SKILL_ROOT / "assets" / "subagent.agent.md.template",
         SKILL_ROOT / "assets" / "subagent.claude.md.template",
         SKILL_ROOT / "assets" / "subagent.opencode.md.template",
         SKILL_ROOT / "assets" / "subagent.gemini.md.template",
         SKILL_ROOT / "assets" / "subagent.codex.toml.template",
-        SKILL_ROOT / "assets" / "task-handoff.skill.md.template",
+        SKILL_ROOT / "assets" / "task-delegation.skill.md.template",
     ]
-    for path in propagation_targets:
+    for path in propagation_targets[:4]:
         require_contains(
             path,
             ("Code quality: ok | warn | fail | n/a; signals=<list|none>",),
         )
+    require_contains(
+        propagation_targets[4],
+        ("Code quality: ok|warn|fail|n/a; signals=<list|none>",),
+    )
+    require_contains(
+        propagation_targets[5],
+        ("Code quality: ok | warn | fail | n/a; signals=<list|none>",),
+    )
     # Apply contract: edit-capable/reviewer subagent templates must instruct the
     # agent to APPLY the standards while working, not merely report the marker.
     apply_instruction_targets = [
@@ -4448,38 +4356,22 @@ def check_code_quality_policy() -> None:
         SKILL_ROOT / "assets" / "subagent.codex.toml.template",
     ]
     for path in apply_instruction_targets:
-        require_contains(path, ("Code Quality & Maintainability",))
+        require_contains(path, ("code-quality loaded=true",))
     require_contains(
-        SKILL_ROOT / "assets" / "task-handoff.skill.md.template",
-        ("Skills Referenced: code-quality loaded=true",),
+        SKILL_ROOT / "assets" / "task-delegation.skill.md.template",
+        ("host load evidence is not child", "child-visible code-quality standards"),
     )
 
 
 def check_layered_context_hard_rule() -> None:
-    """Ensure hard rule #37 (layered context & self-contained subagents) is declared in SKILL.md and the supporting snippets exist with the canonical content."""
+    """Ensure compact layered context and worker digests remain documented."""
     require_contains(
         SKILL_ROOT / "SKILL.md",
         (
-            "Layered context & self-contained subagents",
-            "subagent_count >= 2",
-            "**Audience:** all | host-orchestrator | subagents",
-            "subagent-digest:managed:start",
-            "audience-tags snippet",
-            "project-standard-digest snippet",
-            "explorer-agents",
-        ),
-    )
-    audience_path = SKILL_ROOT / "assets" / "audience-tags.snippet.md"
-    require_contains(
-        audience_path,
-        (
-            "**Audience:**",
-            "all",
-            "host-orchestrator",
-            "subagents",
-            "subagent_count >= 2",
-            "balanced",
-            "Subagent Self-Contained Notice",
+            "Self-contained workers, honest context",
+            "five lines, or three for Codex",
+            "Audience labels and a parent's `recent` snapshot",
+            "subagent-digest:managed:start v=",
         ),
     )
     digest_path = SKILL_ROOT / "assets" / "project-standard-digest.snippet.md"
@@ -4489,16 +4381,26 @@ def check_layered_context_hard_rule() -> None:
             "subagent-digest:managed:start v=",
             "subagent-digest:managed:end",
             "sha256",
-            "task-handoff",
+            "task-delegation",
             "Codex variant",
+            "exactly these five required bullet lines",
+            "three required Codex bullet lines",
         ),
     )
 
 
 def check_audience_tags_in_agents_md() -> None:
-    """Ensure AGENTS.md.template carries the audience-tag placeholders and Project Snapshot has the **Audience:** all marker."""
+    """Ensure compact root memory does not require audience-only markers."""
     template = SKILL_ROOT / "assets" / "AGENTS.md.template"
     require_contains(
+        template,
+        (
+            "## Project Snapshot",
+            "## Orchestration Operating Model",
+            "## Skills",
+        ),
+    )
+    require_not_contains(
         template,
         (
             "{{AUDIENCE_TAGS_BLOCK}}",
@@ -4532,7 +4434,7 @@ def check_subagent_self_containment() -> None:
             "<!-- subagent-digest:managed:start v=",
             "Project standard digest (managed by agents-system-setup):",
             "Boundary: least privilege",
-            "Handoff: consult `task-handoff` skill",
+            "host-loaded skills are not child context",
             "<!-- subagent-digest:managed:end -->",
         ),
     )
@@ -4560,7 +4462,7 @@ def check_explorer_agents_reference() -> None:
         SKILL_ROOT / "SKILL.md",
         (
             "explorer-agents",
-            "native explorer subagent",
+            "Use [explorer agents]",
         ),
     )
     require_contains(
@@ -4598,7 +4500,8 @@ def check_host_builtins_routing_reference() -> None:
         (
             "<!-- agents-system-setup:host-builtins-routing -->",
             "### Native Runtime Agents",
-            "host_builtins_routing: declined",
+            "no worker count or forced invocation applies",
+            "Load `task-delegation`",
         ),
     )
     try:
@@ -4608,10 +4511,10 @@ def check_host_builtins_routing_reference() -> None:
     except UnicodeDecodeError:
         return
     rel = snippet_path.relative_to(REPO).as_posix()
-    if snippet.count("<!-- agents-system-setup:host-builtins-routing -->") < 2:
-        err(f"{rel}: host-builtins-routing anchor must appear at least twice")
-    if snippet.count("### Native Runtime Agents") < 2:
-        err(f"{rel}: Native Runtime Agents heading must appear at least twice")
+    if snippet.count("<!-- agents-system-setup:host-builtins-routing -->") != 1:
+        err(f"{rel}: host-builtins-routing anchor must appear exactly once")
+    if snippet.count("### Native Runtime Agents") != 1:
+        err(f"{rel}: Native Runtime Agents heading must appear exactly once")
 
 
 def check_host_builtins_routing_in_agents_md() -> None:
@@ -4626,32 +4529,31 @@ def check_host_builtins_routing_in_agents_md() -> None:
     except UnicodeDecodeError:
         return
 
-    platform_line = next(
-        (i for i, line in enumerate(lines, start=1) if line == "### Platform-native delegation"),
+    orchestration_line = next(
+        (i for i, line in enumerate(lines, start=1) if line == "## Orchestration Operating Model"),
         None,
     )
     placeholder_line = next(
         (i for i, line in enumerate(lines, start=1) if "{{HOST_BUILTINS_ROUTING_BLOCK}}" in line),
         None,
     )
-    wave_line = next(
-        (i for i, line in enumerate(lines, start=1) if line == "## Wave Execution"),
+    security_line = next(
+        (i for i, line in enumerate(lines, start=1) if line == "## Security & Audit Matrix"),
         None,
     )
-    if not platform_line or not placeholder_line or not wave_line:
+    if not orchestration_line or not placeholder_line or not security_line:
         err(f"{rel}: cannot verify host builtins placeholder placement")
         return
-    if not (platform_line < placeholder_line < wave_line):
+    if not (orchestration_line < placeholder_line < security_line):
         err(
-            f"{rel}: {{HOST_BUILTINS_ROUTING_BLOCK}} must be between "
-            "### Platform-native delegation and ## Wave Execution"
+            f"{rel}: {{HOST_BUILTINS_ROUTING_BLOCK}} must be inside "
+            "## Orchestration Operating Model before ## Security & Audit Matrix"
         )
 
 
 def check_cross_session_orchestration_policy() -> None:
     """v1.11.0: keep the GitHub Copilot app cross-session orchestration advisory in sync
-    across the parallelism reference, the AGENTS.md.template Copilot delegation note + Wave
-    Execution bullet, and SKILL.md hard rule #13. Host-app-specific and advisory — generated
+    across the parallelism reference and SKILL.md hard rule #13. Host-app-specific and advisory — generated
     files never depend on it, so this only guards that the guidance is present and consistent."""
     require_contains(
         SKILL_ROOT / "references" / "parallelism.md",
@@ -4665,13 +4567,146 @@ def check_cross_session_orchestration_policy() -> None:
     require_contains(
         SKILL_ROOT / "assets" / "AGENTS.md.template",
         (
-            "child sessions (1 session per branch/PR) via `/orchestrate`",
-            "GitHub Copilot app only (advisory):",
+            "## Orchestration Operating Model",
+            "Delegate for specialist context",
+            "zero specialists is valid",
         ),
     )
     require_contains(
         SKILL_ROOT / "SKILL.md",
         ("optional Copilot-app cross-session advisory",),
+    )
+
+
+def check_advisory_supervision_policy() -> None:
+    """v1.12.0: guard the opt-in supervision protocol for running child sessions.
+
+    Supervision is the in-flight counterpart to v1.11.0's dispatch model. It is
+    Copilot-app-specific, off by default, and must stay consistent across the
+    parallelism reference, the handoff reporting contract, the topology verdict
+    owner, the interview gate, the AGENTS.md advisory lines, and SKILL.md rule #13.
+    """
+    require_contains(
+        SKILL_ROOT / "references" / "parallelism.md",
+        (
+            "### Supervising a running child session",
+            "advisory_supervision",
+            "#### C1 — the plan gate",
+            "only when the child was created in plan mode",
+            "**Polling is banned.**",
+            "Premise invalidation",
+            "`returned`, `reconciled-from-artifact`, or `explicitly-abandoned`",
+            "The branch/PR is the source of truth",
+            "**Advise, never edit.**",
+            "https://github.com/github/app/releases/tag/v1.0.10",
+            "https://github.com/github/copilot-cli/releases/tag/v1.0.72",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "handoff.md",
+        ("In bounds: yes | no; escaped=<paths|none>",),
+    )
+    for template in (
+        "subagent.agent.md.template",
+        "subagent.claude.md.template",
+        "subagent.gemini.md.template",
+        "subagent.opencode.md.template",
+        "task-delegation.skill.md.template",
+    ):
+        require_contains(
+            SKILL_ROOT / "assets" / template,
+            ("In bounds: yes | no; escaped=<paths|none>",),
+        )
+    require_contains(
+        SKILL_ROOT / "assets" / "subagent.codex.toml.template",
+        ("In bounds: yes|no; escaped=<paths|none>",),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "topology.md",
+        (
+            "## Advisory Supervision Routing",
+            "adds **no new role**",
+            "advisory_verdict_owner = merged",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "interview.md",
+        (
+            "### 9e. Advisory supervision of child sessions (signal-gated, off by default)",
+            "Record `advisory_supervision = off`",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        (
+            "## Orchestration Operating Model",
+            "Workers never",
+            "{{HOST_BUILTINS_ROUTING_BLOCK}}",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "advisory_supervision = off",
+            "**Advisory supervision (Q9e)** is signal-gated",
+        ),
+    )
+
+
+def check_domain_skill_policy() -> None:
+    """v1.13.0: guard the project-domain skill layer.
+
+    Before this, `SKILL.md` Phase 2 carried a bare "- Skills to create." bullet with
+    no taxonomy, no derivation rule, and no reference, while `skill.template.md` was
+    the only skill template without a `skill-kind` marker. Project domain knowledge
+    therefore defaulted into the always-loaded `AGENTS.md`. These guards keep the
+    `domain` kind, the placement rule, the admission gate, and the never-overwrite
+    ownership contract in sync.
+    """
+    require_contains(
+        SKILL_ROOT / "assets" / "skill.template.md",
+        (
+            "<!-- agents-system-setup:skill-kind: domain -->",
+            "The plugin owns this file's structure; YOU own its content.",
+            "improve` / `upgrade` never overwrite the body below",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "skill-format.md",
+        (
+            "## Skill kinds",
+            "### Admission gate for a `domain` skill",
+            "**Never overwritten.**",
+            "Soft cap: roughly one domain skill per major ownership zone",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "context-optimization.md",
+        (
+            "### 2a. Placement rule — where a piece of knowledge goes",
+            "`skill-kind: domain` skill",
+            "Needed on every task",
+            "Needed on some tasks and project-specific",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "instruction-memory-audit.md",
+        (
+            "domain-skill-restatement",
+            "Body is **user-authored**",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "interview.md",
+        ("This question is about skills to *install*, not skills to *author*.",),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "- **Skills to create** —",
+            "never a blank \"what skills do you want?\" prompt",
+            "project-specific, load-on-demand, stable trigger",
+        ),
     )
 
 
@@ -4820,23 +4855,21 @@ def check_tool_catalog_stamp_in_templates() -> None:
         require_contains(SKILL_ROOT / "assets" / template_name, (stamp,))
 
 
-def check_task_handoff_skill_policy() -> None:
-    """Ensure the host-side task-handoff skill is emitted and referenced as the source of truth."""
+def check_task_delegation_skill_policy() -> None:
+    """Ensure the host-side task-delegation skill is emitted and referenced as the source of truth."""
     skill_path = (
         SKILL_ROOT
-        / "assets" / "task-handoff.skill.md.template"
+        / "assets" / "task-delegation.skill.md.template"
     )
     require_contains(
         skill_path,
         (
-            "name: task-handoff",
-            "agents-system-setup:skill-kind: host-handoff",
-            "Host-only composition",
+            "name: task-delegation",
+            "agents-system-setup:skill-kind: host-delegation",
             "12 required-minimum fields",
-            "Skills Referenced: task-handoff loaded=true",
-            "subagents are executors",
+            "Skills Referenced: task-delegation loaded=true",
+            "Workers execute their assignment and never re-delegate",
             "fail-closed",
-            ".codex/skills/task-handoff/SKILL.md",
             "Acceptance Checklist",
             "Reporting Template",
             "Build gate:",
@@ -4845,27 +4878,24 @@ def check_task_handoff_skill_policy() -> None:
     require_contains(
         SKILL_ROOT / "SKILL.md",
         (
-            "task-handoff",
-            "host-side source of truth",
-            "Skills Referenced: task-handoff loaded=true",
-            "Subagents never re-delegate through this skill",
+            "`task-delegation` is the host workflow",
+            "host-delegation",
+            "Skills Referenced: task-delegation loaded=true",
+            "inline fail-closed Acceptance Checklist",
         ),
     )
     require_contains(
         SKILL_ROOT / "assets" / "AGENTS.md.template",
         (
-            "{{TASK_HANDOFF_SKILL_PATHS}}",
-            "Use the `task-handoff` skill",
-            "Skills Referenced: task-handoff loaded=true",
-            "executors",
+            "{{SKILL_TABLE_ROWS}}",
+            "Load only the skills",
         ),
     )
     require_contains(
         SKILL_ROOT / "references" / "handoff.md",
         (
-            "task-handoff",
-            "host-side `task-handoff` skill",
-            "Skills Referenced: task-handoff loaded=true",
+            "task-delegation",
+            "Skills Referenced: task-delegation loaded=true",
             "Subagents are executors",
             "return-to-orchestrator",
         ),
@@ -4873,23 +4903,24 @@ def check_task_handoff_skill_policy() -> None:
     require_contains(
         SKILL_ROOT / "references" / "platforms.md",
         (
-            "Skill auto-load and pointer-fallback rule",
-            "task-handoff",
+            "Skill loading and child-context rule",
+            "task-delegation",
             "code-change-build-gate",
-            "Skills Referenced: task-handoff loaded=true",
-            "pointer-only is acceptable",
+            "Skills Referenced: task-delegation loaded=true",
+            "a pointer alone is never",
+            "evidence that the child loaded it",
         ),
     )
     require_contains(
         SKILL_ROOT / "references" / "context-optimization.md",
         (
             "code-change-build-gate",
-            "task-handoff",
-            "host-only",
+            "task-delegation",
+            "Host-loaded skill evidence",
         ),
     )
     # Every subagent template (Markdown + Codex TOML) must keep an inline
-    # Reporting Template guard with the new Build gate line and a task-handoff
+    # Reporting Template guard with the new Build gate line and a task-delegation
     # source-of-truth pointer.
     for template_name in (
         "subagent.agent.md.template",
@@ -4900,40 +4931,39 @@ def check_task_handoff_skill_policy() -> None:
         require_contains(
             SKILL_ROOT / "assets" / template_name,
             (
-                "task-handoff",
+                "task-delegation",
                 "fail-closed minimum",
                 "Build gate: n/a | bucket=",
-                "return-to-orchestrator",
+                "question_request",
             ),
         )
     require_contains(
         SKILL_ROOT / "assets" / "subagent.codex.toml.template",
         (
-            "task-handoff",
-            ".codex/skills/task-handoff/SKILL.md",
-            "Never use the skill to delegate to another subagent",
-            "Build gate:",
-            "code-change-build-gate",
+            "task-delegation",
+            ".agents/skills/task-delegation/SKILL.md",
+            "Never re-delegate",
+            "Security analysis: when assigned",
+            "Build gate: when assigned",
+            "Content quality:",
+            "Code quality:",
         ),
     )
 
 
 def check_agents_doctor_skill_policy() -> None:
-    """Ensure the host-side read-only agents-doctor health check is present and wired.
-
-    The doctor reconciles the generated agent system on disk against the central
-    manifest and catches strays (especially a hand-written orchestrator file),
-    missing artifacts, checksum drift, and operational-state misroutes.
-    """
+    """Ensure the canonical read-only doctor and generation-completion hook exist."""
     skill_path = SKILL_ROOT / "assets" / "agents-doctor.skill.md.template"
     require_contains(
         skill_path,
         (
             "name: agents-doctor",
             "agents-system-setup:skill-kind: host-doctor",
-            "# Agents Doctor (host-side)",
-            "**READ-ONLY**",
-            "**HOST-ONLY**",
+            "# Agents Doctor (host-side, read-only)",
+            "at most 150",
+            "12,288 raw UTF-8 bytes",
+            "--memory-only",
+            "skill-load-state-unknown",
             "orchestrator-subagent-file",
             "stray-agent",
             ".agents-system-setup/generated.json",
@@ -4948,41 +4978,1230 @@ def check_agents_doctor_skill_policy() -> None:
             "agents-system-setup:tool-kind: host-doctor",
             "This tool NEVER modifies files",
             "generated.json",
+            "ROOT_MAX_LINES = 150",
+            "ROOT_MAX_BYTES = 12_288",
             "orchestrator-subagent-file",
             "stray-agent",
             "operational-state-artifact",
+            "check_memory",
             "--json",
             "--strict",
+            "--memory-only",
         ),
     )
     require_contains(
         SKILL_ROOT / "SKILL.md",
         (
             "agents-doctor",
-            "reconciles on-disk agents against",
+            "agents-doctor.py --memory-only",
             ".agents-system-setup/agents-doctor.py",
-            "stray-agent",
-            "orchestrator-subagent-file",
         ),
     )
     require_contains(
         SKILL_ROOT / "references" / "agents-doctor.md",
         (
-            "# Agents Doctor — generated-system health check",
-            "## Signal catalog",
-            "## Reconciliation algorithm",
-            "## Exit codes",
-            "orchestrator-subagent-file",
-            "stray-agent",
+            "# Agents Doctor — generated-system and memory health check",
+            "## Canonical memory contract",
+            "12,288 bytes",
+            "raw UTF-8",
+            "## Controlled adapters and imports",
+            "## References and native skills",
+            "## Manifest reconciliation",
+            "## Read-only boundary",
         ),
     )
     require_contains(
-        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        SKILL_ROOT / "assets" / "project-policy.md.template",
         (
-            "## Generated-System Health Check",
-            "python3 .agents-system-setup/agents-doctor.py",
+            "Instruction Memory Audit",
+            "Use the read-only `agents-doctor` skill",
+            "Human Input / Question Protocol",
         ),
     )
+
+
+def _doctor_fixture_error(label: str, detail: str) -> None:
+    err(f"agents-doctor fixture {label}: {detail}")
+
+
+def _doctor_fixture_assert(label: str, condition: bool, detail: str) -> None:
+    if not condition:
+        _doctor_fixture_error(label, detail)
+
+
+def _doctor_fixture_has_signal(findings: list[Any], signal: str, severity: str | None = None) -> bool:
+    return any(
+        getattr(finding, "signal", None) == signal
+        and (severity is None or getattr(finding, "severity", None) == severity)
+        for finding in findings
+    )
+
+
+def _doctor_fixture_snapshot(root: Path) -> dict[str, tuple[str, bytes | str | None]]:
+    snapshot: dict[str, tuple[str, bytes | str | None]] = {}
+    if not root.exists():
+        return snapshot
+    for path in sorted(root.rglob("*")):
+        rel = path.relative_to(root).as_posix()
+        if path.is_symlink():
+            snapshot[rel] = ("symlink", os.readlink(path))
+        elif path.is_dir():
+            snapshot[rel] = ("dir", None)
+        elif path.is_file():
+            snapshot[rel] = ("file", path.read_bytes())
+    return snapshot
+
+
+def _doctor_fixture_write(root: Path, relative: str, content: bytes | str) -> Path:
+    path = root / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if isinstance(content, str):
+        path.write_bytes(content.encode("utf-8"))
+    else:
+        path.write_bytes(content)
+    return path
+
+
+def _doctor_fixture_manifest(artifacts: list[tuple[str, str]]) -> dict[str, Any]:
+    return {
+        "schema": 1,
+        "plugin_version": "v1.2.3",
+        "artifacts": [
+            {"path": path, "kind": kind, "checksum": "sha256:" + "0" * 64}
+            for path, kind in artifacts
+        ],
+    }
+
+
+def _doctor_fixture_stamp() -> str:
+    return "<!-- agents-system-setup:generated-by: v1.2.3 -->"
+
+
+def _doctor_fixture_new_root(parent: Path, label: str) -> Path:
+    root = parent / label
+    root.mkdir(parents=True, exist_ok=False)
+    return root
+
+
+def _doctor_fixture_symlink(link: Path, target: Path) -> bool:
+    try:
+        link.symlink_to(target, target_is_directory=target.is_dir())
+    except OSError as exc:
+        if exc.errno not in {errno.EPERM, errno.EACCES, errno.ENOSYS}:
+            raise
+        warn(f"agents-doctor fixtures: symbolic links unavailable ({exc}); case not exercised.")
+        return False
+    return True
+
+
+def _doctor_fixture_render_asset(filename: str, values: dict[str, str]) -> str:
+    template = (SKILL_ROOT / "assets" / filename).read_text(encoding="utf-8")
+    return re.sub(r"\{\{([A-Z][A-Z0-9_]*)\}\}", lambda match: values[match.group(1)], template)
+
+
+def _doctor_fixture_run_cli(
+    doctor_script: Path,
+    root: Path,
+    *args: str,
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, str(doctor_script), "--root", str(root), *args],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+
+
+def _doctor_fixture_test_memory_budget(doctor: dict[str, Any], root: Path) -> None:
+    check_memory = doctor["check_memory"]
+    cases = [
+        ("exact-150-lines", b"x\n" * 150, 150, 300, None),
+        ("one-over-lines", b"x\n" * 150 + b"x", 151, 301, "memory-budget-lines"),
+        ("exact-12288-bytes", b"x" * 12_287 + b"\n", 1, 12_288, None),
+        ("one-over-bytes", b"x" * 12_288 + b"\n", 1, 12_289, "memory-budget-bytes"),
+        ("long-single-line", b"x" * 12_289, 1, 12_289, "memory-budget-bytes"),
+        ("unicode-exact-bytes", ("é" * 6_143 + "a\n").encode("utf-8"), 1, 12_288, None),
+        ("unicode-one-over", ("é" * 6_144 + "\n").encode("utf-8"), 1, 12_289, "memory-budget-bytes"),
+        ("crlf-150-lines", b"x\r\n" * 150, 150, 450, None),
+        ("unterminated-final-line", b"x\n" * 149 + b"x", 150, 299, None),
+        ("invalid-utf8", b"\xff", 1, 1, "memory-invalid-utf8"),
+    ]
+    for label, raw, expected_lines, expected_bytes, expected_signal in cases:
+        path = root / "AGENTS.md"
+        path.write_bytes(raw)
+        findings, report = check_memory(root, None)
+        _doctor_fixture_assert(
+            label,
+            report.get("lines") == expected_lines and report.get("bytes") == expected_bytes,
+            f"reported lines/bytes={report.get('lines')}/{report.get('bytes')}, expected {expected_lines}/{expected_bytes}",
+        )
+        if expected_signal:
+            _doctor_fixture_assert(
+                label,
+                _doctor_fixture_has_signal(findings, expected_signal, "error"),
+                f"missing expected error signal {expected_signal}",
+            )
+        else:
+            _doctor_fixture_assert(
+                label,
+                not any(getattr(finding, "severity", None) == "error" for finding in findings),
+                "exact-boundary fixture unexpectedly produced an error",
+            )
+
+
+def _doctor_fixture_test_generated_relationships(
+    doctor: dict[str, Any], parent: Path, rendered_engine: str
+) -> None:
+    skills = (
+        "task-delegation", "agents-doctor", "tool-catalog-audit",
+        "code-quality", "code-change-build-gate",
+    )
+    base_values = {
+        "PROJECT_NAME": "Fixture project",
+        "PLUGIN_VERSION": "v1.2.3",
+        "GENERATED_AT": "fixture",
+        "PURPOSE": "Maintain a small Python application.",
+        "PROJECT_STACK": "Python standard library",
+        "TARGET_PLATFORMS": "Copilot CLI",
+        "ARTIFACT_TRACKING": "project-local",
+        "ARTIFACT_TRACKING_NOTES": "Tracking is approved for this isolated fixture.",
+        "INSTALL_CMD": "python -m venv .venv",
+        "BUILD_CMD": "python -m compileall src",
+        "TEST_CMD": "python -m unittest discover tests",
+        "LINT_CMD": "python -m tabnanny src",
+        "DIRECTORY_ARCHITECTURE_ROWS": "| src/** | Application | @orchestrator | owned |",
+        "MODEL_SELECTION_POLICY": "adaptive-balanced",
+        "HOST_BUILTINS_ROUTING_BLOCK": "",
+        "SECURITY_AUDIT_SUMMARY_ROWS": "| External writes | all | @orchestrator | Explicit user approval |",
+        "THREAT_MODEL_SUMMARY": "Treat external inputs as untrusted; preserve authorization boundaries.",
+        "ARCHITECTURE_DECISION_SUMMARY": "Keep application logic separate from integration code.",
+        "PROJECT_POLICY_PATH": "docs/agents/project-policy.md",
+        "QUALITY_GATE_ROWS": "| Code changes | Unit tests and independent review | human reviewer | yes |",
+        "BUILD_GATE_ROOT_BLOCK": "## Build Gate (SDLC)\nLoad `code-change-build-gate`; missing required context or evidence blocks action.",
+        "CODE_QUALITY_ROOT_BLOCK": "## Code Quality & Maintainability\nConform first; load `code-quality` before code edits/reviews.",
+        "DETAIL_REFERENCES": "",
+        "LEARNING_MEMORY_SUMMARY": "Learning is disabled; report none.",
+        "SECURITY_AUDIT_MATRIX_ROWS": "| External writes | host | all | approval | project policy |",
+        "THREAT_MODEL_ROWS": "| Source | input boundary | unsafe content | validate inputs | host | active |",
+        "ARCHITECTURE_DECISION_ROWS": "| Layering | separate integration | inline | testability | preserve contracts | ADR-1 |",
+        "ADR_INDEX_ROWS": "| ADR-1 | Keep integration separate | host | accepted |",
+        "CAPABILITY_MATRIX_ROWS": "| Delivery | host | human reviewer | code changes |",
+        "REQUIREMENTS_TRIAGE_OWNER": "@orchestrator",
+        "REQUIREMENTS_TRIAGE_STATUS": "merged",
+        "CONTENT_QUALITY_OWNER": "@orchestrator",
+        "CONTENT_QUALITY_CURATOR": "merged",
+        "CODE_QUALITY_OWNER": "human reviewer",
+        "CODE_QUALITY_STRICTNESS": "standard",
+        "BUILD_GATE_STRICTNESS": "standard",
+        "SECURITY_TEAM_OPERATING_MODEL": "The host owns scope; human approval remains independent.",
+        "UNIT_TEST_OWNER": "@orchestrator",
+        "E2E_OWNER": "human reviewer",
+        "CHANGE_VALIDATOR_OWNER": "@orchestrator",
+    }
+    cases = [
+        (profile, specialists)
+        for profile in ("Compact", "Balanced", "Full")
+        for specialists in ((), ("reviewer",), ("builder", "security-auditor", "tester"))
+    ]
+    for profile, specialists in cases:
+        label = f"profile-{profile.casefold()}-{len(specialists)}-specialists"
+        root = _doctor_fixture_new_root(parent, label)
+        values = dict(base_values)
+        values["CONTEXT_PROFILE"] = profile
+        values["AGENT_ROSTER_ROWS"] = "\n".join(
+            ["| @orchestrator | Host delivery | Direct work |"]
+            + [f"| @{name} | Scoped {name} work | Assigned by host |" for name in specialists]
+        )
+        values["SKILL_TABLE_ROWS"] = "\n".join(
+            f"| {name} | {name} workflow | `.github/skills/{name}/SKILL.md` |"
+            for name in skills
+        )
+        text = _doctor_fixture_render_asset("AGENTS.md.template", values)
+        _doctor_fixture_write(root, "AGENTS.md", text)
+        artifacts = [("AGENTS.md", "agents-md")]
+        policy = values["PROJECT_POLICY_PATH"]
+        _doctor_fixture_write(
+            root, policy, _doctor_fixture_render_asset("project-policy.md.template", values)
+        )
+        artifacts.append((policy, "other"))
+        for name in skills:
+            relative = f".github/skills/{name}/SKILL.md"
+            _doctor_fixture_write(root, relative, _doctor_fixture_render_asset(f"{name}.skill.md.template", values))
+            artifacts.append((relative, "skill"))
+        for name in specialists:
+            relative = f".github/agents/{name}.agent.md"
+            _doctor_fixture_write(
+                root, relative,
+                f"---\nname: {name}\ndescription: Use when validating fixtures.\n---\n{_doctor_fixture_stamp()}\n",
+            )
+            artifacts.append((relative, "subagent"))
+        _doctor_fixture_write(root, "src/app.py", "VALUE = 1\n")
+        _doctor_fixture_write(
+            root, "tests/test_app.py",
+            "import unittest\nfrom src.app import VALUE\n\n"
+            "class AppTest(unittest.TestCase):\n    def test_value(self):\n        self.assertEqual(VALUE, 1)\n",
+        )
+        engine_path = ".agents-system-setup/agents-doctor.py"
+        engine = _doctor_fixture_write(root, engine_path, rendered_engine)
+        artifacts.append((engine_path, "other"))
+        pre_manifest = _doctor_fixture_run_cli(engine, root, "--memory-only", "--json")
+        draft_payload = json.loads(pre_manifest.stdout)
+        _doctor_fixture_assert(
+            label, pre_manifest.returncode == 0,
+            "actual rendered draft failed: " + pre_manifest.stdout,
+        )
+        manifest = _doctor_fixture_manifest(artifacts)
+        for artifact in manifest["artifacts"]:
+            artifact["checksum"] = "sha256:" + doctor["sha256_of"](root / artifact["path"], root)
+        _doctor_fixture_write(
+            root,
+            ".agents-system-setup/generated.json",
+            json.dumps(manifest, indent=2) + "\n",
+        )
+        before = _doctor_fixture_snapshot(root)
+        result = subprocess.run(
+            [sys.executable, str(engine), "--json"], cwd=parent,
+            capture_output=True, text=True, encoding="utf-8", check=False,
+        )
+        payload = json.loads(result.stdout)
+        _doctor_fixture_assert(
+            label, result.returncode == 0 and payload.get("ok") is True,
+            "actual manifested engine/skills failed normal reconciliation: " + result.stdout,
+        )
+        _doctor_fixture_assert(
+            label,
+            payload.get("manifest_present") is True
+            and draft_payload["memory"]["lines"] <= 150
+            and draft_payload["memory"]["bytes"] <= 12_288
+            and payload["memory"] == draft_payload["memory"],
+            "complete rendered root metrics or manifest state were inconsistent",
+        )
+        _doctor_fixture_assert(
+            label, before == _doctor_fixture_snapshot(root),
+            "normal reconciliation changed actual generated artifacts",
+        )
+        if profile == "Compact" and not specialists:
+            for omitted_path, _kind in artifacts:
+                incomplete = dict(manifest)
+                incomplete["artifacts"] = [
+                    artifact for artifact in manifest["artifacts"]
+                    if artifact["path"] != omitted_path
+                ]
+                _doctor_fixture_write(root, ".agents-system-setup/generated.json", json.dumps(incomplete))
+                omitted_result = _doctor_fixture_run_cli(engine, root, "--json")
+                omitted_payload = json.loads(omitted_result.stdout)
+                _doctor_fixture_assert(
+                    f"inventory-{omitted_path}",
+                    omitted_result.returncode == 1 and any(
+                        finding["signal"] == "stray-artifact" and finding["path"] == omitted_path
+                        for finding in omitted_payload["findings"]
+                    ),
+                    "a real generated artifact escaped manifest/checksum coverage",
+                )
+            _doctor_fixture_write(root, ".agents-system-setup/generated.json", json.dumps(manifest))
+        _doctor_fixture_assert(
+            label,
+            len(doctor["discover_agent_files"](root)) == len(specialists),
+            "specialist discovery count does not match the explicit sample output",
+        )
+
+
+def _doctor_fixture_test_memory_findings(
+    doctor: dict[str, Any], parent: Path
+) -> None:
+    check_memory = doctor["check_memory"]
+    start = doctor["MANAGED_START"]
+    end = doctor["MANAGED_END"]
+    stamp = _doctor_fixture_stamp()
+
+    malformed = _doctor_fixture_new_root(parent, "malformed-managed-markers")
+    _doctor_fixture_write(
+        malformed,
+        "AGENTS.md",
+        f"{stamp}\n{start}\nsummary without an end marker\n",
+    )
+    findings, _report = check_memory(
+        malformed, _doctor_fixture_manifest([("AGENTS.md", "agents-md")])
+    )
+    _doctor_fixture_assert(
+        "malformed-managed-markers",
+        _doctor_fixture_has_signal(findings, "malformed-managed-markers", "error"),
+        "generated malformed marker fixture was not rejected",
+    )
+
+    unresolved = _doctor_fixture_new_root(parent, "unresolved-placeholders")
+    _doctor_fixture_write(
+        unresolved,
+        "AGENTS.md",
+        f"{stamp}\n{start}\n{{{{PROFILE}}}}\n{end}\n",
+    )
+    findings, _report = check_memory(
+        unresolved, _doctor_fixture_manifest([("AGENTS.md", "agents-md")])
+    )
+    _doctor_fixture_assert(
+        "unresolved-placeholders",
+        _doctor_fixture_has_signal(findings, "unresolved-placeholder", "error"),
+        "generated unresolved placeholder was not rejected",
+    )
+
+    stale = _doctor_fixture_new_root(parent, "stale-delegation-name")
+    _doctor_fixture_write(
+        stale,
+        "AGENTS.md",
+        f"{stamp}\n{start}\nUse task-handoff for active delegation.\n{end}\n",
+    )
+    findings, _report = check_memory(
+        stale, _doctor_fixture_manifest([("AGENTS.md", "agents-md")])
+    )
+    _doctor_fixture_assert(
+        "stale-delegation-name",
+        _doctor_fixture_has_signal(findings, "stale-task-handoff-name", "error"),
+        "active legacy delegation name was not rejected",
+    )
+    _doctor_fixture_write(
+        stale,
+        "AGENTS.md",
+        f"{stamp}\n{start}\nRecognize task-handoff only as legacy migration history.\n{end}\n",
+    )
+    findings, _report = check_memory(
+        stale, _doctor_fixture_manifest([("AGENTS.md", "agents-md")])
+    )
+    _doctor_fixture_assert(
+        "legacy-delegation-name",
+        not _doctor_fixture_has_signal(findings, "stale-task-handoff-name"),
+        "explicit legacy migration wording was incorrectly rejected",
+    )
+
+    missing = _doctor_fixture_new_root(parent, "missing-reference-and-skill")
+    _doctor_fixture_write(
+        missing,
+        "AGENTS.md",
+        f"{stamp}\n{start}\n[policy](project-policy.md)\n"
+        ".agents/skills/missing/SKILL.md\n"
+        f"{end}\n",
+    )
+    findings, _report = check_memory(
+        missing, _doctor_fixture_manifest([("AGENTS.md", "agents-md")])
+    )
+    _doctor_fixture_assert(
+        "missing-reference-and-skill",
+        _doctor_fixture_has_signal(findings, "required-reference-missing", "error")
+        and _doctor_fixture_has_signal(findings, "declared-skill-missing", "error"),
+        "missing required reference/skill was not reported",
+    )
+
+    overlaps = _doctor_fixture_new_root(parent, "overlapping-native-skills")
+    _doctor_fixture_write(
+        overlaps,
+        "AGENTS.md",
+        f"{stamp}\n{start}\n"
+        ".agents/skills/shared/SKILL.md\n"
+        ".gemini/skills/shared/SKILL.md\n"
+        f"{end}\n",
+    )
+    for relative in (
+        ".agents/skills/shared/SKILL.md",
+        ".gemini/skills/shared/SKILL.md",
+    ):
+        _doctor_fixture_write(
+            overlaps,
+            relative,
+            "---\nname: shared\n---\n",
+        )
+    findings, _report = check_memory(
+        overlaps, _doctor_fixture_manifest([("AGENTS.md", "agents-md")])
+    )
+    _doctor_fixture_assert(
+        "overlapping-native-skills",
+        _doctor_fixture_has_signal(findings, "skill-overlap", "warn"),
+        "overlapping native skill roots were not reported",
+    )
+
+    legacy = _doctor_fixture_new_root(parent, "legacy-codex-skill")
+    _doctor_fixture_write(
+        legacy,
+        "AGENTS.md",
+        f"{stamp}\n{start}\n.codex/skills/legacy/SKILL.md\n{end}\n",
+    )
+    _doctor_fixture_write(
+        legacy,
+        ".codex/skills/legacy/SKILL.md",
+        "---\nname: legacy\n---\n",
+    )
+    findings, _report = check_memory(
+        legacy, _doctor_fixture_manifest([("AGENTS.md", "agents-md")])
+    )
+    _doctor_fixture_assert(
+        "legacy-codex-skill",
+        _doctor_fixture_has_signal(findings, "declared-skill-legacy-location", "error"),
+        "an active generated legacy Codex skill declaration was accepted",
+    )
+
+    manifest_escape = _doctor_fixture_new_root(parent, "manifest-out-of-root")
+    _doctor_fixture_write(
+        manifest_escape,
+        "AGENTS.md",
+        f"{stamp}\n{start}\nsummary\n{end}\n",
+    )
+    escape_manifest = _doctor_fixture_manifest(
+        [("AGENTS.md", "agents-md"), ("../outside-agent.md", "subagent")]
+    )
+    _doctor_fixture_write(
+        manifest_escape,
+        ".agents-system-setup/generated.json",
+        json.dumps(escape_manifest) + "\n",
+    )
+    findings, manifest_present = doctor["run"](manifest_escape)
+    _doctor_fixture_assert(
+        "manifest-out-of-root",
+        manifest_present
+        and _doctor_fixture_has_signal(findings, "manifest-artifact-out-of-root", "error"),
+        "out-of-root manifest artifact was not rejected without reading it",
+    )
+
+
+def _doctor_fixture_test_adapters_and_read_only(
+    doctor: dict[str, Any], parent: Path
+) -> None:
+    check_memory = doctor["check_memory"]
+    start = doctor["MANAGED_START"]
+    end = doctor["MANAGED_END"]
+    stamp = _doctor_fixture_stamp()
+    manifest = _doctor_fixture_manifest([("AGENTS.md", "agents-md")])
+
+    clean = _doctor_fixture_new_root(parent, "thin-adapters")
+    _doctor_fixture_write(clean, "AGENTS.md", f"{stamp}\n{start}\nsummary\n{end}\n")
+    adapter = (
+        f"{stamp}\n<!-- agents-system-setup:memory-adapter: claude-code -->\n\n"
+        "@AGENTS.md\n"
+    )
+    _doctor_fixture_write(clean, "CLAUDE.md", adapter)
+    _doctor_fixture_write(
+        clean,
+        "GEMINI.md",
+        adapter.replace("claude-code", "gemini-cli"),
+    )
+    before = _doctor_fixture_snapshot(clean)
+    findings, _report = check_memory(clean, manifest)
+    after = _doctor_fixture_snapshot(clean)
+    _doctor_fixture_assert(
+        "thin-adapters",
+        not any(getattr(finding, "severity", None) == "error" for finding in findings),
+        "valid thin adapters produced an error",
+    )
+    _doctor_fixture_assert(
+        "thin-adapters",
+        before == after,
+        "doctor modified a valid adapter fixture",
+    )
+
+    custom = _doctor_fixture_new_root(parent, "custom-adapter")
+    _doctor_fixture_write(custom, "AGENTS.md", f"{stamp}\n{start}\nsummary\n{end}\n")
+    _doctor_fixture_write(custom, "CLAUDE.md", "Custom instructions stay unchanged.\n")
+    before = _doctor_fixture_snapshot(custom)
+    findings, _report = check_memory(custom, None)
+    _doctor_fixture_assert(
+        "custom-adapter",
+        _doctor_fixture_has_signal(findings, "adapter-drift", "warn"),
+        "custom non-generated adapter drift was not reported",
+    )
+    _doctor_fixture_assert(
+        "custom-adapter",
+        before == _doctor_fixture_snapshot(custom),
+        "custom adapter was modified",
+    )
+
+    cycle = _doctor_fixture_new_root(parent, "adapter-cycle")
+    _doctor_fixture_write(
+        cycle,
+        "AGENTS.md",
+        f"{stamp}\n{start}\n@CLAUDE.md\n{end}\n",
+    )
+    _doctor_fixture_write(cycle, "CLAUDE.md", f"{stamp}\n@AGENTS.md\n")
+    findings, _report = check_memory(cycle, manifest)
+    _doctor_fixture_assert(
+        "adapter-cycle",
+        _doctor_fixture_has_signal(findings, "adapter-cycle", "error"),
+        "adapter import cycle was not detected",
+    )
+
+    eager = _doctor_fixture_new_root(parent, "adapter-eager-import")
+    _doctor_fixture_write(eager, "AGENTS.md", f"{stamp}\n{start}\nsummary\n{end}\n")
+    _doctor_fixture_write(eager, "CLAUDE.md", f"{stamp}\n@references/workflow.md\n")
+    findings, _report = check_memory(eager, manifest)
+    _doctor_fixture_assert(
+        "adapter-eager-import",
+        _doctor_fixture_has_signal(findings, "adapter-eager-workflow-import", "error"),
+        "adapter eager workflow import was not detected",
+    )
+
+    outside = _doctor_fixture_new_root(parent, "adapter-out-of-root")
+    _doctor_fixture_write(outside, "AGENTS.md", f"{stamp}\n{start}\nsummary\n{end}\n")
+    _doctor_fixture_write(outside, "CLAUDE.md", "@../../outside.md\n")
+    findings, _report = check_memory(outside, None)
+    _doctor_fixture_assert(
+        "adapter-out-of-root",
+        _doctor_fixture_has_signal(findings, "adapter-out-of-root-import", "warn"),
+        "out-of-root adapter import was not reported",
+    )
+
+
+def _doctor_fixture_test_rejected_drafts(
+    doctor: dict[str, Any], parent: Path, doctor_script: Path
+) -> None:
+    start, end = doctor["MANAGED_START"], doctor["MANAGED_END"]
+    stamp = _doctor_fixture_stamp()
+    empty_link = _doctor_fixture_new_root(parent, "empty-reference")
+    _doctor_fixture_write(empty_link, "AGENTS.md", f"{stamp}\n{start}\n[Current document](<>)\n{end}\n")
+    findings, _memory = doctor["check_memory"](empty_link)
+    _doctor_fixture_assert(
+        "empty-reference", not any(finding.severity == "error" for finding in findings),
+        "an empty Markdown destination crashed or failed memory assessment",
+    )
+    draft = _doctor_fixture_new_root(parent, "unstamped-partial-draft")
+    _doctor_fixture_write(
+        draft, "AGENTS.md",
+        f"{start}\n{{{{PROFILE}}}}\nUse task-handoff for assignments.\n{end}\n",
+    )
+    before = _doctor_fixture_snapshot(draft)
+    result = _doctor_fixture_run_cli(doctor_script, draft, "--memory-only", "--json")
+    payload = json.loads(result.stdout)
+    signals = {finding["signal"] for finding in payload["findings"]}
+    _doctor_fixture_assert(
+        "unstamped-partial-draft",
+        result.returncode == 1 and {
+            "invalid-generation-stamp", "unresolved-placeholder", "stale-task-handoff-name"
+        } <= signals,
+        "an unstamped managed draft bypassed generated-output checks",
+    )
+    _doctor_fixture_assert(
+        "unstamped-partial-draft", before == _doctor_fixture_snapshot(draft),
+        "doctor changed an unapproved partial draft",
+    )
+
+    tail = _doctor_fixture_new_root(parent, "preserved-user-tail")
+    raw = (f"{stamp}\n{start}\nProject rules.\n{end}\n" + "Preserved user rule.\n" * 150).encode("utf-8")
+    _doctor_fixture_write(tail, "AGENTS.md", raw)
+    findings, memory = doctor["check_memory"](tail)
+    _doctor_fixture_assert(
+        "preserved-user-tail",
+        _doctor_fixture_has_signal(findings, "memory-budget-lines", "error")
+        and memory["bytes"] == len(raw)
+        and (tail / "AGENTS.md").read_bytes() == raw,
+        "a preserved user tail was excluded or changed",
+    )
+
+    for label, declaration, actual_path in (
+        ("non-native-prefix", "docs/skills/task-delegation/SKILL.md", "docs/skills/task-delegation/SKILL.md"),
+        ("native-parent-traversal", ".agents/skills/../../docs/task-delegation/SKILL.md", "docs/task-delegation/SKILL.md"),
+    ):
+        root = _doctor_fixture_new_root(parent, label)
+        _doctor_fixture_write(root, "AGENTS.md", f"{stamp}\n{start}\n{declaration}\n{end}\n")
+        _doctor_fixture_write(root, actual_path, "---\nname: task-delegation\n---\n")
+        findings, _memory = doctor["check_memory"](root)
+        _doctor_fixture_assert(
+            label, _doctor_fixture_has_signal(findings, "declared-skill-mislocated", "error"),
+            "an existing but non-discoverable skill was accepted",
+        )
+        _doctor_fixture_write(root, "AGENTS.md", f"{stamp}\n{start}\nProject rules.\n{end}\n")
+        findings, _memory = doctor["check_memory"](
+            root, _doctor_fixture_manifest([("AGENTS.md", "agents-md"), (declaration, "skill")])
+        )
+        _doctor_fixture_assert(
+            label + "-manifest",
+            _doctor_fixture_has_signal(findings, "declared-skill-mislocated", "error"),
+            "a mislocated skill bypassed manifest-only declaration checks",
+        )
+
+    history = _doctor_fixture_new_root(parent, "legacy-skill-history")
+    _doctor_fixture_write(
+        history, "AGENTS.md",
+        f"{stamp}\n{start}\nLegacy migration input: `.codex/skills/task-handoff/SKILL.md`.\n{end}\n",
+    )
+    findings, _memory = doctor["check_memory"](history)
+    _doctor_fixture_assert(
+        "legacy-skill-history",
+        not any(finding.severity == "error" for finding in findings),
+        "an explicitly historical skill path was treated as an active declaration",
+    )
+
+    linked = _doctor_fixture_new_root(parent, "skill-native-root-escape")
+    _doctor_fixture_write(linked, "AGENTS.md", f"{stamp}\n{start}\n.agents/skills/task-delegation/SKILL.md\n{end}\n")
+    target = _doctor_fixture_write(linked, "docs/task-delegation/SKILL.md", "---\nname: task-delegation\n---\n")
+    skill_link = linked / ".agents/skills/task-delegation/SKILL.md"
+    skill_link.parent.mkdir(parents=True)
+    if _doctor_fixture_symlink(skill_link, target):
+        findings, _memory = doctor["check_memory"](linked)
+        _doctor_fixture_assert(
+            "skill-native-root-escape",
+            _doctor_fixture_has_signal(findings, "declared-skill-mislocated", "error"),
+            "a skill resolving outside its native root was accepted",
+        )
+
+
+def _doctor_fixture_test_manifest_errors(
+    doctor: dict[str, Any], parent: Path, doctor_script: Path
+) -> None:
+    root = _doctor_fixture_new_root(parent, "manifest-input-errors")
+    _doctor_fixture_write(root, "AGENTS.md", "# Existing project\n")
+    valid = _doctor_fixture_manifest([])
+    valid_artifact = _doctor_fixture_manifest([("x", "other")])["artifacts"][0]
+    invalid_values = [
+        None, [], {}, {"artifacts": []},
+        {"schema": 1, "artifacts": []},
+        {"plugin_version": "v1.2.3", "artifacts": []},
+        {**valid, "schema": "wrong"}, {**valid, "schema": True},
+        {**valid, "schema": 2}, {**valid, "schema": None},
+        {**valid, "artifacts": None}, {**valid, "artifacts": "invalid"},
+        {**valid, "artifacts": [None]}, {**valid, "artifacts": [{}]},
+        {**valid, "artifacts": [{**valid_artifact, "path": 42}]},
+        {**valid, "artifacts": [{**valid_artifact, "kind": []}]},
+        {**valid, "artifacts": [{**valid_artifact, "kind": "unknown"}]},
+        {**valid, "artifacts": [{**valid_artifact, "checksum": []}]},
+        {**valid, "artifacts": [{**valid_artifact, "checksum": None}]},
+        {**valid, "plugin_version": None}, {**valid, "plugin_version": ""},
+        {**valid, "artifacts": [valid_artifact] * 2},
+    ]
+    raw_cases = [b"\xff", b"{"] + [
+        json.dumps(value).encode("utf-8") for value in invalid_values
+    ]
+    manifest_path = root / ".agents-system-setup/generated.json"
+    for index, raw in enumerate(raw_cases):
+        _doctor_fixture_write(root, ".agents-system-setup/generated.json", raw)
+        before = _doctor_fixture_snapshot(root)
+        for arguments in ((), ("--memory-only",)):
+            result = _doctor_fixture_run_cli(doctor_script, root, *arguments, "--json")
+            payload = json.loads(result.stdout)
+            _doctor_fixture_assert(
+                f"invalid-manifest-{index}",
+                result.returncode == 1 and payload["manifest_present"] is True
+                and payload["ok"] is False
+                and any(finding["signal"] == "invalid-manifest" for finding in payload["findings"]),
+                "invalid manifest was absent, accepted, or not represented as structured JSON",
+            )
+        _doctor_fixture_assert(
+            f"invalid-manifest-{index}", before == _doctor_fixture_snapshot(root),
+            "doctor mutated invalid manifest input",
+        )
+    manifest_path.unlink()
+    manifest_path.mkdir()
+    result = _doctor_fixture_run_cli(doctor_script, root, "--json")
+    _doctor_fixture_assert(
+        "manifest-directory", result.returncode == 1
+        and any(f["signal"] == "invalid-manifest" for f in json.loads(result.stdout)["findings"]),
+        "an unreadable manifest directory was treated as absent",
+    )
+    manifest_path.rmdir()
+    _doctor_fixture_write(root, ".agents-system-setup/generated.json", json.dumps(valid))
+    original_read = Path.read_bytes
+
+    def denied_manifest(path: Path) -> bytes:
+        if path == manifest_path:
+            raise PermissionError("fixture denied manifest read")
+        return original_read(path)
+
+    with patch.object(Path, "read_bytes", denied_manifest):
+        findings, present = doctor["run"](root)
+    _doctor_fixture_assert(
+        "manifest-read-denied", present
+        and _doctor_fixture_has_signal(findings, "invalid-manifest", "error"),
+        "manifest read failure was treated as absence",
+    )
+
+    for kind in ("subagent", "agents-md", "skill", "mcp-config", "hooks", "other"):
+        case = _doctor_fixture_new_root(parent, f"manifest-{kind}")
+        _doctor_fixture_write(case, "AGENTS.md", _doctor_fixture_stamp() + "\n" + doctor["MANAGED_START"] + "\nRules.\n" + doctor["MANAGED_END"] + "\n")
+        missing = ".agents/skills/missing/SKILL.md" if kind == "skill" else f"missing-{kind}.txt"
+        manifest = _doctor_fixture_manifest([(missing, kind)])
+        _doctor_fixture_write(case, ".agents-system-setup/generated.json", json.dumps(manifest))
+        findings, present = doctor["run"](case)
+        expected = "declared-skill-missing" if kind == "skill" else "missing-artifact"
+        _doctor_fixture_assert(
+            f"manifest-{kind}", present and _doctor_fixture_has_signal(findings, expected, "error"),
+            f"missing {kind} artifact was silently ignored",
+        )
+        manifest = _doctor_fixture_manifest([(f"../outside-{kind}.txt", kind)])
+        _doctor_fixture_write(case, ".agents-system-setup/generated.json", json.dumps(manifest))
+        findings, _present = doctor["run"](case)
+        _doctor_fixture_assert(
+            f"manifest-{kind}-outside",
+            _doctor_fixture_has_signal(findings, "manifest-artifact-out-of-root", "error"),
+            f"out-of-root {kind} artifact was silently ignored",
+        )
+
+    external = _doctor_fixture_write(parent, "external-memory.md", _doctor_fixture_stamp())
+    guarded = _doctor_fixture_new_root(parent, "out-of-root-stamp-read")
+    if _doctor_fixture_symlink(guarded / "AGENTS.md", external):
+        _doctor_fixture_write(
+            guarded, ".agents-system-setup/generated.json",
+            json.dumps(_doctor_fixture_manifest([("AGENTS.md", "agents-md")])),
+        )
+        original_open = Path.open
+
+        def guarded_open(path: Path, *args: Any, **kwargs: Any) -> Any:
+            resolved = path.resolve()
+            if guarded not in resolved.parents:
+                raise AssertionError(f"doctor attempted an out-of-root read: {path}")
+            return original_open(path, *args, **kwargs)
+
+        with patch.object(Path, "open", guarded_open):
+            findings, _present = doctor["run"](guarded)
+        _doctor_fixture_assert(
+            "out-of-root-stamp-read",
+            _doctor_fixture_has_signal(findings, "memory-out-of-root-link", "error"),
+            "normal reconciliation did not refuse the external canonical target",
+        )
+
+
+def _doctor_fixture_test_inventory_and_checksums(
+    doctor: dict[str, Any], parent: Path, doctor_script: Path
+) -> None:
+    root = _doctor_fixture_new_root(parent, "checksum-contract")
+    _doctor_fixture_write(root, "AGENTS.md", "# Existing project\n")
+    artifact_path = _doctor_fixture_write(root, "covered.txt", "covered content\n")
+    digest = doctor["sha256_of"](artifact_path, root)
+    manifest = _doctor_fixture_manifest([("covered.txt", "other")])
+    manifest["artifacts"][0]["checksum"] = "sha256:" + digest
+    manifest_path = ".agents-system-setup/generated.json"
+    for index, checksum in enumerate((
+        None, "", "sha256:short", "md5:" + digest, digest,
+        "SHA256:" + digest, "sha256:" + digest.upper(), "sha256:" + digest + "0",
+    )):
+        invalid = _doctor_fixture_manifest([("covered.txt", "other")])
+        if checksum is None:
+            invalid["artifacts"][0].pop("checksum")
+        else:
+            invalid["artifacts"][0]["checksum"] = checksum
+        _doctor_fixture_write(root, manifest_path, json.dumps(invalid))
+        result = _doctor_fixture_run_cli(doctor_script, root, "--json")
+        _doctor_fixture_assert(
+            f"checksum-format-{index}", result.returncode == 1
+            and any(f["signal"] == "invalid-manifest" for f in json.loads(result.stdout)["findings"]),
+            "an invalid checksum disabled or bypassed reconciliation",
+        )
+    _doctor_fixture_write(root, manifest_path, json.dumps(manifest))
+    original_open = Path.open
+
+    def unreadable_artifact(path: Path, *args: Any, **kwargs: Any) -> Any:
+        if path == artifact_path:
+            raise PermissionError("fixture denied artifact read")
+        return original_open(path, *args, **kwargs)
+
+    with patch.object(Path, "open", unreadable_artifact):
+        findings, present = doctor["run"](root)
+    _doctor_fixture_assert(
+        "checksum-read-error", present
+        and _doctor_fixture_has_signal(findings, "artifact-read-error", "error"),
+        "a failed checksum read was silently skipped",
+    )
+    _doctor_fixture_write(root, "covered.txt", "intentionally changed\n")
+    findings, _present = doctor["run"](root)
+    _doctor_fixture_assert(
+        "checksum-drift", _doctor_fixture_has_signal(findings, "checksum-drift", "warn"),
+        "intentional edits no longer produce the established drift warning",
+    )
+
+    stamp = _doctor_fixture_stamp()
+    for index, (relative, contents) in enumerate((
+        (".github/skills/unindexed/SKILL.md", f"---\nname: unindexed\n---\n{stamp}\n"),
+        ("docs/agents/unlinked.md", f"{stamp}\nProject policy.\n"),
+        (".mcp.json", '{"x-agents-system-setup":{},"mcpServers":{}}\n'),
+        (".github/hooks/check.json", '{"x-agents-system-setup":{}}\n'),
+    )):
+        orphan = _doctor_fixture_new_root(parent, f"unmanifested-controlled-{index}")
+        _doctor_fixture_write(orphan, "AGENTS.md", "# Existing project\n")
+        _doctor_fixture_write(orphan, relative, contents)
+        _doctor_fixture_write(orphan, manifest_path, json.dumps(_doctor_fixture_manifest([])))
+        result = _doctor_fixture_run_cli(doctor_script, orphan, "--json")
+        _doctor_fixture_assert(
+            f"unmanifested-controlled-{index}", result.returncode == 1 and any(
+                finding["signal"] == "stray-artifact" and finding["path"] == relative
+                for finding in json.loads(result.stdout)["findings"]
+            ),
+            "an unindexed generated artifact bypassed authoritative inventory checks",
+        )
+
+    user_root = _doctor_fixture_new_root(parent, "user-owned-controlled-outputs")
+    for relative, contents in (
+        ("AGENTS.md", "# Existing project\n"),
+        (".github/skills/local/SKILL.md", "---\nname: local\n---\nUser-owned skill.\n"),
+        ("docs/agents/local-policy.md", "# User policy\n"),
+        (".github/hooks/local.json", "{}\n"),
+        (".mcp.json", '{"mcpServers":{}}\n'),
+    ):
+        _doctor_fixture_write(user_root, relative, contents)
+    _doctor_fixture_write(user_root, manifest_path, json.dumps(_doctor_fixture_manifest([])))
+    before = _doctor_fixture_snapshot(user_root)
+    result = _doctor_fixture_run_cli(doctor_script, user_root, "--json")
+    _doctor_fixture_assert(
+        "user-owned-controlled-outputs", result.returncode == 0
+        and before == _doctor_fixture_snapshot(user_root),
+        "unmarked user-owned non-agent files were treated as generated inventory or changed",
+    )
+
+
+def _doctor_fixture_test_runtime_surface_links(
+    doctor: dict[str, Any], parent: Path
+) -> None:
+    original_open, original_scandir = Path.open, os.scandir
+    for label, relative, directory_link in (
+        ("agent-link", ".github/agents/orchestrator.agent.md", False),
+        ("agent-directory-link", ".github/agents", True),
+        ("skill-directory-link", ".agents/skills", True),
+    ):
+        root = _doctor_fixture_new_root(parent, label)
+        _doctor_fixture_write(root, "AGENTS.md", "# Existing project\n")
+        _doctor_fixture_write(root, ".agents-system-setup/generated.json", json.dumps(_doctor_fixture_manifest([])))
+        external = _doctor_fixture_new_root(parent, label + "-external")
+        target = _doctor_fixture_write(external, "orchestrator.agent.md", _doctor_fixture_stamp())
+        link = root / relative
+        link.parent.mkdir(parents=True, exist_ok=True)
+        if not _doctor_fixture_symlink(link, external if directory_link else target):
+            continue
+
+        def check_path(path: Path) -> None:
+            resolved = Path(path).resolve()
+            if resolved != root and root not in resolved.parents:
+                raise AssertionError(f"doctor inspected an out-of-root runtime target: {path}")
+
+        def guarded_open(path: Path, *args: Any, **kwargs: Any) -> Any:
+            check_path(path)
+            return original_open(path, *args, **kwargs)
+
+        def guarded_scandir(path: Any) -> Any:
+            check_path(Path(path))
+            return original_scandir(path)
+
+        with patch.object(Path, "open", guarded_open), patch("os.scandir", guarded_scandir):
+            findings, present = doctor["run"](root)
+        _doctor_fixture_assert(
+            label, present and _doctor_fixture_has_signal(findings, "runtime-surface-out-of-root", "error"),
+            "a rejected runtime entry was silently omitted from assessment",
+        )
+        if not directory_link:
+            _doctor_fixture_assert(
+                label, _doctor_fixture_has_signal(findings, "orchestrator-subagent-file", "error"),
+                "an external orchestrator symlink escaped the lexical agent check",
+            )
+
+
+def _doctor_fixture_test_cli_and_linker(
+    doctor: dict[str, Any], parent: Path, doctor_script: Path
+) -> None:
+    start = doctor["MANAGED_START"]
+    end = doctor["MANAGED_END"]
+    stamp = _doctor_fixture_stamp()
+
+    clean = _doctor_fixture_new_root(parent, "cli-clean")
+    _doctor_fixture_write(clean, "AGENTS.md", "# Existing project\n\nPreserve user instructions.\n")
+    before = _doctor_fixture_snapshot(clean)
+    memory_json = _doctor_fixture_run_cli(doctor_script, clean, "--memory-only", "--json")
+    _doctor_fixture_assert("cli-clean", memory_json.returncode == 0, "memory-only clean fixture did not exit 0")
+    try:
+        payload = json.loads(memory_json.stdout)
+    except json.JSONDecodeError as exc:
+        payload = {}
+        _doctor_fixture_error("cli-clean", f"--json output was not valid JSON: {exc}")
+    _doctor_fixture_assert(
+        "cli-clean",
+        payload.get("manifest_present") is False
+        and payload.get("memory_only") is True
+        and payload.get("ok") is True,
+        "memory-only JSON did not preserve manifest/ok semantics",
+    )
+    memory = payload.get("memory", {})
+    _doctor_fixture_assert(
+        "cli-clean",
+        memory.get("token_count", {}).get("status") == "unavailable"
+        and memory.get("effective_context", {}).get("status") == "unknown",
+        "JSON report did not label tokenizer/context uncertainty honestly",
+    )
+    normal = _doctor_fixture_run_cli(doctor_script, clean, "--json")
+    _doctor_fixture_assert("cli-clean", normal.returncode == 2, "normal pre-manifest mode did not exit 2")
+    short_strict = _doctor_fixture_run_cli(doctor_script, clean, "--memory-only", "--strict")
+    _doctor_fixture_assert("cli-clean", short_strict.returncode == 0, "a complete short root was forced to pad")
+    _doctor_fixture_assert(
+        "cli-clean",
+        before == _doctor_fixture_snapshot(clean),
+        "CLI doctor changed a clean pre-manifest fixture",
+    )
+
+    warning = _doctor_fixture_new_root(parent, "cli-warning")
+    _doctor_fixture_write(warning, "AGENTS.md", f"{stamp}\n{start}\nsummary\n{end}\n")
+    _doctor_fixture_write(warning, "CLAUDE.md", "custom adapter\n")
+    non_strict = _doctor_fixture_run_cli(doctor_script, warning, "--memory-only")
+    strict = _doctor_fixture_run_cli(doctor_script, warning, "--memory-only", "--strict")
+    _doctor_fixture_assert("cli-warning", non_strict.returncode == 0, "warning-only memory check failed without --strict")
+    _doctor_fixture_assert("cli-warning", strict.returncode == 1, "--strict did not promote warnings to exit 1")
+
+    bad = _doctor_fixture_new_root(parent, "cli-error")
+    _doctor_fixture_write(bad, "AGENTS.md", f"{stamp}\n{start}\nmissing end\n")
+    bad_before = _doctor_fixture_snapshot(bad)
+    bad_result = _doctor_fixture_run_cli(doctor_script, bad, "--memory-only", "--json")
+    _doctor_fixture_assert("cli-error", bad_result.returncode == 1, "memory error did not exit 1")
+    _doctor_fixture_assert(
+        "cli-error",
+        bad_before == _doctor_fixture_snapshot(bad),
+        "CLI doctor changed an error fixture",
+    )
+
+    commands: list[tuple[str, list[str]]] = []
+    for label, executable, filename, options in (
+        ("posix", "bash", "link-project-memory.sh", []),
+        ("powershell", "pwsh", "link-project-memory.ps1", ["-NoProfile", "-File"]),
+    ):
+        helper = SKILL_ROOT / "scripts" / filename
+        command = shutil.which(executable)
+        if not helper.is_file():
+            _doctor_fixture_error(f"linker-{label}", "memory helper is missing")
+        elif command is None:
+            warn(f"agents-doctor fixtures: {executable} unavailable; {label} helper not exercised.")
+        else:
+            commands.append((label, [command, *options, helper.as_posix()]))
+
+    for label, command in commands:
+        source = f"{stamp}\n# preserved user tail\n"
+        fresh = _doctor_fixture_new_root(parent, f"linker-{label}-fresh")
+        _doctor_fixture_write(fresh, "AGENTS.md", source)
+        first = subprocess.run(command, cwd=fresh, capture_output=True, text=True, check=False)
+        expected = (
+            f"<!-- agents-system-setup:generated-by: {stamp.split(': ', 1)[1][:-4]} -->\n"
+            "<!-- agents-system-setup:memory-adapter: claude-code -->\n\n@AGENTS.md\n"
+        )
+        _doctor_fixture_assert(f"linker-{label}-fresh", first.returncode == 0, f"fresh helper run failed: {first.stderr}")
+        _doctor_fixture_assert(f"linker-{label}-fresh", (fresh / "CLAUDE.md").read_bytes() == expected.encode("utf-8"), "fresh adapter content is incorrect")
+        original_adapter = (fresh / "CLAUDE.md").read_bytes()
+        second = subprocess.run(command, cwd=fresh, capture_output=True, text=True, check=False)
+        _doctor_fixture_assert(f"linker-{label}-idempotent", second.returncode == 0, "idempotent helper run failed")
+        _doctor_fixture_assert(f"linker-{label}-idempotent", (fresh / "CLAUDE.md").read_bytes() == original_adapter, "idempotent run changed the adapter")
+        _doctor_fixture_assert(f"linker-{label}-source", (fresh / "AGENTS.md").read_bytes() == source.encode("utf-8"), "helper changed canonical memory")
+
+        custom = _doctor_fixture_new_root(parent, f"linker-{label}-custom")
+        _doctor_fixture_write(custom, "AGENTS.md", source)
+        _doctor_fixture_write(custom, "CLAUDE.md", "custom\n")
+        custom_before = _doctor_fixture_snapshot(custom)
+        custom_result = subprocess.run(command, cwd=custom, capture_output=True, text=True, check=False)
+        _doctor_fixture_assert(f"linker-{label}-custom", custom_result.returncode != 0, "custom destination was overwritten")
+        _doctor_fixture_assert(f"linker-{label}-custom", _doctor_fixture_snapshot(custom) == custom_before, "custom fixture changed")
+
+        symlink_root = _doctor_fixture_new_root(parent, f"linker-{label}-symlink")
+        _doctor_fixture_write(symlink_root, "AGENTS.md", source)
+        _doctor_fixture_write(symlink_root, "custom-target", "target\n")
+        if _doctor_fixture_symlink(symlink_root / "CLAUDE.md", Path("custom-target")):
+            before_link = _doctor_fixture_snapshot(symlink_root)
+            symlink_result = subprocess.run(command, cwd=symlink_root, capture_output=True, text=True, check=False)
+            _doctor_fixture_assert(f"linker-{label}-symlink", symlink_result.returncode != 0, "symlink destination was overwritten")
+            _doctor_fixture_assert(f"linker-{label}-symlink", _doctor_fixture_snapshot(symlink_root) == before_link, "symlink fixture changed")
+
+        race = _doctor_fixture_new_root(parent, f"linker-{label}-race")
+        _doctor_fixture_write(race, "AGENTS.md", source)
+        processes = [
+            subprocess.Popen(command, cwd=race, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            for _ in range(2)
+        ]
+        for process in processes:
+            process.communicate()
+        results = [process.returncode for process in processes]
+        _doctor_fixture_assert(f"linker-{label}-race", 0 in results and set(results) <= {0, 1}, f"unexpected race results {results}")
+        _doctor_fixture_assert(f"linker-{label}-race", (race / "CLAUDE.md").is_file() and not (race / "CLAUDE.md").is_symlink(), "race destination is not a regular file")
+        _doctor_fixture_assert(f"linker-{label}-race", (race / "CLAUDE.md").read_bytes() == expected.encode("utf-8"), "race changed the final adapter bytes")
+
+
+def _validator_fixture_test_codex_optional_rendering(parent: Path) -> None:
+    """Render Codex optional rows both absent and present, then inspect semantics."""
+    template_path = SKILL_ROOT / "assets" / "subagent.codex.toml.template"
+    try:
+        template = template_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        _doctor_fixture_error("codex-rendering", f"could not load Codex template: {exc}")
+        return
+
+    base_values = {
+        "NAME": "fixture-worker",
+        "PLUGIN_VERSION": "v1.2.3",
+        "GENERATED_AT": "fixture",
+        "REPLICATION_SOURCE": "user-plan",
+        "TRIGGER_PHRASES": "validating generated fixtures",
+        "ONE_LINE_RESPONSIBILITY": "validate the emitted artifact",
+        "DEVELOPER_INSTRUCTIONS": "Follow the supplied project policy and return evidence.",
+        "PROJECT_POLICY_PATH": "project-policy.md",
+        "OWNED_PATHS": "src/**",
+        "READONLY_PATHS": "AGENTS.md",
+        "SENSITIVE_PATHS": ".mcp.json",
+        "FORBIDDEN_ACTIONS": "unapproved external writes",
+        "APPROVAL_REQUIRED_FOR": "MCP and release changes",
+        "AUDIT_EVIDENCE": "tests and review evidence",
+        "RELEVANT_ADRS": "ADR-0001",
+        "PATTERNS_TO_PRESERVE": "existing conventions",
+        "ANTI_PATTERNS_TO_AVOID": "silent scope expansion",
+        "OPTIONAL_MODEL_LINE": "",
+        "OPTIONAL_REASONING_EFFORT_LINE": "",
+        "OPTIONAL_SANDBOX_MODE_LINE": "",
+        "OPTIONAL_MCP_APPROVAL_COMMENT": "agents-system-setup:mcp-not-applicable",
+        "MCP_ID": "fixture",
+        "MCP_URL": "https://example.invalid",
+        "SKILL_PATH": ".agents/skills/task-delegation/SKILL.md",
+    }
+
+    def render(name: str, **overrides: str) -> tuple[str, dict[str, Any] | None]:
+        values = dict(base_values)
+        values["NAME"] = name
+        values.update(overrides)
+        rendered = re.sub(
+            r"\{\{([A-Z0-9_]+)\}\}",
+            lambda match: values.get(match.group(1), match.group(0)),
+            template,
+        )
+        output_path = parent / "codex-rendered" / f"{name}.toml"
+        _doctor_fixture_write(parent, f"codex-rendered/{name}.toml", rendered)
+        unresolved = sorted(set(re.findall(r"\{\{[A-Za-z0-9_.:-]+\}\}", rendered)))
+        _doctor_fixture_assert(
+            f"codex-rendering-{name}",
+            not unresolved,
+            f"rendered Codex output has unresolved placeholders: {', '.join(unresolved)}",
+        )
+        parsed: dict[str, Any] | None = None
+        try:
+            import tomllib
+        except ImportError:
+            tomllib = None
+        if tomllib is not None:
+            try:
+                parsed = tomllib.loads(rendered)
+            except Exception as exc:
+                _doctor_fixture_error(f"codex-rendering-{name}", f"rendered TOML is invalid: {exc}")
+        _doctor_fixture_assert(
+            f"codex-rendering-{name}",
+            "project-policy.md" in rendered
+            and ".agents/skills/task-delegation/SKILL.md" in rendered,
+            "rendered Codex output lost project-policy or skill relationships",
+        )
+        _doctor_fixture_assert(
+            f"codex-rendering-{name}",
+            output_path.is_file(),
+            "rendered Codex fixture was not written",
+        )
+        return rendered, parsed
+
+    adaptive, adaptive_data = render("implementer")
+    _doctor_fixture_assert(
+        "codex-rendering-adaptive",
+        "model_reasoning_effort" not in adaptive
+        and "sandbox_mode" not in adaptive
+        and "model =" not in adaptive,
+        "adaptive rendering emitted static model/effort/sandbox pins",
+    )
+    if adaptive_data is not None:
+        _doctor_fixture_assert(
+            "codex-rendering-adaptive",
+            "model_reasoning_effort" not in adaptive_data
+            and "sandbox_mode" not in adaptive_data,
+            "adaptive TOML unexpectedly parsed optional pins",
+        )
+
+    pinned, pinned_data = render(
+        "pinned-worker",
+        OPTIONAL_MODEL_LINE='model = "fixture-model"',
+        OPTIONAL_REASONING_EFFORT_LINE='model_reasoning_effort = "model-advertised"',
+        OPTIONAL_SANDBOX_MODE_LINE='sandbox_mode = "workspace-write"',
+    )
+    _doctor_fixture_assert(
+        "codex-rendering-pinned",
+        'model = "fixture-model"' in pinned
+        and 'model_reasoning_effort = "model-advertised"' in pinned
+        and 'sandbox_mode = "workspace-write"' in pinned,
+        "explicit Codex pins were not rendered at their optional rows",
+    )
+    if pinned_data is not None:
+        _doctor_fixture_assert(
+            "codex-rendering-pinned",
+            pinned_data.get("model_reasoning_effort") == "model-advertised"
+            and pinned_data.get("sandbox_mode") == "workspace-write",
+            "explicit Codex optional rows parsed to unexpected values",
+        )
+
+    reviewer, reviewer_data = render(
+        "reviewer",
+        OWNED_PATHS="none",
+        OPTIONAL_SANDBOX_MODE_LINE='sandbox_mode = "read-only"',
+    )
+    _doctor_fixture_assert(
+        "codex-rendering-reviewer",
+        'sandbox_mode = "read-only"' in reviewer,
+        "read-only reviewer rendering omitted the required sandbox pin",
+    )
+    if reviewer_data is not None:
+        _doctor_fixture_assert(
+            "codex-rendering-reviewer",
+            is_codex_read_only_identity(reviewer_data.get("name"), "reviewer")
+            and codex_owned_paths_empty(reviewer_data.get("developer_instructions"))
+            and reviewer_data.get("sandbox_mode") == "read-only",
+            "read-only or empty-owned-path semantics were not preserved",
+        )
+
+    format_reference = (SKILL_ROOT / "references" / "agent-format.md").read_text(encoding="utf-8")
+    for marker in (
+        "{{OPTIONAL_REASONING_EFFORT_LINE}}",
+        "{{OPTIONAL_SANDBOX_MODE_LINE}}",
+        "explicit model-supported pin",
+        "read-only roles/empty Owned paths",
+    ):
+        _doctor_fixture_assert(
+            "codex-rendering-contract",
+            marker in format_reference,
+            f"agent-format.md is missing optional-row contract marker {marker}",
+        )
+
+
+def check_agents_doctor_behavior_fixtures() -> None:
+    """Exercise the same read-only doctor used by generation completion."""
+    script_path = SKILL_ROOT / "assets" / "agents-doctor.py.template"
+    try:
+        source = script_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        _doctor_fixture_error("bootstrap", f"could not load doctor template: {exc}")
+        return
+    namespace: dict[str, Any] = {"__name__": "agents_doctor_validator_fixture"}
+    try:
+        exec(compile(source, str(script_path), "exec"), namespace)
+    except Exception as exc:
+        _doctor_fixture_error("bootstrap", f"doctor template did not compile/import: {exc}")
+        return
+
+    resolved_source = source.replace("{{PLUGIN_VERSION}}", "v1.2.3").replace(
+        "{{GENERATED_AT}}", "fixture"
+    )
+    _doctor_fixture_assert(
+        "bootstrap",
+        "{{" not in resolved_source and "}}" not in resolved_source,
+        "generated doctor fixture still contains unresolved placeholders",
+    )
+
+    temporary_base = Path(tempfile.gettempdir()).resolve()
+    if temporary_base == REPO or REPO in temporary_base.parents:
+        temporary_base = REPO.parent
+    with tempfile.TemporaryDirectory(
+        prefix="agents-system-setup-doctor-", dir=temporary_base
+    ) as directory:
+        parent = Path(directory).resolve()
+        doctor_script = parent / ".doctor-source" / "agents-doctor.py"
+        _doctor_fixture_write(parent, ".doctor-source/agents-doctor.py", resolved_source)
+        try:
+            _doctor_fixture_test_memory_budget(namespace, parent)
+            _doctor_fixture_test_memory_findings(namespace, parent)
+            _doctor_fixture_test_rejected_drafts(namespace, parent, doctor_script)
+            _doctor_fixture_test_manifest_errors(namespace, parent, doctor_script)
+            _doctor_fixture_test_inventory_and_checksums(namespace, parent, doctor_script)
+            _doctor_fixture_test_runtime_surface_links(namespace, parent)
+            _doctor_fixture_test_generated_relationships(namespace, parent, resolved_source)
+            _doctor_fixture_test_adapters_and_read_only(namespace, parent)
+            _doctor_fixture_test_cli_and_linker(namespace, parent, doctor_script)
+            _validator_fixture_test_codex_optional_rendering(parent)
+        except Exception as exc:
+            _doctor_fixture_error("unexpected", f"fixture execution raised {type(exc).__name__}: {exc}")
 
 
 # ---------- main ----------
@@ -5037,12 +6256,16 @@ def main() -> int:
     check_host_builtins_routing_reference()
     check_host_builtins_routing_in_agents_md()
     check_cross_session_orchestration_policy()
+    check_advisory_supervision_policy()
+    check_domain_skill_policy()
     check_tool_catalog_json_schema()
     check_tool_catalog_reference()
     check_tool_catalog_audit_skill_template()
     check_tool_catalog_stamp_in_templates()
-    check_task_handoff_skill_policy()
+    check_task_delegation_skill_policy()
     check_agents_doctor_skill_policy()
+    check_agents_doctor_behavior_fixtures()
+    check_final_integration_contracts()
     check_upgrade_mismatch_detection_policy()
 
     if WARNINGS:

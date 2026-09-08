@@ -1,77 +1,46 @@
 # Audience Tags Snippet
 
-Audience tags are visible Markdown markers that tell each runtime which agent
-class should treat a section as directive context. They are plain text, not HTML
-comments, because visible markers survive provider markdown loaders, context
-summaries, and copy/paste between runtimes.
+Audience tags are optional reading hints, not runtime loader controls. They
+neither remove text from context nor make a referenced skill available to a
+child. New compact root memory does not require per-section markers or a
+separate Subagent Self-Contained Notice.
 
 ## Audience values
 
-Use exactly these three values. Do not add role-specific variants.
-
 | Value | Meaning |
 |---|---|
-| `all` | Every agent, including the host orchestrator and every subagent, should read this section. |
-| `host-orchestrator` | Only the host CLI session, the implicit orchestrator, should read this section in full. Subagents may skim for situational awareness but should not act on its directives. |
-| `subagents` | Content directed at specialist subagents; the host orchestrator may skip when routing. |
+| `all` | Relevant to host and workers. |
+| `host-orchestrator` | Host coordination guidance; workers do not orchestrate. |
+| `subagents` | Worker execution guidance. |
 
-## Emission rule
-
-Audience tags emit ONLY when `subagent_count >= 2` AND
-`output_profile in {balanced, full}`. For Compact profile or single-agent setups,
-omit audience markers entirely because the file is small enough that segmentation
-has no benefit.
-
-## Per-profile rendering
-
-| Profile | Rendering rule |
-|---|---|
-| **Compact** | Omit audience markers entirely; `AGENTS.md` stays minimal. |
-| **Balanced** | Emit visible `**Audience:** <value>` line under each `## Section` heading; keep section body unchanged. |
-| **Full** | Emit visible marker plus a leading "Why this section matters for <audience>" sentence under each section. |
+Preserve useful existing `**Audience:**` labels within the same complete-file
+150-line/12-KiB budget. Do not add a rationale paragraph beneath every heading
+in Full profile; put explanatory detail on demand.
 
 ## Marker placement
 
-Place the marker immediately after the `##` heading and before any body text,
-tables, blockquotes, or managed blocks.
+When a label genuinely helps, put it beneath its heading:
 
 ```markdown
 ## Directory Architecture
 
 **Audience:** all
-
-| Path (glob) | Purpose | Owner | Edit rule |
-|---|---|---|---|
 ```
 
-The marker is visible project memory, not hidden metadata. If a section is copied
-into a subagent prompt, the audience line should remain readable and harmless.
+## Worker self-containment
 
-## Subagent Self-Contained Notice block
+Keep the compact project-standard digest, owned paths, acceptance checklist,
+safety boundaries, and reporting skeleton inside each worker's own file.
+Workers are executors: never re-delegate; return `question_request` or
+`return-to-orchestrator` for missing context or scope.
 
-Inject this top-level section when the emission rule is met:
+The host loads `task-delegation` before assignments. A packet saying
+`Skills Referenced: task-delegation loaded=true` records a **host** load only;
+pass the child's necessary excerpts or use a supported child preload/load.
+Do not tell the child to rely on a skill body it never received.
 
-```markdown
-## Subagent Self-Contained Notice
+## Migration
 
-**Audience:** subagents
-
-If you are a specialist subagent (not the host CLI session), your own `.agent.md`
-or `.toml` file is the single source of truth for fail-closed operation.
-You may read `AGENTS.md` rows for project-wide context and consult the
-`task-handoff` skill when the host packet says `Skills Referenced: task-handoff loaded=true`.
-Subagents are executors: never compose new delegation packets, never re-delegate.
-Your own file must already inline role, owned paths, handoff acceptance, safety
-boundaries, and reporting skeleton.
-If scope exceeds your owned paths, stop and return-to-orchestrator with the
-needed owner, paths, and reason.
-```
-
-## Anti-patterns
-
-- Using HTML comments as audience tags. They are unreliable across runtime
-  markdown loaders and summarizers.
-- Adding a fourth audience value such as `reviewer-only`. The canonical set is
-  exactly `all`, `host-orchestrator`, and `subagents`.
-- Emitting audience tags in Compact mode. That regresses small-project context
-  by adding segmentation where the file is already short.
+Classify obsolete per-heading markers and repeated Self-Contained Notice prose
+as compact-repair candidates, not automatic deletion. Preserve user content and
+required worker guards; show the proposed diff before an approved replacement.

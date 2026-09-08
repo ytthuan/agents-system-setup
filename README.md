@@ -9,6 +9,50 @@
 
 - A multi-runtime plugin/skill package that **bootstraps**, **updates**, **improves**, **upgrades**, or **replicates** a complete multi-agent system across five supported runtimes: **GitHub Copilot CLI**, **Claude Code**, **OpenCode**, **OpenAI Codex (CLI + App)**, and **Gemini CLI** artifact layouts — from a single skill, with a Canonical IR for bidirectional replication, parallel-aware orchestration, mandatory security/audit/architecture governance, version-stamped artifacts, and compact-by-default context output baked in.
 
+## Native-first compact memory (current source)
+
+New setups reuse the active harness's native initialization **output**, then
+synthesize one canonical `AGENTS.md`. Existing instructions are audited and
+repaired only after approval; the plugin does not rerun initialization over
+customized memory to force a replacement.
+
+| Harness | Native command | Documented default file |
+|---|---|---|
+| Codex CLI TUI | `/init` | `AGENTS.md` |
+| Copilot CLI | `/init` or `copilot init` | `.github/copilot-instructions.md` |
+| Claude Code | `/init` | `CLAUDE.md` |
+| OpenCode | `/init` | `AGENTS.md` |
+| Gemini CLI | `/init` | `GEMINI.md` |
+
+For Copilot, the plugin prefers this root-target request in the native
+interactive command surface:
+
+```text
+/init generate AGENTS.md at root instead of .github/copilot-instructions.md
+```
+
+Ask about another draft location only if unsupported or conflicting. The request
+is not a guaranteed filename-switch API; record actual output and disclose any
+fallback. Claude/Gemini use thin native imports; Copilot/Codex/OpenCode can read
+root memory directly. See [native initialization](./plugins/agents-system-setup/skills/agents-system-setup/references/native-initialization.md).
+
+The complete synthesized root is capped at **150 physical lines AND 12 KiB**,
+targeting 80-120 lines in **every** profile. This is plugin policy, not an OpenAI
+line/token mandate. Full expands local on-demand policy, not always-loaded memory.
+The read-only doctor's `--memory-only` mode enforces output budgets before
+compliant completion; declined repairs leave user content untouched.
+
+The Skills index gives concrete triggers and native paths. `task-delegation`
+replaces `task-handoff`, keeps the assignment contract, and selects direct work
+or useful specialists with adaptive-balanced model/effort choice. Explicit pins,
+provider/budget limits, required independent review and approval gates prevail.
+No minimum worker count or forced fan-out; a host skill load is not child context.
+
+**Legacy notes below:** references to Copilot-only `/init`, 3-50 mandatory
+workers, full root matrices, symlink/copy adapters, or inherited context describe
+earlier behavior. This section and the current skill/references supersede those
+details; tagged release behavior remains documented in the changelog.
+
 ## Relationship to Copilot `/init` and native `AGENTS.md` support
 
 This plugin **complements** Copilot's built-in `/init` and native `AGENTS.md` interop — it does not duplicate them. `/init` analyzes a repo and seeds a single Copilot guidance file, which Copilot (and other agents) then read natively. That single-file, single-runtime bootstrap is the *starting point* this plugin builds on, not what it competes with — an `/init`-seeded `AGENTS.md` is a valid input to `update`/`improve` mode.
@@ -57,7 +101,7 @@ In short: `/init` writes the first file for one agent; this plugin architects, g
 
 ## Install — per runtime
 
-Each runtime has a different install/use mechanism. The repo ships plugin manifests where a runtime supports them; Gemini CLI support is artifact-based and does not claim a plugin install.
+Each runtime has a different install/use mechanism. The repo ships plugin manifests where a runtime supports them; Gemini CLI support is artifact-based and does not claim a plugin install. These commands track the default branch — to pin a released version, see [Install a specific release](#install-a-specific-release).
 
 ### GitHub Copilot CLI
 
@@ -127,6 +171,105 @@ gemini
 
 Inside Gemini CLI, invoke generated subagents with Gemini's agent invocation syntax, for example `@<agent-name>`. Supported artifact shapes are project `.gemini/agents/*.md`, user `~/.gemini/agents/*.md`, and extension-bundled `agents/*.md` when packaging a Gemini extension yourself.
 
+## Install a specific release
+
+The commands above track the default branch and give you whatever is newest. To pin a released version — for reproducible setups, CI, or to stay on a known-good release — use the syntax below. Replace `v1.13.0` with the tag you want; see [releases](https://github.com/ytthuan/agents-system-setup/releases) and [CHANGELOG.md](./CHANGELOG.md).
+
+Two things to know before picking a command:
+
+- **Copilot CLI and Claude Code pin the *marketplace*, not the plugin.** Neither documents a per-plugin version selector, so you pin the Git ref of the marketplace source and install from it. In `plugin@marketplace` syntax the part after `@` is the **marketplace name** (`ytthuan`), not a version.
+- **Pinning is not automatic updating.** A pinned marketplace stays on that ref until you re-add it at a newer one.
+
+### GitHub Copilot CLI
+
+```bash
+copilot plugin marketplace add ytthuan/agents-system-setup#v1.13.0
+copilot plugin install agents-system-setup@ytthuan
+```
+
+`marketplace add` accepts `owner/repo#ref`; the direct `plugin install owner/repo` form has no documented ref syntax. Source: <https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-plugin-reference>.
+
+Local-directory alternative, useful when you want the exact tree on disk:
+
+```bash
+git clone --depth 1 --branch v1.13.0 https://github.com/ytthuan/agents-system-setup.git
+copilot plugin install ./agents-system-setup
+```
+
+### Claude Code
+
+```text
+/plugin marketplace add https://github.com/ytthuan/agents-system-setup.git#v1.13.0
+/plugin install agents-system-setup@ytthuan
+```
+
+Appending `#<ref>` to a Git URL pins a branch or tag. Source: <https://code.claude.com/docs/en/plugin-marketplaces>.
+
+### OpenAI Codex CLI
+
+```bash
+codex plugin marketplace add ytthuan/agents-system-setup --ref v1.13.0
+codex
+> /plugins        # install agents-system-setup from the pinned marketplace
+```
+
+Codex is the one runtime here with a documented per-marketplace `--ref` flag. Source: <https://developers.openai.com/codex/plugins/build>.
+
+### OpenCode
+
+OpenCode installs by clone-and-copy, so pin the clone:
+
+```bash
+git clone --depth 1 --branch v1.13.0 https://github.com/ytthuan/agents-system-setup.git
+cd agents-system-setup
+./scripts/install-opencode.sh project   # or "global"
+```
+
+### Gemini CLI
+
+Gemini support here is artifact-based — this repo ships no `gemini-extension.json`, so `gemini extensions install` does **not** apply to it. Pin by cloning the tag, then generate or copy artifacts into your project:
+
+```bash
+git clone --depth 1 --branch v1.13.0 https://github.com/ytthuan/agents-system-setup.git
+```
+
+### Universal fallbacks
+
+These work regardless of runtime plugin support:
+
+```bash
+# Clone at the tag (detached HEAD at that commit)
+git clone --depth 1 --branch v1.13.0 https://github.com/ytthuan/agents-system-setup.git
+
+# Move an existing clone to the tag
+git fetch --tags && git checkout v1.13.0
+
+# Release tarball published by the release workflow
+gh release download v1.13.0 --repo ytthuan/agents-system-setup
+
+# Or the plain source archive, no gh required
+curl -fL -o agents-system-setup-v1.13.0.tar.gz \
+  https://github.com/ytthuan/agents-system-setup/archive/refs/tags/v1.13.0.tar.gz
+```
+
+Every release ships a `agents-system-setup-<version>.tar.gz` plus a `.sha256` checksum. Verify before use:
+
+```bash
+shasum -a 256 -c agents-system-setup-1.13.0.tar.gz.sha256
+```
+
+Tags can in principle be moved; pin the commit SHA instead if you need a guarantee stronger than a tag.
+
+### Check what you have installed
+
+Every generated artifact carries a `<!-- agents-system-setup:generated-by: vX.Y.Z -->` stamp, and `.agents-system-setup/generated.json` records the authoritative manifest:
+
+```bash
+grep -r "agents-system-setup:generated-by" AGENTS.md
+```
+
+Upgrading a project generated by an older version is a first-class mode — run the skill and ask for `agents-system-setup upgrade`, which applies the per-version migration playbook rather than overwriting your files.
+
 ## Usage
 
 Once installed, invoke the skill — no arguments needed; it auto-detects mode:
@@ -163,11 +306,15 @@ exceptions so large rosters do not trigger one prompt per agent.
 
 The host CLI session orchestrator always fans out **parallel-safe subagents** in one wave (multiple `Task` calls in a single response), then awaits before the next wave. Parallel-safety is computed automatically from the Directory Architecture — see [parallelism reference](./plugins/agents-system-setup/skills/agents-system-setup/references/parallelism.md). Under the **GitHub Copilot app**, that same parallel-safety computation also identifies which units can become independent **child sessions / parallel PRs** (1 session per branch/PR) via `/orchestrate` — an advisory third primitive that portable generated files never depend on.
 
+Dispatching a child is one half; **supervising it while it runs** is the other. Opt in with `advisory_supervision` (`off` by default) and the host adds a plan gate on children created in plan mode, steers only on premise invalidation by a sibling — polling is banned — and refuses to close a wave until every dispatched unit is `returned`, `reconciled-from-artifact`, or `explicitly-abandoned`, because no completion callback is documented and the branch/PR is the source of truth. It fails closed: if the app-only tools are absent from the host's surface the protocol is `n/a` rather than simulated. See [supervising a running child session](./plugins/agents-system-setup/skills/agents-system-setup/references/parallelism.md#supervising-a-running-child-session).
+
 For Claude Code, when 3+ subagents are independent and would benefit from peer-to-peer challenge, the generator additionally emits `AGENT-TEAMS.md` with the opt-in env var (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), settings snippet, suggested teammate roster, and a token-cost warning. Source: <https://docs.anthropic.com/en/docs/claude-code/agent-teams>.
 
 ## Context optimization
 
 Generated output is **compact by default**. The skill asks for an output profile (`Balanced`, `Compact`, or `Full`) and records where long detail lives. `AGENTS.md` stays the routing and policy index; exhaustive marketplace research, long threat rationale, full ADR text, and platform schema detail are linked as references instead of repeated in every agent file.
+
+Knowledge is placed by **how often it is actually needed**, since `AGENTS.md` is loaded in every host session and is the fallback a subagent opens when it needs a rule beyond its compact project-standard digest. Every-task knowledge — routing, ownership, gates — stays resident there. Project knowledge that only *some* tasks need (business rules, regulatory constraints, this repo's own coordination conventions) becomes a **`skill-kind: domain` skill**, which costs ~100 tokens to discover and loads its body only when its trigger matches. Those skills are derived from the project (purpose, domain classification, stack, ownership zones, existing docs/ADRs) and confirmed at the normal plan gate — never elicited by a blank "what skills do you want?" prompt — and must pass a four-part admission gate so the layer does not become a dumping ground. The plugin owns the scaffold; **you own the body, and `improve`/`upgrade` never overwrite it.** See the [placement rule](./plugins/agents-system-setup/skills/agents-system-setup/references/context-optimization.md#2a-placement-rule--where-a-piece-of-knowledge-goes).
 
 ## Local-only vs git-tracked agents
 

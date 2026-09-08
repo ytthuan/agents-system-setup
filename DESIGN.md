@@ -4,6 +4,37 @@ This document explains **why** each phase and hard rule of `agents-system-setup`
 
 Public runtime support spans **Copilot CLI**, **Claude Code**, **OpenCode**, **OpenAI Codex (CLI + App)**, and **Gemini CLI** artifact layouts. Plugin installation is documented only for runtimes with supported plugin/install surfaces; Gemini CLI remains artifact-first.
 
+## Native-first contract (current source)
+
+Native initialization and canonical memory are separate stages. Harnesses have
+different command surfaces and output filenames; native output provides project
+facts, not permission to alter configuration or overwrite user instructions.
+Copilot prefers an explicit root-`AGENTS.md` request, falling back only with a
+disclosed, approved choice. Reusing output avoids vendored internal prompt drift.
+
+Always-loaded memory now has a complete-file **150-line AND 12,288-byte** limit.
+The root keeps exact commands, ownership, critical controls, gate triggers and a
+skill-loading index. Full matrices and procedures live in local project policy
+or skills. All profiles share the limit; it is a plugin contract rather than a
+vendor line/token requirement. Native imports and audience tags do not make
+context free, and unknown global context is not zero.
+
+The existing read-only doctor enforces deterministic output properties; reviewed
+proposals handle semantic conflicts and redundancy. A procedural skill cannot
+guarantee arbitrary model behavior by prose alone. Whole-file sizes, approved
+preimages, local references, and actual runtime observations are distinct evidence.
+
+`task-delegation` preserves the assignment contract while choosing the smallest
+useful execution topology and available model/effort within explicit constraints.
+Responsibilities are mandatory when applicable, not separate processes by
+default. Independent review remains independent; a parent load marker never
+stands in for context that a child did not receive.
+
+The historical rationale below predates this contract. In particular, mandatory
+worker counts, unconditional parallelism, full inline root matrices, and
+symlink/copy defaults are superseded by the current skill and its
+[context policy](./plugins/agents-system-setup/skills/agents-system-setup/references/context-optimization.md).
+
 ## Hard rules — reasoning
 
 | Rule | Why it exists | What it prevents |
@@ -21,11 +52,13 @@ Public runtime support spans **Copilot CLI**, **Claude Code**, **OpenCode**, **O
 | 11. Cross-OS aware | Plugin will be installed on Linux, macOS, Windows | `.sh` scripts on Windows, CRLF in bash files |
 | 12. Git is opt-in | Some users scaffold inside an existing repo; auto-initing would corrupt history | Detached HEAD, lost commits |
 | 13. Parallelism is mandatory where independent | Agent teams should use the user's available concurrency safely | Sequential bottlenecks and hidden shared-path conflicts |
+| 13a. Supervision is opt-in and trigger-based | Watching every child is a context bottleneck; watching none is blind dispatch. The plan gate is the cheapest intervention with the highest leverage, and no completion callback is documented — so reconciliation must read artifacts, not trust messages | Polling loops that burn host turns for zero information, and waves that silently close over a dead child |
 | 14. Spec-Kit recommendation for software projects | Spec-driven development is valuable but should remain opt-in | Silent tool installs or missed high-value workflow setup |
 | 15. Security/audit/architecture governance baseline | Agent systems can change code, config, tools, and release paths; ownership and evidence must be explicit | Unsafe MCP/tool writes, secrets leakage, unauditable changes, architecture drift |
 | 16. Security-sensitive writes require evidence | Risky changes need proof, not just a success-shaped summary | "Done" reports with no build/test/security/audit trail |
 | 17. Evidence-based improve mode | Audits should prioritize real findings with sources and severity | Cosmetic rewrites that miss security, architecture, or supply-chain risk |
 | 18. Context budget is a feature | Generated agent systems become less useful when every file repeats every rule | Prompt bloat, missed routing facts, expensive/noisy subagent delegation |
+| 18a. Knowledge is placed by how often it is needed | `AGENTS.md` is loaded in every host session and is a subagent's fallback beyond its compact digest, so parking domain detail there taxes work that never needs it and defeats the v1.6.0 layering — while routing and gates pushed into a skill go invisible until a trigger fires | Business rules bloating every host turn; and gates nobody loads |
 | 19. Artifact tracking is explicit | Agent systems may be team infrastructure or personal local memory; the write behavior must match user intent | Accidentally committing private prompts, or hiding team-owned agent files |
 | 20. Plan handoff normalized before emission | Planning prompts and slash commands have their own metadata, not runtime agent schemas | Copying `agent: Plan`, Spec-Kit metadata, or Copilot frontmatter into Claude/OpenCode/Codex artifacts |
 | 21. Runtime drift is source-backed and gated | Upstream agent runtimes change formats independently; support claims must match implemented emitters and validators | Advertising candidate runtimes too early, switching formats on docs ambiguity, stale schema guidance |

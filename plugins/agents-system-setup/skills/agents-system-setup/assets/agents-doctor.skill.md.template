@@ -1,102 +1,130 @@
 ---
 name: agents-doctor
-description: 'Use when the host orchestrator (or a human/CI) needs to verify that the generated agent system on disk still matches its manifest. Read-only. Reconciles agent files against .agents-system-setup/generated.json and reports strays (including a hand-written orchestrator file), missing artifacts, checksum drift, missing stamps, and operational-state misroutes. Returns findings; the orchestrator owns any fix decisions.'
+description: 'Use when the host orchestrator (or a human/CI) needs to verify generated agent artifacts, canonical AGENTS.md memory, adapters, and native skill paths. Read-only. Reconciles against .agents-system-setup/generated.json when present and supports --memory-only drafts before a manifest exists. Returns findings; the orchestrator owns fix decisions.'
 ---
 
 <!-- agents-system-setup:generated-by: {{PLUGIN_VERSION}} -->
 <!-- agents-system-setup:generated-at: {{GENERATED_AT}} -->
 <!-- agents-system-setup:skill-kind: host-doctor -->
 
-# Agents Doctor (host-side)
+# Agents Doctor (host-side, read-only)
 
 ## Purpose
 
-Reconcile the agent system on disk against the central manifest
-`.agents-system-setup/generated.json` and report drift. This is a host-side,
+Reconcile generated artifacts against `.agents-system-setup/generated.json` and
+audit the complete canonical `AGENTS.md` memory contract. This is a host-side,
 **read-only** check: it never edits files. Subagents never invoke it; the host
 CLI session (or a human, or CI) runs it, reviews findings, and owns any fix or
 migration decision.
 
-The most important signal is a **stray `orchestrator` agent file**: the
-orchestrator is the host CLI session reading `AGENTS.md`, never an emitted
-subagent (no `orchestrator.agent.md` / `.claude/agents/orchestrator.md` /
-`.opencode/agents/orchestrator.md` / `.codex/agents/orchestrator.toml` /
-`.gemini/agents/orchestrator.md`). A generating session that hand-writes one
-produces an unregistered file that no runtime resolves.
+The orchestrator is the host CLI session reading `AGENTS.md`, never an emitted
+subagent. A generated `orchestrator` agent file is therefore an error.
+
+The canonical memory path is the complete root `AGENTS.md`, not a managed block,
+template, adapter, or truncated proxy. The plugin policy is **at most 150
+physical LF-delimited lines and at most 12,288 raw UTF-8 bytes**, including
+preserved user content. The advisory target is 80-120 lines. CRLF counts as one
+line delimiter but all raw bytes count; a final unterminated line and a long
+single line are counted exactly. Invalid UTF-8 is an error.
 
 ## How to run
 
 Prefer the bundled engine; it is standard-library Python only and read-only:
 
 ```bash
-python3 .agents-system-setup/agents-doctor.py          # human summary
-python3 .agents-system-setup/agents-doctor.py --json    # machine-readable
-python3 .agents-system-setup/agents-doctor.py --strict   # warnings fail (CI)
+python3 .agents-system-setup/agents-doctor.py             # human summary
+python3 .agents-system-setup/agents-doctor.py --json       # machine-readable
+python3 .agents-system-setup/agents-doctor.py --strict     # warnings fail (CI)
+python3 .agents-system-setup/agents-doctor.py --memory-only # pre-manifest draft
 ```
 
 Exit codes: `0` clean · `1` error-severity findings (or warnings under
-`--strict`) · `2` no manifest found.
+`--strict`) · `2` no manifest found in normal mode. `--memory-only` expects
+manifest absence and returns `0`/`1` based on memory findings.
 
-If Python is unavailable, perform the same checks manually by reading the
-manifest and scanning the runtime agent directories per the catalog below.
+If Python is unavailable, do not silently substitute a different size
+algorithm. Report that the executable checker could not run.
 
 ## Input contract
 
 ```yaml
 root: <repo-root>            # default: parent of .agents-system-setup/
 strict: false                # treat warnings as failures
+memory_only: false           # allow a missing manifest
 ```
 
-The host does not expand the scan beyond the runtime agent directories
-(`.github/agents`, `.claude/agents`, `.opencode/agents`, `.codex/agents`,
-`.gemini/agents`), the skills paths, and `.agents-system-setup/`.
+The host scans only the root memory, controlled adapters, declared local
+references/skills, current project skill roots
+(`.github/skills`, `.claude/skills`, `.opencode/skills`, `.agents/skills`,
+`.gemini/skills`), the legacy Codex migration root `.codex/skills`, runtime
+agent directories, and `.agents-system-setup/`. User/global skill discovery is
+reported as unknown, not scanned or treated as zero context.
 
 ## Check catalog
 
 | Signal | Severity | Detection rule |
 |---|---|---|
-| `orchestrator-subagent-file` | error | An agent file whose logical name is `orchestrator` exists in any runtime agents directory (always invalid per the host-session-is-orchestrator rule). |
-| `stray-agent` | error | An agent file exists on disk but its path is absent from manifest `artifacts[]` (likely hand-written outside the plugin). |
-| `missing-artifact` | error | A manifest `subagent` / `agents-md` artifact path is missing on disk. |
-| `checksum-drift` | warn | A file's sha256 differs from the manifest `checksum` (edited since generation; content evolves naturally, so this is a warning). |
-| `missing-stamp` | warn | An agent file has no `agents-system-setup:generated-by` stamp (pre-stamp or hand-authored). |
-| `operational-state-artifact` | error | A forbidden subtree (`agents` / `skills` / `hooks` / `commands` / `prompts` / `plugins`) exists inside `.agents-system-setup/`. |
-| `manifest-version-drift` | warn | The manifest `plugin_version` differs from the `AGENTS.md` stamp (suggest running upgrade mode). |
+| `orchestrator-subagent-file` | error | An agent file named `orchestrator` exists in a runtime agents directory. |
+| `stray-agent` | error | An agent file exists on disk but its path is absent from manifest `artifacts[]`. |
+| `stray-artifact` | error | A controlled generated-style non-agent artifact is absent from the manifest, including the emitted engine. |
+| `missing-artifact` | error | A manifest artifact path is missing on disk. |
+| `checksum-drift` | warn | A file's sha256 differs from its manifest checksum. |
+| `artifact-read-error` | error | A listed existing artifact cannot be hashed safely. |
+| `runtime-surface-out-of-root` | error | A controlled runtime entry points outside the assessed root; its target is not read. |
+| `missing-stamp` | warn | A generated agent file has no generation stamp. |
+| `operational-state-artifact` | error | A forbidden runtime subtree exists inside `.agents-system-setup/`. |
+| `manifest-version-drift` | warn | Manifest and generation stamps have different plugin versions. |
+| `memory-budget-lines` / `memory-budget-bytes` | error | Complete root memory exceeds 150 physical lines or 12,288 raw UTF-8 bytes. |
+| `memory-target-lines` | warn | Complete root memory exceeds the advisory 120-line target; shorter complete files need no padding. |
+| `memory-invalid-utf8` | error | Root memory cannot be decoded as strict UTF-8. |
+| `malformed-managed-markers` | error/warn | Generated managed markers are missing, duplicated, or out of order. |
+| `unresolved-placeholder` | error | Generated output contains an unresolved uppercase, double-braced generation token. |
+| `invalid-generation-stamp` | error | Generated-style root memory lacks one valid stamp; markers alone never authorize a rewrite. |
+| `invalid-manifest` | error | Manifest must be readable JSON with schema 1, nonempty plugin_version, typed artifact records, and a valid SHA-256 checksum for every record. |
+| `adapter-missing-canonical-import` | error | A generated Claude/Gemini adapter does not import canonical `@AGENTS.md`. |
+| `adapter-cycle` / `adapter-eager-workflow-import` | error | A controlled import graph has a cycle or eagerly imports workflow detail. |
+| `adapter-drift` / `legacy-memory-copy` | warn | Existing/custom copies or adapters need reviewed reconciliation; no repair is automatic. |
+| `declared-skill-missing` / `declared-skill-mislocated` | error | A declared local skill path is missing or outside a current native root. |
+| `declared-skill-legacy-location` | error | An active generated declaration still uses a retired Codex skill root. Explicit migration/history mentions are not active declarations. |
+| `skill-overlap` | warn | Overlapping native discovery paths need review. |
+| `skill-load-state-unknown` | info | File existence was checked, but native loader state is not inferred from a link. |
+| `stale-task-handoff-name` | error | Generated output uses retired active `task-handoff`/`host-handoff` names outside explicit migration/history text. |
 
-If `.agents-system-setup/generated.json` is absent, only
-`orchestrator-subagent-file` and `operational-state-artifact` can run; the engine
-exits `2` and the host should offer to (re-)run the plugin so a manifest exists.
+Markdown links prove only checked file existence; they do not prove a skill
+loaded. Token counts are explicitly `unavailable` without a tokenizer
+dependency or provider API. Adapter/import overhead is reported separately
+from canonical root size, and unknown personal/global context is not zero.
 
 ## Output
 
-The engine returns a findings list (`--json`):
+The engine returns a findings list with exact memory metrics under `--json`:
 
 ```json
 {
   "ok": false,
-  "manifest_present": true,
-  "counts": {"error": 1, "warn": 0},
+  "manifest_present": false,
+  "memory_only": true,
+  "memory": {
+    "canonical_path": "AGENTS.md",
+    "lines": 101,
+    "bytes": 8420,
+    "hard_limits": {"max_lines": 150, "max_bytes": 12288},
+    "target_lines": {"min": 80, "max": 120},
+    "token_count": {"status": "unavailable"},
+    "controlled_adapter_overhead": {"lines": 0, "bytes": 0},
+    "effective_context": {"status": "unknown"}
+  },
+  "counts": {"error": 1, "warn": 0, "info": 0},
   "findings": [
     {
       "severity": "error",
-      "signal": "orchestrator-subagent-file",
-      "path": ".github/agents/orchestrator.agent.md",
-      "detail": "<why this is wrong>",
+      "signal": "memory-budget-lines",
+      "path": "AGENTS.md",
+      "detail": "<exact observed and allowed values>",
       "suggested_action": "<host-reviewed fix; never applied automatically>"
     }
   ]
 }
-```
-
-## Reporting template
-
-```text
-Agents doctor: ok | findings
-Manifest: <path | MISSING>
-Errors: <count>  Warnings: <count>
-Findings:
-  - <severity> <signal> <path>: <detail> -> <suggested_action>
-Handoff status: completed | blocked | returned-to-orchestrator
 ```
 
 ## Boundary rules (READ FIRST)
@@ -104,18 +132,20 @@ Handoff status: completed | blocked | returned-to-orchestrator
 1. This skill is **READ-ONLY**. It returns findings and never modifies files.
 2. This skill is **HOST-ONLY**. Subagents must not invoke it; if a subagent
    notices drift in its owned files it `return-to-orchestrator`.
-3. Fixes are owned by the host orchestrator plus user approval. Stray/orchestrator
-   removals go through the upgrade-mode migration ledger in
-   `references/misplaced-artifacts-migration.md`, never a silent delete.
-4. A clean result means no drift was found in the scanned surfaces only; it is
-   not approval for any write.
+3. Fixes are owned by the host orchestrator plus user approval. Stray/removal
+   decisions use the migration ledger, never a silent delete.
+4. A clean result means no drift was found in scanned surfaces only; it is not
+   approval for any write.
+5. Existing/custom memory and adapters may be assessed but are never rewritten.
 
 ## Anti-patterns
 
 - Running this skill from inside a generated subagent.
-- Auto-deleting a stray or orchestrator file because the finding looks obvious —
-  route removals through the migration ledger with user approval.
-- Treating `checksum-drift` as an error; content evolves and the warning is
-  informational unless `--strict` is set for CI.
-- Expanding the scan outside the runtime agent directories and
-  `.agents-system-setup/`.
+- Auto-deleting a stray or orchestrator file because the finding looks obvious.
+- Treating `checksum-drift` as an error; it is informational unless `--strict`.
+- Treating a host skill load or Markdown link as proof that a child/runtime
+  loaded the skill.
+- Replacing a custom adapter/copy automatically. Legacy copies and drift are
+  reviewed warnings.
+- Expanding the scan into unrelated personal/global directories or arbitrary
+  out-of-root paths.

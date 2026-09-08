@@ -1,6 +1,8 @@
 # Parallel Subagents & Claude Code Agent Teams
 
-Generated agent systems must exploit parallelism wherever the work is independent. This is not optional — sequential-only topologies waste wall-clock and burn the user's context.
+Generated agent systems use parallelism only when it materially improves
+completion time or context isolation. Direct host execution and sequential work
+are valid when startup, coordination, or integration cost outweighs the benefit.
 
 ## Three distinct primitives
 
@@ -8,21 +10,20 @@ Generated agent systems must exploit parallelism wherever the work is independen
 |---|---|---|---|
 | **Parallel subagents** | Multiple subagent invocations in **one orchestrator turn**, each in its own context window or child session | Copilot CLI (`Task`/`agent` tools and optional `/fleet`), Claude Code (tool-based subagents), OpenCode (`task` + `@agent`), OpenAI Codex (child agent threads), Gemini CLI (root agent calls subagent tools / `@agent`) | Fan-out from one orchestrator; results return to the orchestrator only |
 | **Agent teams** (Claude Code only, experimental) | Independent Claude instances that **message each other directly**, with a shared task list | Claude Code only — requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` | Lead + teammates; teammates communicate peer-to-peer |
-| **Cross-session orchestration** (GitHub Copilot app only) | Each unit of work runs in its **own session = worktree + branch + PR**; sessions can message each other and nest under the spawner | GitHub Copilot app host via `/orchestrate` + `create_session` (wraps a Copilot CLI session) | Host orchestrator promotes parallel-safe units to child sessions/PRs; advisory, never a generated-file dependency |
+| **Cross-session orchestration** (GitHub Copilot app only) | Each unit of work runs in its **own session = worktree + branch + PR**; sessions can message each other and nest under the spawner | GitHub Copilot app host via `/orchestrate` + `create_session` (wraps a Copilot CLI session) | Host orchestrator promotes parallel-safe units to child sessions/PRs (**dispatch**), and may opt in to [supervising a running child](#supervising-a-running-child-session); advisory, never a generated-file dependency |
 
-Sources: https://docs.github.com/en/copilot/concepts/agents/copilot-cli/fleet · https://docs.anthropic.com/en/docs/claude-code/sub-agents · https://docs.anthropic.com/en/docs/claude-code/agent-teams · https://opencode.ai/docs/agents/ · https://developers.openai.com/codex/subagents · https://github.com/google-gemini/gemini-cli/blob/main/docs/core/subagents.md · GitHub Copilot app v0.2.33 release notes: https://github.com/github/app/releases/tag/v0.2.33
+Sources: https://docs.github.com/en/copilot/concepts/agents/copilot-cli/fleet · https://docs.anthropic.com/en/docs/claude-code/sub-agents · https://docs.anthropic.com/en/docs/claude-code/agent-teams · https://opencode.ai/docs/agents/ · https://developers.openai.com/codex/subagents · https://github.com/google-gemini/gemini-cli/blob/main/docs/core/subagents.md · GitHub Copilot app v0.2.33 (`/orchestrate`): https://github.com/github/app/releases/tag/v0.2.33 · GitHub Copilot app v1.0.10 (cross-session plan approval): https://github.com/github/app/releases/tag/v1.0.10 · GitHub Copilot app v0.2.7 (cross-session messages): https://github.com/github/app/releases/tag/v0.2.7 · GitHub Copilot app v1.0.3 (needs-input session tree bubbling): https://github.com/github/app/releases/tag/v1.0.3 · GitHub Copilot CLI v1.0.72 (multi-turn subagents): https://github.com/github/copilot-cli/releases/tag/v1.0.72
 
 ## When to use which (decision flow)
 
 ```
-Is the work independent across N domains?
-├─ No  → single subagent (or sequential chain)
-└─ Yes → does the user want results synthesized centrally?
-         ├─ Yes → PARALLEL SUBAGENTS (fan-out + collect)
-         └─ No, teammates need to challenge each other
-                / share findings as they go
-                → AGENT TEAM (Claude Code only;
-                  fall back to parallel subagents on other runtimes)
+Would delegation materially help?
+├─ No  → host executes directly
+└─ Yes → are multiple substantial tasks independent and nonoverlapping?
+         ├─ No  → one worker or sequential chain
+         └─ Yes → does concurrency beat startup/integration cost?
+                  ├─ Yes → parallel workers (fan-out + collect)
+                  └─ No  → sequential workers
 ```
 
 ## Parallel-readiness derived from Directory Architecture
@@ -42,13 +43,17 @@ The generator computes parallel-safety automatically from the Directory Architec
 | `integration-tester` | end-to-end | `tests/integration/**` | ⚠️ depends on wave 1 | 2 |
 | `release-notes` | docs | `CHANGELOG.md` | ⚠️ depends on wave 2 | 3 |
 
-The orchestrator prompt (Phase 4) is rendered with explicit fan-out instructions per wave.
+The orchestrator records dependency waves, but invokes a wave concurrently only
+when the work is substantial, independent, and beneficial within active limits.
 
 ## Cross-session orchestration (GitHub Copilot app)
 
 The third primitive promotes a unit of work to its **own session = own worktree + branch + PR** (one session per branch/PR), driven by the GitHub Copilot app's `/orchestrate` command and `create_session`. Sessions can message each other and nest under the session that spawned them. It is **host-app-specific and advisory**: generated files never depend on it, and non-Copilot runtimes — and Copilot CLI run outside the app — simply ignore this section.
 
-This is the highest-value axis for a single generated agent system: most systems live in one repo, and splitting a large change into a reviewable fan-out (or stack) of per-owner PRs maps directly onto the roster's ownership zones (1 session ≈ 1 branch ≈ 1 PR ≈ 1 owner slice).
+When the user explicitly opts in, this can help large changes whose independent
+owner slices benefit from separate reviewable branches/PRs. It is not a default
+dispatch mode, and path-disjoint work alone does not justify session creation
+(1 session ≈ 1 branch ≈ 1 PR ≈ 1 owner slice).
 
 ### From waves to sessions — decision procedure
 
@@ -65,6 +70,111 @@ The parallel-safety predicate above (non-overlapping `owns`, no cross-deps, no s
 - Every child session still obeys the Directory Architecture, Build Gate ownership, and the MCP approval gate — a session is a different *container* for the same governed unit, never a way around a gate.
 - **Out of scope here:** cloud sessions and cross-repo / multi-workspace fan-out. This section is intra-repo multi-session.
 
+### Supervising a running child session
+
+Everything above is **dispatch**: promote a unit, integrate at the end. This
+subsection covers **supervision** — what the host does while a child is still
+running. It is opt-in and recorded as `advisory_supervision`.
+
+**Probe the capability first, and fail closed.** Generation cannot tell Copilot
+CLI from the Copilot app, and the artifact persists for both. If
+`respond_to_session_plan` / `create_session` are absent from the host's tool
+surface, this protocol is `n/a`: do not simulate, narrate, or approximate it —
+fall back to the standard wave model.
+
+There is no numeric sizing floor. The user must opt in, the app-only tools must
+exist, and each promoted unit must justify the branch/PR/integration overhead.
+Do not spawn a child session merely because a unit is path-disjoint.
+
+#### C1 — the plan gate
+
+A child paused in plan mode notifies its creator, its plan surfaces via
+`get_session`, and `respond_to_session_plan` approves or redirects it (app
+v1.0.10).
+
+- **Precondition.** C1 fires **only when the child was created in plan mode**. A
+  unit dispatched from a fully specified 12-field packet is normally created
+  interactive or autopilot, and then C1 never fires. Plan mode is a deliberate
+  dispatch decision: use it when the unit's scope is uncertain or touches a shared
+  boundary; skip it when the host already planned the work.
+- **Limitation.** Choosing the child's continuation mode after approval is not
+  documented. Approving returns the child to the mode it was created in.
+- **Why this is the checkpoint worth having.** Redirecting a plan costs one
+  message; redirecting after implementation costs a full child run plus a rework
+  PR.
+
+#### C2 — steer only on a trigger, and never poll
+
+Three intervention triggers are already owned elsewhere and are cited, not
+restated: blocking questions route through `question_request`
+([handoff](./handoff.md)); boundary escape is caught **before** any write by
+Acceptance Checklist item 3 (`File Inventory.to_modify` intersects only
+`Owned paths`); a stalled child bubbles its tree into the most urgent sidebar
+group (app v1.0.3).
+
+One trigger is genuinely new, and only the host can detect it:
+
+- **Premise invalidation** — a sibling's decision (API contract, schema, shared
+  type) invalidates the premise the child was dispatched on. Only the host sees
+  every sibling. This is the in-flight owner for the risk named above: that
+  path-disjoint is not integration-safe.
+
+**Polling is banned.** Progress curiosity, style preference, and "check how it is
+going" are not triggers. Each poll costs a `get_session` plus a host reasoning
+turn with zero expected information gain, and it is what turns a supervisor into
+the bottleneck.
+
+#### C3 — reconciliation is host-owned, not a child-side promise
+
+No completion callback is documented — only *plan-ready* notifies the creator. A
+child that crashes, is interrupted by a human, blocks on a tool-approval prompt,
+or exhausts its context sends nothing, and a "report back when you finish"
+instruction sits in the oldest part of that child's context while coming due at
+the moment of maximum context pressure. So the loop closes from artifacts:
+
+1. **Wave-close invariant.** Do not close wave N until every dispatched unit is
+   `returned`, `reconciled-from-artifact`, or `explicitly-abandoned`.
+2. **`reconciled-from-artifact`.** When no return arrives, derive status from the
+   branch/PR state plus `get_session`. **The branch/PR is the source of truth;
+   the child's message is an optimization.**
+3. A non-returning child is `unreconciled` — never silently dropped.
+
+Returning subagents report `In bounds:` per the [handoff](./handoff.md) Reporting
+Template.
+
+#### Boundaries
+
+- **Advise, never edit.** The host never writes inside a child's owned surface —
+  two writers on one branch is corruption.
+- Advice flows **one hop**, host to child, never past a child into that child's
+  own subagents.
+- **Subagents never orchestrate sessions**, and never call
+  `respond_to_session_plan` or `send_session_message`. `architecture-reviewer`
+  returns the premise verdict; only the host acts on it.
+- Supervision is **never a gate bypass** — every gate still runs inside the child.
+
+#### Verdict
+
+`architecture-reviewer` receives a host-composed premise packet and returns a
+short verdict, so the expensive plan/diff reading stays out of the host's context:
+
+```text
+Advisory verdict: approve | redirect | hold
+premise: intact | invalidated-by:<sibling>
+note: <= 2 sentences
+```
+
+Generic engineering critique routes to the host's built-in rubber-duck critic
+instead. Do not duplicate it.
+
+#### Levels
+
+`advisory_supervision`:
+
+- `off` — the default, and the value whenever the user does not opt in.
+- `plan-gate` — C1 plus C3 reconciliation.
+- `standard` — C1, C3, and C2 on the premise trigger.
+
 ## Orchestrator prompt patterns (per runtime)
 
 ### Copilot CLI / OpenCode / OpenAI Codex / Gemini CLI (parallel subagents)
@@ -74,23 +184,23 @@ The parallel-safety predicate above (non-overlapping `owns`, no cross-deps, no s
 
 <!-- agents-system-setup:wave-execution -->
 
-For independent work, **fan out**: invoke all parallel-safe subagents in a
-single turn using the runtime's native subagent call surface (Task/agent tool,
-@agent, or child agent threads). Wait for all results. Synthesize. Then start
-the next wave.
+First choose host-direct versus delegated execution. When multiple delegated
+tasks are substantial, independent, nonoverlapping, and likely to benefit,
+invoke them concurrently within runtime/user limits. Wait for every dispatched
+result, reconcile, then begin dependent work.
 
-Sequential is the default ONLY when:
-- A subagent's owns_paths overlap another's
-- A subagent's input is the previous subagent's output
-- A subagent must touch shared state (the AGENTS.md or release notes)
-
-Never serialize parallel-safe work.
+Use sequential or direct execution when paths overlap, outputs are dependent,
+shared state is involved, startup dominates, or concurrency would increase
+retry, rate-limit, or integration cost.
 ```
 
 Runtime-specific notes:
 - **Copilot CLI:** use Task/agent calls when the orchestrator must synthesize results. `/fleet` is optional CLI UX for independent batches that do not need provider-agnostic generated files to depend on it. Under the **GitHub Copilot app**, `/orchestrate` additionally promotes parallel-safe units to child sessions/PRs — see [Cross-session orchestration](#cross-session-orchestration-github-copilot-app).
 - **OpenCode:** primary agents can invoke subagents automatically or via `@<agent-name>`; gate this with `permission.task` wildcard deny/ask plus named roster allows.
-- **Codex:** child agent threads are explicitly requested and visible in the CLI/App. Use `.codex/config.toml` `[agents] max_threads = 6`, `max_depth = 1` as safe defaults. Keep `/agent` and `codex exec` as optional CLI usage notes only.
+- **Codex:** child agent threads are explicitly requested and visible in the
+  CLI/App. Preserve configured limits. The current concurrency key is
+  `agents.max_concurrent_threads_per_session`; recognize `max_threads` only as
+  a legacy alias. Do not force six threads as a vendor default.
 - **Gemini CLI:** subagents cannot recursively call other subagents. Keep all parallel fan-out in the root/orchestrator session and tell workers to return cross-boundary work rather than delegating.
 
 ### Claude Code (agent team option)
@@ -98,7 +208,7 @@ Runtime-specific notes:
 ```markdown
 ## Coordination protocol
 
-When the user's task spans 3+ independent concerns AND benefits from
+When the user's task spans multiple independent concerns AND benefits from
 peer-to-peer challenge (architecture vs UX vs devil's advocate;
 competing debug hypotheses; cross-layer refactors):
 
@@ -107,7 +217,7 @@ competing debug hypotheses; cross-layer refactors):
 3. Provide the shared task list; teammates self-coordinate.
 4. For risky tasks, require plan approval before implementation.
 
-Otherwise, default to parallel subagents (fan-out / collect).
+Otherwise, prefer ordinary host execution or subagents without Agent Teams.
 ```
 
 Claude decision rule: use **subagents** when workers only need to return results to the main session; use the **Agent tool** as the invocation mechanism for those subagents; use **agent teams** only when independent Claude instances need to discuss, challenge findings, claim tasks, or coordinate without routing every message through the lead.
@@ -116,22 +226,35 @@ Claude decision rule: use **subagents** when workers only need to return results
 
 When emitting subagents and orchestrator, the skill MUST:
 
-1. **Compute waves** from the Directory Architecture and emit the wave table in `AGENTS.md`.
-2. **Render the parallel-execution clause** in the orchestrator prompt for every runtime.
+1. **Compute dependencies and ownership** from the Directory Architecture.
+   Emit waves only for delegated work; zero specialists is valid.
+2. **Render the adaptive execution clause** in the orchestrator prompt:
+   direct first, then sequential or concurrent delegation by benefit.
 3. **For Claude Code projects**, also emit an `AGENT-TEAMS.md` snippet documenting:
-   - When to enable agent teams (3+ independent concerns + peer challenge value)
+   - When to enable agent teams (multiple independent concerns + peer challenge value)
    - The env var (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`) plus a settings.json snippet
    - Suggested teammate roster (drawn from the Agent Roster, marked `team-suitable`)
-4. **Token-cost warning**: agent teams cost N× tokens (one Claude instance per teammate). Surface this in the AGENT-TEAMS.md so users opt in knowingly.
-5. **When Copilot CLI/app is a selected runtime**, render the Copilot-app cross-session advisory: a note in the `AGENTS.md` › Platform-native delegation Copilot row plus a Wave Execution bullet, both pointing at the [Cross-session orchestration](#cross-session-orchestration-github-copilot-app) section. **Advisory only** — never emit a first-class app-specific block into the shared `AGENTS.md` (it is copied to `CLAUDE.md`/`GEMINI.md` and read natively by Codex/OpenCode, so an app-only primitive there would leak into every runtime's context).
+4. **Token-cost warning**: each teammate adds context and coordination cost; actual spend depends on work, caching, retries and model choice, not a guaranteed N× multiplier. Surface the uncertainty in AGENT-TEAMS.md so users opt in knowingly.
+5. **When Copilot CLI/app is selected and the user opts in**, keep
+   cross-session orchestration advisory-only. Do not make it a root-memory
+   requirement or automatically create sessions, branches, or PRs.
+6. **When `advisory_supervision` is not `off`**, preserve plan approval,
+   premise-only steering, banned polling, one-writer ownership, and wave-close
+   reconciliation.
 
 ## Anti-patterns
 
-- **Sequential-only orchestrator** — burns wall-clock when the work is independent. The default must be fan-out for parallel-safe subagents.
+- **Mandatory fan-out** — invokes workers even when direct or sequential
+  execution is cheaper, clearer, or safer.
+- **Minimum worker counts** — process count is not a quality gate.
 - **Parallel writes to overlapping paths** — race condition on disk; one subagent's write is overwritten silently. The Directory Architecture is the lock.
-- **Agent teams for trivial tasks** — coordination overhead and token cost outweigh benefit. Use parallel subagents instead.
+- **Agent teams for trivial tasks** — coordination overhead and token cost outweigh benefit. Prefer direct host work, not another automatic fan-out.
 - **Agent teams without the env var** — silently falls back to single-session behavior.
 - **Forgetting wave 2+ depends on wave 1** — orchestrator must `await` wave N before starting wave N+1.
 - **A first-class cross-session block in the shared `AGENTS.md`** — leaks a Copilot-app-only primitive into `CLAUDE.md`/`GEMINI.md`/Codex/OpenCode. Keep cross-session orchestration advisory, in the Copilot delegation cell and a Wave Execution note.
 - **Subagents spawning sessions** — cross-session orchestration is host-orchestrator-only; subagents `return-to-orchestrator` when work exceeds their owned surface.
 - **Treating parallel-safe as merge-safe** — path-disjoint PRs can still be a logical/integration conflict; the predicate is a candidate filter, not a guarantee.
+- **Polling a running child** — "how is it going" costs a `get_session` plus a host reasoning turn with zero expected information gain. Steer only on the premise trigger; the other three are already owned by `question_request`, the Acceptance Checklist, and sidebar status.
+- **Closing a wave with an unreconciled child** — no completion callback is documented, so a silent child is not a finished child. Every dispatched unit must be `returned`, `reconciled-from-artifact`, or `explicitly-abandoned` before wave N closes.
+- **Simulating cross-session tools that are not present** — the app-only surface does not exist in Copilot CLI. If `respond_to_session_plan` / `create_session` are missing, the protocol is `n/a`; narrating it anyway produces confident fiction.
+- **The host editing inside a child's owned surface** — supervision is advice, not a second writer. Two writers on one branch is corruption.

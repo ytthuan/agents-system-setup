@@ -2,6 +2,75 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [1.14.0] - 2026-09-08
+
+### Added
+
+- Native-first initialization guidance for all five harnesses, with distinct
+  commands/files, explicit Copilot root-`AGENTS.md` preference, approval-safe
+  existing-memory handling, and disclosed fallback.
+- Complete-file memory enforcement through the existing read-only doctor,
+  including pre-manifest `--memory-only` assessment and behavioral fixtures.
+- Local project-policy template for on-demand governance, ADRs, capability
+  coverage and review detail.
+
+### Changed
+
+- Canonical `AGENTS.md` synthesis targets 80-120 physical lines and must fit
+  150 lines AND 12,288 UTF-8 bytes in every profile. Full expands on-demand
+  material, not root memory; skills have concrete triggers and native paths.
+- Rename `task-handoff` to `task-delegation` (`host-delegation`), with coordinated
+  approval-safe migration of paths, pointers, manifests and exact permissions.
+- Default to adaptive-balanced model/effort selection and task-based delegation,
+  preserving explicit pins, budgets, provider limits and independent gates.
+  Remove mandatory minimum-worker counts and forced fan-out.
+- Use thin Claude/Gemini native import adapters; memory helpers no longer
+  overwrite existing content or fall back to full policy copies.
+
+### Fixed
+
+- Host-loaded skill evidence and context freshness no longer imply a child
+  received the body. Required excerpts or native child loading remain explicit.
+- Current Codex skill discovery uses `.agents/skills`; legacy `.codex/skills`
+  is migration input. Model effort and concurrency guidance uses advertised
+  capabilities rather than a closed effort enum or an invented fixed default.
+- Doctor reconciliation requires manifest schema 1 and per-artifact SHA-256
+  checksums, reports unreadable or unindexed generated outputs, and rejects
+  out-of-root runtime surfaces without reading external targets.
+
+## [1.13.0] - 2026-07-28
+
+Two subsystems ship in this release: **child-session supervision** (the in-flight counterpart to v1.11.0's dispatch model) and the **`skill-kind: domain`** project-knowledge layer. They were developed as separate `1.12.0` and `1.13.0` work; `1.12.0` was never published as its own tag, so both are released here.
+
+### Added
+
+- **Supervising a running child session — the in-flight counterpart to v1.11.0's dispatch model.** v1.11.0 taught generated systems to *promote* parallel-safe units to child sessions (1 session ≈ 1 branch ≈ 1 PR) and integrate at the end. It said nothing about what the host does **while** a child is running. The GitHub Copilot app ships the transport for that — `create_session`, `send_session_message`, `get_session`, and `respond_to_session_plan` — but ships **no governance model** saying when to intervene, what to check, or what happens when a child never comes back. This release adds that model. It is opt-in (`advisory_supervision`), **off by default**, and deliberately scoped as an amendment rather than a second orchestration model: three of the four candidate intervention triggers were already owned by `question_request`, the Acceptance Checklist, and sidebar status, so they are cited instead of restated.
+  - **`references/parallelism.md`** — new `### Supervising a running child session` subsection under the existing Copilot-app section. Opens with a **fail-closed capability probe** (generation cannot distinguish Copilot CLI from the Copilot app and the artifact persists for both, so a missing `respond_to_session_plan` / `create_session` makes the protocol `n/a` — never simulated), plus a **sizing floor** of `parallel_safe_units >= 3`. Three checkpoints: **C1 the plan gate**, which fires *only when the child was created in plan mode* and names the undocumented continuation-mode limitation; **C2 steering**, restricted to the one genuinely new trigger — **premise invalidation** by a sibling's API-contract/schema decision, which only the host can see — with **polling explicitly banned**; and **C3 reconciliation**, which is host-owned and artifact-based. Adds Generator obligation #6, four anti-patterns, and the v1.0.10 / v1.0.72 source citations. Out of scope: cloud sessions and cross-repo / multi-workspace.
+  - **The wave-close invariant.** No completion callback is documented — only *plan-ready* notifies the creator — so a child that crashes, is interrupted, blocks on a tool prompt, or exhausts its context sends nothing. A prompt-level "report back" obligation sits in the oldest part of that child's context while coming due at peak context pressure, so the loop closes from durable artifacts instead: a wave may not close until every dispatched unit is `returned`, `reconciled-from-artifact`, or `explicitly-abandoned`, and **the branch/PR is the source of truth; the child's message is an optimization**. A non-returning child is `unreconciled`, never silently dropped.
+  - **`references/interview.md` § 9e** — one signal-gated question (never two), following hard rule #22's opt-in pattern: asked only when Copilot is selected **and** `parallel_safe_units >= 3` **and** the user raised child sessions / parallel PRs / mid-run steering. Choices are `Off (Recommended) | Plan gate only | Standard`. Otherwise `advisory_supervision = off` and Phase 8 may surface it as an add-on.
+- **`skill-kind: domain` — a project-knowledge layer, so domain detail stops defaulting into always-loaded memory.** The plugin shipped five well-specified plugin-owned skills (`host-handoff`, `host-audit`, `host-doctor`, `sdlc-build-gate`, `code-quality`) and a generic `skill.template.md`, but `SKILL.md`'s Phase 2 plan spec described project skills in exactly one bare bullet — `- Skills to create.` — with no taxonomy, no derivation rule, and no reference, while every other Phase 2 item carried a full specification. No interview step ever produced the list that template would render (§10 asks only about *marketplace lookup*, i.e. skills to **install**), and `skill.template.md` was the one template with **no** `skill-kind` marker at all. The practical consequence: project business rules, regulatory constraints, and a repo's own coordination conventions had nowhere to live except `AGENTS.md` — which is loaded in **every host session** and is the fallback a subagent must open when it needs a rule beyond its compact project-standard digest, so domain detail parked there both taxes every host turn and defeats the v1.6.0 layering by forcing a whole-file load where a scoped skill would do. That fought hard rule #18 and `context-optimization.md` directly, and `skill-format.md`'s `## Progressive Loading` section had nothing routing to it.
+  - **`references/context-optimization.md` § 2a — the placement rule.** Four rows deciding where a piece of knowledge goes: every-task knowledge stays in `AGENTS.md` (routing, ownership, gates must stay resident); some-task project-specific knowledge becomes a `skill-kind: domain` skill; generic engineering craft stays in a `host-*` skill so it upgrades with the plugin; deep detail goes to that skill's `references/`. Names the two failure modes it exists to prevent — domain knowledge parked in `AGENTS.md`, and routing or gates pushed into a skill where they are invisible until a trigger fires — with the disambiguating test: would the *next* task be wrong without it, or only *some* tasks?
+  - **`references/skill-format.md` — `## Skill kinds` and the admission gate.** Documents the marker, and splits ownership explicitly: plugin-owned kinds are regenerated from templates, while a `domain` skill's body is **user-authored and never overwritten** — the plugin owns the scaffold, the user owns the content. A candidate qualifies only if **all four** hold: project-specific, load-on-demand, stable trigger expressible as `USE FOR:` / `DO NOT USE FOR:`, and not already covered by a `host-*` skill or an `AGENTS.md` table. Soft cap of roughly one per major ownership zone, plus three new anti-patterns.
+  - **`assets/skill.template.md`** — gains the `skill-kind: domain` marker it never had, plus an inline scaffold notice stating that `improve`/`upgrade` never overwrite the body and pointing at the admission gate.
+- **`references/misplaced-artifacts-migration.md` — two upgrade rows.** `v1.9.0 → v1.13.0` is orchestrator-side only and Copilot-only: the two Copilot-app `AGENTS.md` advisory lines were introduced by v1.11.0, so older systems must have them **added** before the supervision clause can extend them. `pre-v1.13.0 → v1.13.0` closes a real data-loss risk — project skills generated before this release carry **no** `skill-kind` marker, so `improve`/`upgrade`/`agents-doctor` could not tell them apart from plugin-owned skills and might regenerate a user-authored body. It stamps `skill-kind: domain` onto unmarked non-plugin-owned skills, **marker line only**, and routes genuinely ambiguous cases to `manual-review` rather than guessing.
+- **README — installing a pinned release.** A new section documenting how to install a specific tagged version per runtime, using only documented syntax (Copilot CLI and Claude Code pin the *marketplace* Git ref; Codex uses `--ref`; OpenCode and Gemini pin by cloning the tag), plus the universal `git clone --branch` / release-tarball / `gh release download` fallbacks.
+
+### Changed
+
+- **`references/parallelism.md` sources — a real citation gap is closed.** The file cited only `github/app` v0.2.33 (`/orchestrate`) and **missed v1.0.10**, the release that actually shipped the advisory primitive: *"Orchestrator sessions can now approve or redirect a child session's plan while it's paused in plan mode, instead of the child waiting for a human. Plan-ready children notify their creator, the plan is surfaced via `get_session`, and the new `respond_to_session_plan` tool resolves it."* Also adds `github/app` v0.2.7 (cross-session message delivery to inactive targets), v1.0.3 (needs-input tree bubbling), and `github/copilot-cli` v1.0.72 (multi-turn subagents / follow-up messages to running agents).
+- **`references/topology.md` — no new role.** A dedicated `advisor-architect` subagent was considered and rejected: three of its four verdict fields are already owned by the Directory Architecture, `change-validator`, and `architecture-reviewer`, and the one new field (`premise`) requires visibility across every sibling — which only the host session has, making a subagent that needs the host to pre-assemble that comparison redundant by construction. Instead `architecture-reviewer` gains the cross-session premise verdict via a host-composed packet, with a new `## Advisory Supervision Routing` sizing table and an `advisory_verdict_owner = merged` fallback for tiny setups. The verdict owner stays read-only and never calls `respond_to_session_plan` or `send_session_message` (hard rules #33 / #36).
+- **`references/handoff.md`** — one new `In bounds: yes | no; escaped=<paths|none>` line in the Reporting Template (the rest of the return contract the template already carried), propagated to all five subagent templates and `task-handoff.skill.md.template` so the field is actually emitted rather than only specified — Codex folds it into its existing risks line to stay inside the `developer_instructions` budget. Plus one sentence in lifecycle step 9: on Copilot CLI a `question_request` from a **still-running** background subagent may be resolved with a follow-up message instead of a re-dispatch, and the Acceptance Checklist re-runs on the amended packet — closing a contract hole that mid-flight packet amendment would otherwise open.
+- **`assets/AGENTS.md.template`** — the two **existing** Copilot-app advisory lines are amended in place; no new lines and no new section, since the shared `AGENTS.md` is copied to `CLAUDE.md`/`GEMINI.md` and read natively by Codex/OpenCode, and the v1.11.0 anti-pattern forbids a first-class app-specific block there.
+- **`SKILL.md` — two hard rules extended in place, no rule #41.** #13 (parallelism primitives) carries the supervision advisory and #18 (context budget) carries the placement rule. A hard rule is the plugin's scarcest namespace (append-only, never renumbered), and both policies belong to rules that already own them; the Phase 1.9 Q9e gate folds into the existing Copilot tool-profile item, and Phase 2's `- Skills to create.` becomes a specified item with derivation sources and the admission gate. Zero net lines — `SKILL.md` stays at 500.
+- **`references/interview.md` § 10** — a scope note separating skills to **install** (marketplace lookup, asked here) from skills to **author** (domain skills, derived in Phase 2 and never elicited by a blank prompt), so the two are not confused.
+- **`references/instruction-memory-audit.md`** — domain skills enter audit scope: a new *Project domain skill* artifact class whose body is proposal-only, and a new `domain-skill-restatement` signal for a domain skill that copies an `AGENTS.md` row or holds routing/ownership/gates. Restatement is double context cost, not relocation: delete the copy or move the knowledge, never both — and routing, ownership, and gates always return to `AGENTS.md`.
+- **`scripts/_validate.py`** — two new guards. `check_advisory_supervision_policy()` covers the protocol across `parallelism.md`, `handoff.md`, `topology.md`, `interview.md`, `AGENTS.md.template`, `SKILL.md`, and the six emitted reporting templates, including both release citations. `check_domain_skill_policy()` covers the marker, the placement rule, the admission gate, the never-overwrite contract, the audit signal, and the interview scope note. Both verified by negative test: weakening `**Polling is banned.**`, changing the marker to `skill-kind: project`, or dropping `In bounds:` from a subagent template each fails the run.
+
+### Validation
+
+- `bash scripts/validate.sh`: `[OK] All checks passed (2 warning(s))` — same pre-existing warnings (SKILL.md at 500 lines + the Codex `developer_instructions` budget).
+- `npx --yes markdownlint-cli2@0.22.1 "**/*.md"`: 51 files, 0 errors.
+
 ## [1.11.0] - 2026-06-22
 
 ### Added

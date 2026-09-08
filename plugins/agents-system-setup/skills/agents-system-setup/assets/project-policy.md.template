@@ -1,0 +1,103 @@
+# {{PROJECT_NAME}} Project Policy
+
+<!-- agents-system-setup:generated-by: {{PLUGIN_VERSION}} -->
+<!-- agents-system-setup:managed:start -->
+
+Load the relevant section when a task touches its trigger. This is on-demand
+project detail, not an eager import or a replacement for root ownership and gates.
+
+## Contents
+
+- [Security & Audit Matrix](#security--audit-matrix)
+- [Threat Model](#threat-model)
+- [Architecture & Design Pattern Decisions](#architecture--design-pattern-decisions)
+- [ADR Index](#adr-index)
+- [Capability Matrix](#capability-matrix)
+- [Review Responsibilities](#review-responsibilities)
+- [Instruction Memory Audit](#instruction-memory-audit)
+- [Human Input / Question Protocol](#human-input--question-protocol)
+- [Security Team Operating Model](#security-team-operating-model)
+
+## Security & Audit Matrix
+
+| Risk / control | Owner | Applies to paths | Evidence required | Source |
+|---|---|---|---|---|
+{{SECURITY_AUDIT_MATRIX_ROWS}}
+
+Keep each active control's trigger, owner, approval, and evidence requirement in
+the root summary. This table adds rationale and sources, not hidden gates.
+
+## Threat Model
+
+| Asset | Trust boundary | Threat | Mitigation | Owner | Status |
+|---|---|---|---|---|---|
+{{THREAT_MODEL_ROWS}}
+
+## Architecture & Design Pattern Decisions
+
+| Decision | Selected pattern | Alternatives | Why | Risks / guardrails | ADR |
+|---|---|---|---|---|---|
+{{ARCHITECTURE_DECISION_ROWS}}
+
+## ADR Index
+
+| ADR | Decision | Owner | Status |
+|---|---|---|---|
+{{ADR_INDEX_ROWS}}
+
+## Capability Matrix
+
+| Capability | Responsible owner | Supporting roles | Trigger |
+|---|---|---|---|
+{{CAPABILITY_MATRIX_ROWS}}
+
+Responsibilities need not be separate worker processes. Required independent
+review cannot be performed by the writer; otherwise the host may own a concern.
+
+## Review Responsibilities
+
+- **Requirements triage:** {{REQUIREMENTS_TRIAGE_OWNER}}; {{REQUIREMENTS_TRIAGE_STATUS}}.
+  Clarify material ambiguity and scope before planning. Triage is advisory and
+  read-mostly; it cannot grant approvals or expand write scope.
+- **Content quality:** {{CONTENT_QUALITY_OWNER}}; {{CONTENT_QUALITY_CURATOR}}.
+  Review changed agent-system prose for factual, concise, supported instructions.
+  Report `Content quality: ok|warn|fail|n/a; signals=<list|none>`.
+- **Code quality:** {{CODE_QUALITY_OWNER}}; {{CODE_QUALITY_STRICTNESS}}.
+  Apply existing project conventions while writing, then review maintainability.
+  Load `code-quality` through the root Skills index when source code changes.
+- **Build Gate (SDLC):** {{BUILD_GATE_STRICTNESS}}.
+  Load `code-change-build-gate` for the matrix and strictness rules. Missing a
+  required skill or evidence blocks the action, not just final sign-off.
+
+Omit inapplicable review entries rather than inventing workers or empty matrices.
+Keep current task evidence in the task report, not this durable policy.
+
+## Instruction Memory Audit
+
+Before memory rewrites or upgrades, inspect root memory, adapters, applicable
+overrides, and declared skills. Classify direct-conflict, adapter-drift,
+duplicate-policy, missing-overflow-link, and unsupported-runtime-field separately.
+Propose a compact replacement with retained rules, local relocation targets,
+before/after line and byte counts, and unresolved conflicts. User-authored
+content stays unchanged until approval; declined repairs remain nonconforming.
+Known symlinks/copies are legacy artifacts to inspect, not automatic conflicts.
+Use the read-only `agents-doctor` skill for deterministic findings; semantic
+redundancy and policy conflicts require reviewed evidence.
+
+## Human Input / Question Protocol
+
+Use the active runtime's advertised human-input surface. Workers unable to ask
+return one consolidated `question_request` with reason, question, choices when
+useful, default, urgency, and `if_unanswered`. The host resolves it and reissues
+the scoped task; unanswered blocking questions stop sensitive work.
+
+Answers do not grant unrelated permission. MCP configuration, task/skill
+permissions, hooks, native memory, tracking, and external actions retain their
+separate approval gates. Never invent a question tool or mutate agent config
+to obtain one.
+
+## Security Team Operating Model
+
+{{SECURITY_TEAM_OPERATING_MODEL}}
+
+<!-- agents-system-setup:managed:end -->

@@ -19,6 +19,7 @@ remove vague, unsupported, or overconfident output before users rely on it.
 
 Use `agent-quality-curator` as the primary generated role name. Use
 `anti-slop-reviewer` only as an alias or trigger phrase.
+This is a universal responsibility, not a mandatory separate worker.
 
 | Field | Value |
 |---|---|
@@ -36,8 +37,8 @@ checks semantic quality and prompt hygiene for generated agent-system artifacts.
 
 | Setup size | Decision |
 |---|---|
-| Normal, complex, cross-runtime, audit, improve, replication, MCP, release, skill-heavy, or multi-wave setup | Generate `agent-quality-curator` as a separate read-only subagent. |
-| Tiny direct setup | Merge the responsibility into `reviewer` and record `content_quality_curator = merged`. |
+| Separate context or required independent prose review provides a concrete benefit | Generate `agent-quality-curator` as a read-only specialist with a scoped assignment. |
+| Responsibility can be met by the host/existing reviewer (default) | Record `content_quality_curator = merged`; do not create a worker to satisfy setup-size labels. |
 | Explicit user opt-out or non-agent/prose-free task | Record `content_quality_curator = skipped` with rationale. |
 
 ## Review scope
@@ -47,8 +48,8 @@ The content-quality check applies to:
 - `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, and root orchestrator memory.
 - Runtime agents in `.github/agents/**`, `.claude/agents/**`,
   `.opencode/agents/**`, `.codex/agents/**`, and `.gemini/agents/**`.
-- Runtime skills in `.github/skills/**`, `.claude/skills/**`, and
-  `.opencode/skills/**`.
+- Runtime skills in `.github/skills/**`, `.claude/skills/**`,
+  `.opencode/skills/**`, `.agents/skills/**`, and `.gemini/skills/**`.
 - Plugin, MCP, marketplace, and wrap-up recommendation prose.
 - Setup, update, improve, and replicate output contracts.
 - This plugin's templates and references when the plugin improves itself.

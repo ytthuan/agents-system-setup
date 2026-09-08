@@ -51,6 +51,10 @@ no-secrets policy.
    effect of choosing plugin-managed learning.
 6. Do not re-ask learning or hook setup in wrap-up when Phase 1.9/1.10 already
    handled it.
+7. Keep only the profile, owner, approval boundary and matching load trigger in
+   root memory. Native adapters remain thin; do not paste learning records into
+   them. Any approved root-memory update must satisfy the whole-file line/byte
+   budget, including preserved content.
 
 ## Learning record schema
 

@@ -4,6 +4,13 @@ This skill targets five runtimes. **Use the right schema for each** — agents w
 
 For path matrix and full examples, see [platforms.md](./platforms.md).
 
+Across all runtimes, omit static `model` and effort fields unless the user
+explicitly pins them. The default policy is adaptive balanced selection per
+call: choose among available approved models and model-supported effort values
+using task difficulty, risk, required quality, latency, retries/cache/startup
+cost, and budget. Preserve user/organization pins. Inheritance means the active
+runtime configuration, not a cheaper model.
+
 ## Copilot CLI (`.github/agents/<name>.agent.md`)
 
 Source: https://docs.github.com/en/copilot/concepts/agents/copilot-cli/about-custom-agents#agent-profile-format
@@ -135,7 +142,11 @@ Source: https://developers.openai.com/codex/subagents · general AGENTS.md spec:
 
 Codex uses **two complementary shared artifact surfaces** that should stay compatible with both Codex CLI and Codex App wherever the App has access to the repo artifacts:
 
-1. **`AGENTS.md`** at the repo root — project memory + **Orchestration Operating Model** (host CLI session orchestrator role) + Directory Architecture / Capability Matrix / Waves. **Never emit a `.codex/agents/orchestrator.toml`** — orchestration lives in `AGENTS.md`. This is the canonical pattern for every supported runtime as of v1.3.0; Copilot, Claude, OpenCode, and Gemini now follow Codex's lead.
+1. **`AGENTS.md`** at the repo root — compact project memory plus the host
+   **Orchestration Operating Model**, exact commands, ownership, essential
+   control/gate triggers, and Skills index. Detailed policy and the Capability
+   Matrix live at the approved local project-policy path. **Never emit a
+   `.codex/agents/orchestrator.toml`** — orchestration lives in `AGENTS.md`.
 2. **`.codex/agents/<name>.toml`** (project) or **`~/.codex/agents/<name>.toml`** (user) — one TOML file per **specialized** subagent. Codex loads each as a session config layer; the CLI can switch threads with `/agent`.
 
 Keep **CLI-only** commands and workflows (`codex plugin marketplace add`, `/plugins`, `/agent`, `codex exec`, local approval overlays) in install or "Try it" notes. Do not make generated artifacts depend on those commands for Codex App behavior.
@@ -143,8 +154,8 @@ Keep **CLI-only** commands and workflows (`codex plugin marketplace add`, `/plug
 ```toml
 name = "reviewer"
 description = "Use when reviewing PRs for correctness, security, and missing tests."
-model = "gpt-5.4"                       # optional; inherits from session if omitted
-model_reasoning_effort = "high"         # optional: low|medium|high
+model = "gpt-5.4"                       # optional explicit pin; omit otherwise
+model_reasoning_effort = "high"         # optional explicit pin; validate against selected model
 sandbox_mode = "read-only"              # optional: read-only|workspace-write
 nickname_candidates = ["Atlas", "Delta"]  # optional, presentation only
 developer_instructions = """
@@ -165,8 +176,11 @@ enabled = false
 `developer_instructions` cannot link inline, so every Codex subagent risks duplicating long security/architecture/output prose. Apply the **summary + pointer** rule regardless of output profile:
 
 1. Lead with a 2-3 line role/outcome statement.
-2. Reference the canonical Delegation Packet from [`handoff.md`](./handoff.md#delegation-packet-canonical-schema) and tell Codex to fill it from its session.
-3. Point to specific `AGENTS.md` rows by name ("AGENTS.md › Security & Audit Matrix › row `<owner>`") rather than re-stating them in TOML.
+2. Tell the host to load `task-delegation`, which owns the canonical assignment
+   contract and preserves HandoffIR normalization.
+3. Point to the exact resident `AGENTS.md` ownership/gate row and, when deeper
+   rationale is needed, the relevant heading in the declared local
+   project-policy path. Do not restate either document in TOML.
 4. Keep an explicit short checklist only when the agent owns sensitive surfaces (MCP, secrets, CI/release, dependency manifests, generated scripts).
 5. Keep the `Outcome first` and `Handoff status` lines because Codex sessions surface those directly.
 
@@ -177,7 +191,10 @@ mean the pointer rule was skipped.
 Codex shared artifact rules:
 - **Required fields**: `name`, `description`, `developer_instructions`. Missing any → silent skip.
 - **`name` is the source of truth and generated files keep it equal to the filename stem**. Imported custom files may differ, but replication should report that as drift; built-ins (`default`, `worker`, `explorer`) may still be overridden by reusing the name.
-- **Global config** in `.codex/config.toml`: `[agents] max_threads = 6`, `max_depth = 1`, and optional `job_max_runtime_seconds` defaults.
+- **Global config** in `.codex/config.toml`: current
+  `agents.max_concurrent_threads_per_session`, legacy alias `max_threads`,
+  `max_depth`, and optional `job_max_runtime_seconds`. Preserve configured
+  values; do not emit a fixed thread count as an upstream default.
 - Human input: `request_user_input` is Plan-mode only. It is not a TOML field; Codex child/default/exec flows return `question_request`.
 - Native memories: `[features] memories = true` and `~/.codex/memories/` exist but are off by default and may be region-limited. Do not emit `memory` in agent TOML.
 - MCP servers can be shared via `.mcp.json` at repo root *or* declared per-agent inside the TOML.
@@ -187,6 +204,9 @@ Codex shared artifact rules:
   read-only at generation time; validators can enforce identity surfaces, but
   cannot infer Owned paths from TOML alone.
 - Skills: per-agent enable/disable via `[[skills.config]]` array entries.
+- Skill discovery: current Codex roots are project/ancestor `.agents/skills/`,
+  user `~/.agents/skills/`, and admin `/etc/codex/skills/`. Treat
+  `.codex/skills/` as legacy migration input, not a new output path.
 - `nickname_candidates` are display hints for Codex CLI and App activity views; they are not routing keys.
 - Advanced fan-out: `spawn_agents_on_csv` can launch a row-per-agent workflow. Document it as an explicit workflow, not a default generated behavior; every worker must report exactly once with `report_agent_job_result`.
 - Codex plugin manifests can reference `skills`, `mcpServers`, `apps`, interface assets, `.app.json`, and `.mcp.json`. Marketplace files may be repo-scoped under `.agents/plugins/marketplace.json` or compatible Claude-style roots. Keep app/MCP writes approval-gated.
@@ -261,7 +281,10 @@ The router/orchestrator picks a subagent based on the **`description`** field (o
 The VS Code `plan` prompt (`agent: Plan`) and Spec-Kit `/plan` output are planning inputs, not agent file formats. Normalize them to HandoffIR (see [handoff](./handoff.md)), then place the handoff in the target runtime's supported surface:
 
 - Copilot CLI / Claude Code / OpenCode / Gemini CLI: Markdown body section after valid runtime-specific YAML frontmatter.
-- OpenAI Codex (CLI + App): `developer_instructions` inside `.codex/agents/<name>.toml`, plus project-level summary in `AGENTS.md`. CLI-only interaction notes must stay optional.
+- OpenAI Codex (CLI + App): `developer_instructions` inside
+  `.codex/agents/<name>.toml`; root `AGENTS.md` keeps the host delegation
+  trigger, while the full assignment contract lives in `task-delegation`.
+  CLI-only interaction notes must stay optional.
 
 ## Common Pitfalls
 
@@ -274,6 +297,11 @@ The VS Code `plan` prompt (`agent: Plan`) and Spec-Kit `/plan` output are planni
 - Writing OpenCode `permission.question: allow` as a literal key instead of nested `permission`.
 - Adding `ask_user` to Copilot custom-agent tools.
 - Emitting Codex `request_user_input` or `memory` in agent TOML.
+- Rejecting a valid Codex `model_reasoning_effort` merely because it is not in
+  an old closed `low|medium|high` list. Require a nonempty value supported by
+  the selected model/runtime, preserve unknown imported values for review, and
+  never invent a replacement.
+- Writing new Codex skills under legacy `.codex/skills/`.
 - Embedding `mcpServers` in a Gemini local subagent (emit `mcp_servers:`).
 - Asking a Gemini subagent to call another subagent (the runtime prevents recursive subagent calls).
 - Overlapping responsibilities between two subagents → orchestrator picks wrong one. Make boundaries explicit in `## Out of scope` and in the **Directory Architecture** in `AGENTS.md`.
@@ -324,7 +352,9 @@ placeholder in generated runtime agent directories.
 
 | Placeholder | On form | Off / not-applicable form |
 |---|---|---|
-| `{{OPTIONAL_MODEL_LINE}}` | Runtime-native model line, for example `model: <id>` in YAML frontmatter. | Empty string. |
+| `{{OPTIONAL_MODEL_LINE}}` | Explicitly pinned runtime-native model line: `model: <id>` in YAML or `model = "<id>"` in Codex TOML. | Empty string; adaptive per-call choices do not become static pins. |
+| `{{OPTIONAL_REASONING_EFFORT_LINE}}` | Codex `model_reasoning_effort = "<effort>"` only for an explicit model-supported pin. | Empty string; preserve imported explicit pins or report a target incompatibility. |
+| `{{OPTIONAL_SANDBOX_MODE_LINE}}` | Codex `sandbox_mode = "read-only"` for read-only roles/empty Owned paths; otherwise the narrowest explicitly approved sandbox. | Omit only when the plan permits inherited sandbox policy, never for a required read-only role. |
 | `{{OPTIONAL_TOOLS_BLOCK}}` | Runtime-native tools allowlist, for example Copilot YAML list, Claude comma string, or Gemini YAML list. | Empty string to inherit/default tools. |
 | `{{OPTIONAL_MCP_SERVERS_BLOCK}}` | Approved runtime-native MCP block: Copilot `mcp-servers:`, Claude `mcpServers:`, or Gemini `mcp_servers:`. | Empty string and no MCP key. |
 | `{{OPTIONAL_MCP_APPROVAL_MARKER}}` | Markdown body marker `<!-- agents-system-setup:mcp-approved: <approval-ref> -->`. | Skipped marker `<!-- agents-system-setup:mcp-skipped: no MCP written -->` when MCP was considered; otherwise empty string. |

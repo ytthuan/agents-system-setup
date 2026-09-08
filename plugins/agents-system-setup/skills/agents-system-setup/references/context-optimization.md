@@ -1,216 +1,222 @@
 # Context Optimization
 
-Generated agent systems should be clear enough to route safely and compact enough to stay useful in long sessions. Optimize by **summarizing inline, linking details on demand**, and preserving all hard gates.
+Synthesize project memory from repository facts and the active harness's native
+draft, not a filled workflow manual. Keep essential decisions resident; load
+procedures through skills. See [native initialization](./native-initialization.md)
+for commands, supported dispatch, approvals, and fallback behavior.
+
+## Contents
+
+- [Output profiles](#1-output-profiles)
+- [Generated-output hierarchy](#2-generated-output-hierarchy)
+- [Placement rule](#2a-placement-rule--where-a-piece-of-knowledge-goes)
+- [Context budgets](#3-context-budgets)
+- [Inline vs reference split](#4-inline-vs-reference-split)
+- [Concise delegation packets](#6-concise-delegation-packets)
+- [Context freshness rule](#context-freshness-rule)
+- [Task-Type Routing Map](#task-type-routing-map)
+- [Compact mode trimming](#compact-mode-trimming)
+- [Layered context & audience tags](#layered-context--audience-tags)
 
 ## 1. Output profiles
 
-Ask once during setup and record the answer in the plan.
+| Profile | Use when | Detail placement |
+|---|---|---|
+| `Balanced` (default) | Most projects | Concise root rules; task-specific detail in skills and project policy. |
+| `Compact` | Small repos or tight context | Minimal root decisions and only relevant on-demand material. |
+| `Full` | Audits or regulated projects | Fuller on-demand matrices, rationale, and examples; the same root limit. |
 
-| Profile | Default? | Use when | Inline detail level |
-|---|---:|---|---|
-| `Balanced` | yes | Most projects | Keep routing, ownership, security/audit, architecture decisions, and quality gates inline; cap examples and long candidate lists. |
-| `Compact` | no | Small repos, expert teams, tight context windows | Keep only non-negotiable rules, owners, gates, and links. Move most rationale and overflow rows to reference files. |
-| `Full` | no | Audits, onboarding docs, regulated projects | Include full matrices and rationale inline when the user explicitly asks. |
-
-If the user is unsure, choose `Balanced`.
+All profiles obey the complete-file root budget. Full never means unlimited
+always-loaded memory. Do not pad a small project to meet the target length.
 
 ## 2. Generated-output hierarchy
 
-| Artifact | Purpose | Context rule |
-|---|---|---|
-| `AGENTS.md` | Canonical routing and policy index | One-screen "Read First"; compact matrices; link overflow details. |
-| Runtime memory adapters | `CLAUDE.md`, `GEMINI.md`, and similar provider memory pointers | Import/symlink/copy canonical `AGENTS.md`; keep only provider-specific overrides inline. |
-| Runtime agent files | Role-specific execution instructions | Include role, owned/read-only paths, triggers, security boundary, output contract. Avoid repeating full project policy. |
-| Requirements triage output | Intake brief before planning | Keep inline in the plan as a compact scope/risk/routing seed; do not duplicate full repo memory. |
-| Content quality review | Anti-slop signal check before final output | Keep only status/signals inline; link `content-quality.md` for taxonomy and fixes. |
-| Prompt guidelines | Generator-side authoring guide for main-to-subagent assignments | Load only for orchestrator/generator/replication prompt-contract work; subagents use embedded intake checks. |
-| Memory & learning files | Durable lessons and Learning Index | Load the index first; load detailed entries only when category/path/runtime matches the task. |
-| Reference files | Deep detail | Load only when task needs that domain or when the user asks for full detail. |
-| Plans / summaries | Temporary task state | Lead with outcome, keep evidence concise, link or name files for detail. |
+| Artifact | Context rule |
+|---|---|
+| `AGENTS.md` | Canonical project facts, working commands, ownership, critical controls, gate triggers, and skill index. |
+| Native memory adapters | Thin `@AGENTS.md` imports where supported, not policy copies. Copilot/OpenCode/Codex can use root memory directly. |
+| Runtime agent files | Role, owned/read-only paths, compact project digest, fail-closed intake, safety, and reporting. |
+| Host workflow skills | Load for delegation, code quality, Build Gate, or doctor work; do not inline their full bodies in root memory. |
+| Project domain skills | Load project-specific knowledge only for concrete matching triggers. Preserve user-owned bodies. |
+| Project policy | Local governance detail, capability coverage, ADRs, and review responsibilities; never eagerly import it. |
+| Operational state | Native-init evidence, approvals, migration events, and checksums belong in JSON/JSONL, not root memory. |
 
-Never move mandatory gates out of sight. If details overflow, `AGENTS.md` must say where they went.
+### 2a. Placement rule — where a piece of knowledge goes
+
+| Knowledge | Goes to | Why |
+|---|---|---|
+| Needed on every task | `AGENTS.md` | Routing, ownership, approval boundaries, and gate triggers stay resident. |
+| Needed on some tasks and project-specific | A `skill-kind: domain` skill | A concrete trigger selects the body; metadata is not the full procedure. |
+| Generic craft | An existing host skill such as `task-delegation`, `code-quality`, or `code-change-build-gate` | Reuse one versioned workflow instead of repeating it. |
+| Deep task detail | That skill's `references/` or local project policy | Load only the relevant section. |
+
+Do not move a gate's trigger, owner, approval requirement, or missing-evidence
+blocking rule into an undiscoverable file. Do not leave a full copy behind after
+approved relocation. An ordinary Markdown link makes a reference findable;
+it does not prove runtime discovery or a skill load.
 
 ## 3. Context budgets
 
-Budgets are guidance unless a validator explicitly enforces them.
+| Surface | Target | Enforced rule |
+|---|---|---|
+| Complete synthesized `AGENTS.md` | 80-120 physical lines | At most **150 lines AND 12,288 UTF-8 bytes** after substitution and merging, including user content. |
+| Main `SKILL.md` | About 250 lines | At most 500 lines; move detail into references, not giant lines. |
+| Skill description | Trigger-rich and concise | Follow the native schema; do not paste the procedure into metadata. |
+| Worker instructions | Under about 80 lines | Retain fail-closed intake, ownership, safety, and reporting. Codex has its own body budget. |
 
-| Surface | Target | Hard rule |
-|---|---:|---|
-| Skill frontmatter description | Trigger-rich and under ~900 chars | Must include what/when, not long procedure. |
-| `SKILL.md` body | About 250 lines | Must stay under 500 lines. Move depth to `references/`. |
-| Generated `AGENTS.md` | Top policy readable in one screen | Must include routing, ownership, security/audit, architecture, and quality gates. |
-| Subagent file | Under ~80 lines | Must not duplicate full `AGENTS.md` policy. |
-| Final response | 1-2 short paragraphs or compact table | Include validation/evidence only when useful or requested. |
+The numeric root cap is **plugin policy**, not an OpenAI requirement. Codex's
+current native `/init` scaffold targets 200-400 words; its configurable
+`project_doc_max_bytes` defaults to a 32 KiB instruction-chain budget.
+Anthropic recommends under 200 lines per `CLAUDE.md`. See
+[source-backed runtime details](./native-initialization.md).
+
+Count physical LF-delimited lines, including an unterminated final line. CRLF
+uses one line delimiter but both bytes count. Decode as UTF-8 strictly; count
+raw bytes before newline normalization. Long single lines do not evade the byte
+limit. Never truncate, silently remove rules, or raise a runtime limit to pass.
+
+Run the emitted read-only checker before publishing the generated manifest:
+
+```bash
+python3 .agents-system-setup/agents-doctor.py --memory-only
+```
+
+A hard budget failure blocks compliant completion. Iterate the approved
+synthesis/relocation, or report `nonconforming` when the user declines repair.
+Existing unapproved instructions remain untouched. `--memory-only` checks drafts
+without requiring a manifest; normal doctor invocation retains its missing-
+manifest exit code. Repository fixtures reuse this same checker.
+
+Report bytes and lines exactly. Token counts need the tokenizer name/version
+and measured content scope; otherwise label an estimate or `unavailable`.
+Do not install a tokenizer or upload project instructions merely to obtain a
+count. `cl100k_base` is not an exact cross-vendor or current-model tokenizer.
+
+Report controlled adapter/import bytes separately from root bytes. Imports are
+eager; links and audience labels are not lazy loading. Audit the applicable
+instruction chain, overrides, configured context filenames, and overlapping
+skill paths. Honor smaller known runtime budgets; unknown personal/global
+context is unknown, not zero. Claim effective context only with runtime evidence.
 
 ## 4. Inline vs reference split
 
-Keep inline:
-- Project snapshot.
-- Golden rules.
-- Directory Architecture summary.
-- Agent roster.
-- Capability matrix summary.
-- Security & Audit Matrix summary.
-- Threat Model top risks.
-- Architecture decisions with ADR refs.
-- Quality gates.
-- Runtime "try it" commands.
-- Plan Handoff Contract summary.
-- Requirements triage status and latest intake evidence.
-- Content-quality status, curator mode, and signals.
-- Memory & Learning System summary, including Learning Check and memory owner.
-- Instruction Memory Audit summary for improve/upgrade or memory rewrites.
+Use [AGENTS.md.template](../assets/AGENTS.md.template) as a synthesis contract,
+not a demand to preserve every heading or create empty sections. Keep project
+commands exact; do not invent build/test/lint commands when none exist.
+Retain useful facts from the native draft and verify them against repository
+evidence. Synthesize, do not append the old template after native output.
 
-Move or link when large:
-- Full marketplace candidate research.
-- Full OWASP / SSDF / SLSA rationale.
-- Long threat lists.
-- Full ADR text.
-- Long subagent examples.
-- Full platform schema details.
+Use [project-policy.md.template](../assets/project-policy.md.template) for
+approved local detail, normally `docs/agents/project-policy.md`. Substitute
+`PROJECT_POLICY_PATH` in root links and omit inapplicable policy sections and
+their contents links. Personal/global setups choose an approved, runtime-readable
+local path instead; do not silently write repository docs. A proposed but
+unwritten file cannot satisfy a required reference.
 
-Recommended overflow paths:
-- `docs/agents/security-audit.md`
-- `docs/agents/architecture-decisions.md`
-- `docs/agents/plugin-recommendations.md`
-- `docs/agents/runtime-formats.md`
+Root summary fields preserve the active controls and owners:
+`SECURITY_AUDIT_SUMMARY_ROWS`, `THREAT_MODEL_SUMMARY`, and
+`ARCHITECTURE_DECISION_SUMMARY`. Full source-backed rows, alternatives, ADRs,
+and capability coverage live in project policy. The root Agent Roster lists
+only justified workers with concrete triggers; zero specialists is valid.
 
-Only create docs files after the normal write approval path. Otherwise keep overflow as "recommended file plan" rows.
+Render `BUILD_GATE_ROOT_BLOCK` only for an enabled software-dev Build Gate:
+
+```markdown
+## Build Gate (SDLC)
+
+Strictness: <selected>. Before code changes, load `code-change-build-gate`
+from Skills; compute `max(size_bucket, criticality_bucket)`. Its local matrix
+defines required gates. Missing skill, approval, or evidence blocks work/sign-off.
+```
+
+The skill contains the matrix and strictness modifiers. The resident trigger
+is fail-closed; do not reproduce the full matrix in every root file.
+Render `CODE_QUALITY_ROOT_BLOCK` for code-bearing projects:
+
+```markdown
+## Code Quality & Maintainability
+
+Conform to existing conventions while writing. Load `code-quality` from Skills
+before writing/reviewing code; required review remains independently owned.
+```
+
+Record skipped/inapplicable gates in the manifest/report instead of mandatory
+empty root sections. `LEARNING_MEMORY_SUMMARY` states the selected profile and,
+when enabled, the owner, local index path, and load trigger. Disabled means no
+memory writes. Setup timestamps, recon logs, and latest task verdicts stay out.
+
+Each `SKILL_TABLE_ROWS` entry needs **name, concrete trigger, and native load
+name/local SKILL.md path** for the selected runtimes. Include actual relevant
+skills, never a marketplace catalog. Name-based loading must be native and
+discoverable; keep runtime-specific paths unambiguous. Deduplicate overlapping
+discovery paths only with evidence, not by assuming identical names are merged.
 
 ## 5. Clear generated writing style
 
-Use these defaults in generated content:
-
-1. Outcome or rule first.
-2. Prefer tables for routing, ownership, gates, and decisions.
-3. One sentence per table cell where possible.
-4. No duplicate hard-rule prose across `AGENTS.md` and every subagent.
-5. Use "read this first" / "load when needed" language.
-6. Use explicit `n/a — <reason>` instead of omitting mandatory sections.
-7. Cap recommendations at 3 unless the user asks for "show more".
-8. Pass a subtask slice to subagents; never paste full `AGENTS.md`, full
-   `plan.md`, or unrelated logs into every assignment.
+Use short rules and exact commands. Remove repeated lifecycle/packet prose,
+generic exhortations, empty tables, and superseded facts. Preserve user meaning
+and critical constraints. Show a repair diff before replacing user-owned content.
+No prose compression that hides dozens of unrelated instructions on one line.
 
 ## 6. Concise delegation packets
 
-The orchestrator should pass subagents enough context to act without dumping the full project memory. **The canonical Delegation Packet schema lives in [`handoff.md`](./handoff.md#delegation-packet-canonical-schema).** Every orchestrator template and runtime renderer fills the same fields in the same order; do not redefine the schema here.
+The [canonical schema](./handoff.md#delegation-packet-canonical-schema) retains
+the **12 required-minimum fields** in `task-delegation`. Do not duplicate the
+field list in root memory. Pass the subtask, owned paths, relevant gates, selected
+skills/context, and stop conditions; workers retain an inline safety minimum.
 
-When updating field semantics or adding a field, edit `handoff.md` first, then re-link from this section.
-
-### Context Packet rule
-
-Use the Orchestrator Assignment Format from
-[`prompt-guidelines.md`](./prompt-guidelines.md#orchestrator-assignment-format)
-only when composing or reviewing assignments. Runtime subagents should not load
-that reference by default. Their embedded Assignment Intake is enough.
-
-Every non-trivial assignment gets a small `Context Packet` with task-specific
-files, facts, decisions, references, and explicit `do_not_include` notes. The
-packet should point to `AGENTS.md` rows by section name instead of copying the
-whole file. Set `Context freshness` so subagents know whether to trust the
-orchestrator's snapshot or reload.
+Load [prompt guidelines](./prompt-guidelines.md) for assignment authoring, not
+as mandatory background reading for every worker. Host-loaded skill evidence
+does not transfer its content to children. Pass necessary excerpts or use an
+advertised child preload/load mechanism; report a blocker if required content
+or permission is missing.
 
 ## Context freshness rule
 
-Agents in the same turn should not re-read every `AGENTS.md` row when the orchestrator already loaded it. Use the `Context freshness` field of the canonical Delegation Packet:
-
-| Freshness value | Meaning | Subagent behavior |
-|---|---|---|
-| `AGENTS.md@<sha>` | Orchestrator computed sha during this turn | Trust the snapshot; reload only sections relevant to the new task tag. |
-| `recent` | Same orchestrator turn, no sha available | Skip row-by-row reload; load only Task-Type Routing rows for the current task tag. |
-| `reload` | Stale or unknown | Re-read `AGENTS.md` Read First plus rows for the task tag. |
-
-Orchestrators must set this field whenever they know `AGENTS.md` is fresh; subagents must respect it. Replication and update flows revert to `reload`.
+`AGENTS.md@<sha>` or `recent` describes the host's snapshot freshness, not child
+context inheritance. A child may avoid reloading only material it actually
+received or loaded. Otherwise load the relevant root rows/skill or return a
+`question_request`. `reload` means stale/unknown; replication and updates use it.
+Memory file edits may require a new session/reload to take effect.
 
 ## Task-Type Routing Map
 
-Map common task tags to the references each agent should load (or skip), and to the **Recommended Packet Form** for the Task Assignment Contract (see [`handoff.md`](./handoff.md#recommended-packet-form)). Agents look up their task tag here before reading anything beyond `AGENTS.md` Read First.
+| Task | Required context | Optional detail |
+|---|---|---|
+| Direct read-only or docs work | Relevant ownership and gate rows | Project policy only if its trigger applies. |
+| Delegation | `task-delegation`, scoped plan/context, worker boundary | Native routing details for the active runtime. |
+| Code edit / bug fix / refactor | `code-quality`, enabled `code-change-build-gate`, affected ownership | Relevant ADRs and evidence. |
+| Security / MCP / release / replication | Explicit scope, approval and evidence requirements | Matching security, runtime, and migration references. |
+| Instruction-memory audit | Root memory, adapters, applicable overrides, declared skills | `instruction-memory-audit.md` and read-only doctor findings. |
 
-| Task tag | Always load | Load when applicable | Safe to skip | Recommended packet form |
-|---|---|---|---|---|
-| `read-only-research` | `AGENTS.md` Read First, Directory Architecture | `topology.md` if topology questions | Security & Audit Matrix detail, Threat Model long rationale, MCP gate | short-form |
-| `requirements-triage` | `AGENTS.md` Read First, Directory Architecture, Human Input / Question Protocol | `topology.md`, platform/runtime refs, Security & Audit rows, prior plan only when relevant | Source files outside requested scope, full marketplace research | short-form intake brief |
-| `content-quality-review` | `AGENTS.md` Read First, Content Quality / Anti-Slop Review, Directory Architecture | `content-quality.md`, `output-contract.md`, `handoff.md`, runtime refs for generated artifacts | Source implementation files unrelated to generated prose | short-form quality signals |
-| `prompt-contract-review` | `handoff.md`, `prompt-guidelines.md`, relevant runtime template | `context-optimization.md`, `output-contract.md` | Source implementation files unrelated to generated prompts | short-form with Reporting Protocol |
-| `code-edit` | `AGENTS.md` Read First, Directory Architecture, owning agent boundary | Quality Gates row for this path | Marketplace research, full platform schemas | short-form (≤2 files) · full-form when >2 files or shared boundary |
-| `security-write` | Security & Audit Matrix, Threat Model, owning agent boundary | `security-audit-architecture.md` rows for the change | Long marketplace candidate research | full-form |
-| `bug-hunting` | Security Team Operating Model, Threat Model, Directory Architecture, authorization scope | `security-team.md`, source-backed public security references, project attack surface docs | Full marketplace research unless plugin selection is in scope | full-form |
-| `vulnerability-validation` | Security Team Operating Model, candidate report, authorization scope, Quality Gates | `security-team.md`, relevant tests/harness docs, affected source/control/sink files | Unrelated product areas and full platform schemas | full-form |
-| `attack-path-analysis` | Security Team Operating Model, Threat Model, validation evidence, affected assets | `security-team.md`, deployment/ingress/IaC evidence when relevant | Implementation files outside the affected path | full-form |
-| `remediation-verification` | Security Team Operating Model, validated finding, fix diff, Quality Gates | `security-team.md`, regression tests, owning implementer notes | New discovery outside nearby bypass checks | full-form |
-| `disclosure-triage` | Security Team Operating Model, authorization/scope, report details | `security-team.md`, OWASP disclosure/CISA CVD references when needed | Source files not needed to determine scope or reproduction | full-form |
-| `mcp-write` | MCP approval gate (Phase 3.5), Security & Audit Matrix | `plugin-discovery.md` MCP rendering | Architecture Decisions detail | full-form |
-| `replication` | `replication.md`, `handoff.md`, `output-contract.md` | `models.md` for explicit overrides | Project-specific quality gate detail | full-form |
-| `code-change-build-gate` | `AGENTS.md` › Build Gate (SDLC) inline matrix, `sdlc-build-gate.md`, owning gate role's Reporting Template | runtime-specific build/test runner refs, security-team routing when both `change-bug-hunter` and `vulnerability-researcher` exist | Full marketplace research, unrelated subagent rosters | full-form |
-| `task-handoff` (host only) | `task-handoff` skill body, `handoff.md`, current task tag's expansion blocks | runtime-specific delegation surfaces | Subagent-side prose unless composing for a specific subagent | host-only; emitted skill, not a delegation tag |
-| `release` | Quality Gates, manifests, version sync rules | `runtime-updates.md` for upstream drift | Long architecture rationale | full-form |
-| `docs-only` | `AGENTS.md` Read First | Quality Gates only if doc CI exists | Security/MCP gates unless docs touch credentials | short-form |
-| `bug-fix` | `AGENTS.md` Read First, Directory Architecture, owning agent boundary | Quality Gates row, repro logs, related ADRs | Long marketplace research | full-form (Reproduction block required) |
-| `learning-check` | `AGENTS.md` Memory & Learning System, Learning Index | `learning-memory.md` for update/supersede policy | Full operational ledger, unrelated learnings | short-form |
-| `instruction-memory-audit` | `AGENTS.md` Instruction Memory Audit, Context Loading Policy | `instruction-memory-audit.md`, runtime adapter files, skills, path-scoped rules | Source implementation files unless needed for path-scope evidence | short-form findings |
-
-The map is guidance, not a hard schema. Agents may load more references when the task warrants it; they must not skip load rows that include a hard gate, and they must not downgrade the recommended form for security/MCP/release tasks.
+Keep all mandatory gates for the task. Never load entire reference catalogs
+merely because a table lists them.
 
 ## Compact mode trimming
 
-Output profile (Phase 1.9) controls subagent body verbosity. The frontmatter and section anchors stay intact; only body prose is trimmed.
+Trim explanations, not the worker's acceptance checklist, reporting skeleton,
+owned paths, or safety boundary. Preserve section anchors still referenced by
+consumers. Codex follows the
+[summary + pointer rule](./agent-format.md#codex-toml-summary--pointer-rule)
+without assuming that its parent already delivered a referenced file.
 
-| Section | Compact | Balanced (default) | Full |
-|---|---|---|---|
-| Context Load Order | Single bulleted line referencing `AGENTS.md` rows | Numbered list (current default) | Numbered list plus rationale |
-| Security & Audit Boundaries | One line + link to the matching `AGENTS.md` row | Current expanded list | Expanded list plus evidence template |
-| Architecture & Design Expectations | One line + link to the matching ADR row | Current expanded list | Expanded list plus rejected alternatives |
-| Outputs | One sentence | Current bullet list | Bullet list plus example output |
-| Memory & Learning System | Profile + owner + link | Current compact section | Section plus schema example |
+## Layered context & audience tags
 
-Renderers must keep section headings (so validators and humans can find them) and keep the link target valid. Codex TOML `developer_instructions` follows the "summary + pointer" rule from [agent-format](./agent-format.md#codex-toml-summary--pointer-rule) regardless of profile because TOML cannot link inline.
+The managed project-standard digest remains required in every emitted worker.
+Its hash is a drift warning, not proof of skill loading or an integrity boundary.
+Codex uses the three-line digest; other workers use the five-line version.
 
-## Layered context & audience tags (v1.6.0+)
-
-v1.6.0 introduces per-section `**Audience:** <value>` markers and inline project-standard digests in subagent files so the host orchestrator and specialist subagents can route their reading. The emission is conditional: it only activates when `subagent_count >= 2` AND `output_profile in {balanced, full}`.
-
-### Per-profile rendering rules
-
-| Profile | Audience markers | Self-Contained Notice | Subagent digest |
-|---|---|---|---|
-| `compact` | omitted | omitted | required (managed block) |
-| `balanced` | visible under every `## Section` | emitted at end of AGENTS.md | required (managed block) |
-| `full` | visible + "Why this section matters for <audience>" leading sentence | emitted with full guidance | required (managed block) + leading rationale |
-
-### tiktoken measurement protocol
-
-Use OpenAI's `tiktoken` (encoding `cl100k_base`) to measure effective context per subagent turn. Run before and after upgrading:
-
-```python
-import tiktoken
-enc = tiktoken.get_encoding("cl100k_base")
-def count(path): return len(enc.encode(open(path).read()))
-before = count(".github/agents/X.agent.md") + count("AGENTS.md")  # v1.5.0 effective load
-after  = count(".github/agents/X.agent.md")                       # v1.6.0 — AGENTS.md not needed
-reduction = 1 - after / before
-print(f"reduction: {reduction:.0%}")
-```
-
-Goal: ≥ 40% reduction per subagent turn vs v1.5.0. This is an empirical observation, NOT a release gate.
-
-### Anti-patterns
-
-- Emitting audience tags in Compact profile (regresses small-project context).
-- Using HTML comments (`<!-- read-by: ... -->`) instead of visible `**Audience:**` lines — comments are unreliable across runtime markdown loaders.
-- Treating the digest hash as an exact integrity check (it's a drift detector; WARNING-level only).
-- Adding a 4th audience value (e.g., `reviewer-only`) — three values (`all | host-orchestrator | subagents`) is the canonical set.
+Audience labels are optional reading hints, not loader controls. New compact
+root files do not require a marker under every heading or a separate
+Self-Contained Notice. Preserve useful existing labels within the same budget;
+never claim that they exclude content from tokens. Full may expand on-demand
+detail, not add rationale under every always-loaded heading.
 
 ## 7. Anti-patterns
 
-- Treating `<details>` blocks as context optimization; models still read the text.
-- Moving security/audit/architecture gates into a file that `AGENTS.md` does not link.
-- Repeating the same policy paragraph in every subagent.
-- Treating expected `CLAUDE.md` / `GEMINI.md` adapter pointers as conflicts instead of classifying adapter drift first.
-- Adding anti-slop bloat instead of a compact `Content quality` status and linked signal taxonomy.
-- Loading `prompt-guidelines.md` in every runtime subagent instead of using the
-  embedded Assignment Intake.
-- Generating full marketplace research inline when only one candidate was selected.
-- Hiding lossy replication drops to save space.
-- Loading the full learning ledger for every task instead of the Learning Index and matching entries.
-- Rendering the full Security Team Operating Model for projects that only selected baseline `security-auditor`.
-- Letting security-team context packets paste proprietary plugin text instead of public-source-backed summaries.
+- Passing a budget by checking only the template or managed block.
+- Treating `<details>`, imports, audience labels, or host loading as free context.
+- Moving an enforced trigger/owner out of root without a fail-closed load rule.
+- Overwriting user/domain-skill content or blindly deleting legacy adapters.
+- Claiming exact token savings without measuring the actual loaded context.
+- Using copied vendor prompts or invented commands as native initialization.

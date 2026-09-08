@@ -6,21 +6,21 @@ This contract is also the **Task Assignment / Prompt Contract** for
 orchestrator-to-subagent delegation. The machine-readable schema lives here; the
 prompt-authoring guide lives in [prompt guidelines](./prompt-guidelines.md).
 
-> **Generated systems also receive a host-side `task-handoff` skill.** When
-> the plugin emits an agent system, it generates a portable `task-handoff`
+> **Generated systems also receive a host-side `task-delegation` skill.** When
+> the plugin emits an agent system, it generates a portable `task-delegation`
 > skill at each selected runtime's skills path
-> (`.github/skills/task-handoff/SKILL.md`,
-> `.claude/skills/task-handoff/SKILL.md`,
-> `.opencode/skills/task-handoff/SKILL.md`,
-> `.codex/skills/task-handoff/SKILL.md`,
-> `.gemini/skills/task-handoff/SKILL.md`). The skill body is the
+> (`.github/skills/task-delegation/SKILL.md`,
+> `.claude/skills/task-delegation/SKILL.md`,
+> `.opencode/skills/task-delegation/SKILL.md`,
+> `.agents/skills/task-delegation/SKILL.md`,
+> `.gemini/skills/task-delegation/SKILL.md`). The skill body is the
 > consumer-side reference for the Acceptance Checklist and Reporting
 > Template that subagent templates point to. The host CLI session (the
-> orchestrator role) loads it before composing delegation packets and passes
-> `Skills Referenced: task-handoff loaded=true` in the packet so subagents
-> can rely on the pointer. **Subagents are executors** and do not re-delegate
-> through this skill; if scope exceeds their owned paths, they
-> `return-to-orchestrator`.
+> orchestrator role) loads it before composing delegation packets.
+> `Skills Referenced: task-delegation loaded=true` proves only a host load;
+> pass required excerpts or use a supported child preload/load mechanism.
+> Missing or denied required child context blocks the affected action.
+> **Subagents are executors** and do not re-delegate through this skill.
 
 ## Source prompt
 
@@ -103,9 +103,10 @@ Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reas
 ```
 
 The orchestrator validates this brief, resolves any `question_request` through
-the Human Input / Question Protocol, then converts accepted fields into the
-normal HandoffIR. Triage cannot approve MCP writes, artifact tracking, release
-actions, learning overwrites, or security-sensitive changes.
+the generated project policy at `{{PROJECT_POLICY_PATH}}`, then converts
+accepted fields into the normal HandoffIR. Triage cannot approve MCP writes,
+artifact tracking, release actions, learning overwrites, or security-sensitive
+changes.
 
 ## Per-runtime handoff surfaces
 
@@ -127,10 +128,10 @@ another provider's frontmatter or TOML.
 
 | Runtime | Native delegation surface | Handoff rule |
 |---|---|---|
-| Copilot CLI / VS Code | Task/custom-agent call via the `agent` tool; optional `/fleet` prompt for independent batches | Use Task/agent fan-out when results need orchestrator synthesis. Treat `/fleet` as optional CLI UX, not required artifact behavior. |
-| Claude Code | `Agent` tool for normal subagent work; experimental Agent Teams only when enabled | Fan out multiple `Agent` calls for independent wave members. Return `question_request` from background/headless workers instead of relying on `AskUserQuestion`. |
+| Copilot CLI / VS Code | Task/custom-agent call via the `agent` tool; optional `/fleet` prompt for independent batches | Delegate only when separate context or specialization helps. Treat `/fleet` as optional CLI UX, not required artifact behavior. |
+| Claude Code | `Agent` tool for normal subagent work; experimental Agent Teams only when enabled | Use multiple calls only for worthwhile independent work. Return `question_request` from background/headless workers instead of relying on `AskUserQuestion`. |
 | OpenCode | `task` permission plus `@<agent-name>` routing from a primary agent | Primary agents use `permission.task` with wildcard `deny`/`ask` and named roster allows, or an explicit skipped-roster marker. |
-| OpenAI Codex (CLI + App) | Root `AGENTS.md` asks Codex to spawn child agents; specialists live in `.codex/agents/*.toml` | Keep shared artifacts free of required CLI-only slash commands. Use `.codex/config.toml` `[agents] max_depth = 1` unless the user approves deeper recursion. |
+| OpenAI Codex (CLI + App) | Root `AGENTS.md` asks Codex to spawn child agents; specialists live in `.codex/agents/*.toml` | Keep shared artifacts free of required CLI-only slash commands. Preserve configured recursion and concurrency limits; current concurrency key is `agents.max_concurrent_threads_per_session`, while `max_threads` is a legacy alias. |
 | Gemini CLI | Root Gemini session delegates to local subagents by description or `@<agent-name>` | Keep all fan-out in the root session because Gemini subagents cannot recursively call other subagents. |
 
 ## Delegation packet (canonical schema)
@@ -243,6 +244,8 @@ Allowed Capabilities:
 Skills Referenced:
   allowed:
     - <existing skill name or "none">
+  host_load_evidence: <skill loaded=true | none>
+  child_delivery: <child-loaded | child-preloaded | excerpt-passed | unavailable | denied>
   invocation_notes: <runtime-correct skill behavior>
   do_not_invent: true
 
@@ -314,7 +317,10 @@ Output Schema:
 
 Use full-form whenever the task touches MCP, secrets, CI/release, dependency manifests, generated scripts, ADRs, or fan-out waves — even if the table above suggests short-form.
 
-Do not include unrelated roster rows, marketplace research, or full platform schema details unless the task is generating or validating agent files. When the orchestrator already loaded `AGENTS.md` for the current turn, set `Context freshness: recent` so the subagent skips redundant re-reads (see [context-optimization](./context-optimization.md#context-freshness-rule)).
+Do not include unrelated roster rows, marketplace research, or full platform
+schema details unless the task is generating or validating agent files.
+`Context freshness: recent` means the host composed from a recent snapshot; it
+does not mean the child inherited that snapshot or any loaded skill body.
 
 ### Acceptance Checklist
 
@@ -324,7 +330,8 @@ schema ambiguity return one consolidated `question_request` and stop before the
 risky action.
 
 1. All twelve required-minimum fields are present and non-empty: Task, Source plan, Owned paths, Read-only paths, Relevant gates, Constraints, Dependencies / wave, Required approvals, Runtime format target, Expected output, Context freshness, and Lossiness.
-2. `Context freshness` is explicit (`recent`, an `AGENTS.md` revision, or `reload`) and matches the staleness risk.
+2. `Context freshness` is explicit (`recent`, an `AGENTS.md` revision, or
+   `reload`), matches staleness risk, and is not treated as content inheritance.
 3. `File Inventory.to_modify` (when used) intersects only `Owned paths`.
 4. `File Inventory.to_read_only` (when used) does not include any path the agent owns exclusively.
 5. `Required approvals` lists every approval the task could trigger, or `none`.
@@ -334,7 +341,9 @@ risky action.
 9. `Coordination` lists wave siblings when `Dependencies / wave` is greater than 1.
 10. If the task changes generated agent, skill, memory, recommendation, or output-contract prose, the assignment names the expected Content Quality check or says `n/a`.
 11. `Context Packet` is scoped to the subtask and does not paste full project memory, full plans, or unrelated logs.
-12. `Allowed Capabilities` and `Skills Referenced` are runtime-neutral and do not ask the agent to invent skills or mutate its own frontmatter/TOML.
+12. `Allowed Capabilities` and `Skills Referenced` are runtime-neutral, record
+    host load separately from child delivery, and do not ask the agent to invent
+    skills or mutate its own frontmatter/TOML.
 13. Security-team tasks include authorization scope, affected asset/boundary, validation status, counterevidence, severity rationale, remediation verification need, and proof-gap reporting.
 14. `Output Schema` or `Expected output` is specific enough for the orchestrator to integrate.
 
@@ -356,6 +365,7 @@ Task assignment quality: ok | warn | fail; form=<short|full>; missing=<fields|no
 Content quality: ok | warn | fail | n/a; signals=<list|none>
 Security analysis: n/a | scope=<diff|repository|report|remediation|program>; authorization=<owned-code|approved-target|needs-approval>; validation=<confirmed|likely|needs-info|duplicate|not-reproducible|out-of-scope|mitigated|deferred>; severity=<P0|P1|P2|P3|n/a>; proof_gaps=<none|summary>
 Risks / escalations: <list or "none">
+In bounds: yes | no; escaped=<paths|none>
 Question requests: none | <id>
 Handoff status: accepted | completed | blocked | returned-to-orchestrator
 Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reason>
@@ -363,32 +373,51 @@ Learning Check: none | proposed_new:<id> | proposed_update:<id> | deferred:<reas
 
 ## Host Orchestrator Lifecycle
 
-These thirteen steps live here so `AGENTS.md` can stay compact while still grounding host-session behavior. The host CLI session runs this lifecycle every time it owns a non-trivial task; subagents do not run it themselves.
+These steps live here so `AGENTS.md` can stay compact while still grounding
+host-session behavior. The host CLI session applies them to non-trivial work;
+subagents do not run the lifecycle themselves.
 
-1. **Clarify** — If ambiguous and triage cannot resolve it, ask the user one focused question via the provider-native human-input surface (see `AGENTS.md` › Human Input / Question Protocol).
+1. **Clarify** — If ambiguous and triage cannot resolve it, ask the user one
+   focused question via the provider-native human-input surface described in
+   `{{PROJECT_POLICY_PATH}}`.
 2. **Requirements Triage** — Invoke `@requirements-triage` for ambiguous, risky, cross-runtime, release, MCP, replication, or multi-wave work; otherwise record `triage: skipped` with rationale. Consume the intake brief, risk flags, routing, and `question_request` items before writing the plan.
-3. **Plan** — Write `plan.md`. List subtasks, owning agent per subtask (cross-check Directory Architecture), security/architecture impact, acceptance criteria, triage result, and a Plan Handoff packet.
+3. **Plan** — Record subtasks or direct host actions, logical gate owners,
+   security/architecture impact, acceptance criteria, triage result, and Task
+   Assignments for any delegated work.
 4. **Threat / Architecture check** — If the task touches tools, auth, secrets, dependency manifests, CI/release, data boundaries, APIs, or persistence, delegate to the security and architecture owners before implementation.
 5. **Security Team Scope** — For bug hunting, vulnerability validation, attack-path analysis, disclosure triage, or remediation verification, read `AGENTS.md` › Security Team Operating Model and include authorization scope, evidence, counterevidence, severity rationale, and proof gaps in assignments.
-6. **Compose Assignment** — Compose a Task Assignment using the Required Minimum 12 fields above. Use full-form for normal/risky work (Context Packet, Allowed Capabilities, Skills Referenced, Workflow, Expected output, Stop/Escalation). Safe tiny tasks may use short-form; security/MCP/CI/release/replication or fan-out waves always use full-form.
-7. **Delegate** — Invoke subagents in dependency order using the runtime's native delegation surface (Task/agent tool for Copilot, `Agent` tool for Claude, `task` + `@<agent-name>` for OpenCode, child agent threads for Codex, root-session subagent calls for Gemini). Pass the composed Task Assignment, not the whole project memory.
+6. **Choose execution mode** — Keep small lookups, tightly coupled edits, and
+   low-overhead work in the host. Delegate only substantial bounded work that
+   benefits from specialization, isolation, independent review, or concurrency.
+7. **Compose and deliver** — For each delegated task, use the 12 fields above,
+   select an available model/effort under explicit pins and budgets, and pass
+   required excerpts or supported child-loaded context. Safe tiny delegated
+   tasks may use short-form; risky tasks use full-form.
 8. **Integrate** — Collect outputs; reconcile conflicts. If two agents claim the same path, refer to the Directory Architecture.
-9. **Resolve Questions** — For each returned `question_request`, ask the user once through the provider-native mechanism when possible. If unavailable, apply safe defaults only for reversible, non-sensitive choices; otherwise record the unresolved request and stop before the gated write. Update plan/todos, then re-delegate.
-10. **Verify** — Delegate `@reviewer`, `@tester`, and any required security/architecture owner from Quality Gates. Confirm each subagent passed its Acceptance Checklist or returned a single consolidated `question_request`.
+9. **Resolve Questions** — For each returned `question_request`, ask the user once through the provider-native mechanism when possible. If unavailable, apply safe defaults only for reversible, non-sensitive choices; otherwise record the unresolved request and stop before the gated write. Update plan/todos, then re-delegate. On Copilot CLI, a `question_request` from a **still-running** background subagent may be resolved with a follow-up message instead of a re-dispatch; the subagent re-runs its Acceptance Checklist against the amended packet and recomputes `Task assignment quality`.
+10. **Verify** — Satisfy every logical Quality Gate with its named owner. The
+    host may perform substantive scoped gates where independence is not
+    required; review remains independent of the writer.
 11. **Content Quality Review** — When generated agent-system prose changed, delegate `@agent-quality-curator` or record the merged reviewer check. Require `Content quality: ok|warn|fail|n/a; signals=<list|none>` before final report.
 12. **Reflect & Learn** — Collect each subagent's `Learning Check`. Append low-risk new learnings through the memory owner. Sensitive new learnings (tagged `risk` or touching MCP, CI/release, dependencies, secrets, or generated scripts) require host-orchestrator and security-owner approval. Updating, overwriting, or superseding prior learnings requires host-orchestrator approval and evidence. Never store secrets or raw credentials.
 13. **Report** — Summarize: changes, verification, security/audit evidence, architecture decisions, pending items, triage status, content-quality status/signals, Task assignment quality (filled fields and question-request count), security-team evidence/proof gaps when applicable, and learning proposals accepted/deferred.
 
 ## Wave Execution Playbook
 
-For independent work, the host orchestrator **fans out** all parallel-safe subagents in the current wave in a single host turn using the runtime's native subagent surface. It waits for every result, synthesizes, then starts the next wave. Sequential delegation is allowed only when owned paths overlap, a worker depends on a previous result, or a gate requires review before the next write.
+When substantial delegated tasks are independent, nonoverlapping, and likely
+to benefit, the host may invoke them concurrently within runtime/user limits.
+It waits for and reconciles every dispatched result before dependent work.
+Sequential or direct execution is valid when coordination or startup cost
+outweighs concurrency.
 
 Runtime notes:
 
 - **Copilot CLI** — Task/agent tool fan-out; optional `/fleet` for independent batches (UX, not required).
 - **Claude Code** — `Agent` tool calls (multiple in one assistant turn for parallel-safe subagents); experimental Agent Teams when opted in.
 - **OpenCode** — `task` permission + `@<agent-name>` routing, gated by `permission.task` in `opencode.json`.
-- **OpenAI Codex (CLI + App)** — child agent threads; `.codex/config.toml` `[agents] max_threads` caps concurrency, `max_depth = 1` is the safe default to avoid recursive fan-out.
+- **OpenAI Codex (CLI + App)** — child agent threads; preserve configured
+  recursion/concurrency limits. Current concurrency key:
+  `agents.max_concurrent_threads_per_session`; `max_threads` is a legacy alias.
 - **Gemini CLI** — root-session fan-out only; Gemini subagents cannot recursively call other subagents, so the root session owns all wave coordination.
 
 ## Memory & Learning Coordination
@@ -403,16 +432,21 @@ Subagents return `Learning Check: none | proposed_new:<id> | proposed_update:<id
 
 ## Out of Scope (for the host orchestrator)
 
-- Bulk code edits in a subagent's owned path → delegate.
-- Long-running implementation work the user expects a specialist to own → delegate.
-- Decisions that require product input → bounce to user via `AGENTS.md` › Human Input / Question Protocol.
+- Work inside a worker's active exclusive owned path → return to that worker or
+  reconcile ownership before another writer acts.
+- Long-running implementation work → delegate only when the separation benefit
+  exceeds startup and integration cost.
+- Decisions requiring product input return to the host, which follows
+  `{{PROJECT_POLICY_PATH}}` › Human Input Protocol.
 
 ## Verification
 
 Before declaring done:
 
-1. Confirm every generated `AGENTS.md` contains a non-empty **Plan Handoff Contract** section.
-2. Confirm every generated runtime agent includes handoff input/output guidance in the correct surface for that runtime.
+1. Confirm the Skills index points to a discoverable `task-delegation` skill
+   and the worker templates retain inline fail-closed intake/reporting.
+2. Confirm every generated runtime agent includes assignment input/output
+   guidance in the correct surface for that runtime.
 3. Parse each target's frontmatter or TOML with the target schema.
 4. Confirm any lossy field mapping is in the lossiness report or output contract.
 5. Confirm MCP, secrets, CI/release, and user-scope writes still went through their approval gates.

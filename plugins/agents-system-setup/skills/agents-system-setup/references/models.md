@@ -1,88 +1,93 @@
-# Per-Runtime Model Constraints (optional)
+# Adaptive Model and Effort Selection
 
-Use this reference whenever a user opts in to setting `model:` overrides during the interview (Q9b) or replicating from a runtime that pinned models. The skill keeps `model:` optional in every emitter; this file is the load-on-demand context that explains *what shape each runtime expects*, *what the default is when omitted*, and *where the live rate/usage limits are documented*.
+Use this reference when a user explicitly pins a model/effort, asks for
+cost-performance routing, or a delegated task needs a runtime-available
+selection. Generated agents omit static model and effort fields by default.
 
-> Rate limits and quota numbers change frequently and depend on the user's plan tier. **Do not pin RPM, TPM, or daily caps in this repo.** Link to the official sources, then let users open them when they care.
+## Default policy: adaptive-balanced
 
-## Decision aid: should the user override `model:`?
+Choose direct versus delegated execution before choosing a worker model.
+Delegation has startup, context-transfer, integration, retry, and latency cost;
+inheritance is not necessarily cheap.
 
-Override only when there is a concrete reason. If unsure, leave `model:` blank so the runtime resolves its current default and the agent stays portable across plan changes.
+Apply this precedence:
 
-| Situation | Recommended action |
+1. Explicit user and organization provider/model/effort pins.
+2. Mandatory quality, safety, independence, and gate requirements.
+3. Runtime/provider availability, entitlement, policy, and advertised effort
+   controls, within explicit resource and spending limits.
+4. Task difficulty and risk.
+5. Total expected cost, including retries, cache/startup behavior, and latency.
+
+Explicit pins prevail even when a native per-call override could otherwise
+select a stronger or cheaper model. If no allowed model can meet a mandatory
+requirement, escalate instead of exceeding budget or silently lowering quality.
+
+## Selection procedure
+
+1. Classify the task: direct host work or delegated, read-only or write,
+   bounded or exploratory, routine or high-risk, and whether independent review
+   is required.
+2. Enumerate only models and effort values advertised by the active runtime.
+   Do not rely on a stale newest-model catalog.
+3. Select the least expensive option expected to meet the required quality
+   with acceptable retry and latency risk. Higher risk or ambiguity may justify
+   a stronger model or more effort; routine bounded work usually does not.
+4. Prefer per-call selection where supported. If unavailable, inherit the
+   configured worker/session choice or propose a separately approved config
+   change. Never rewrite a worker definition mid-task for a one-off call.
+5. Record the reason when a model is pinned, translated during replication, or
+   unavailable.
+
+Do not publish permanent prices, rate limits, or entitlement tables. Link to
+current vendor/runtime sources when live commercial details matter.
+Unknown prices remain unknown, not free or cheapest. Use verified cost metadata
+when available; otherwise preserve an approved choice and disclose uncertainty.
+If a hard spending cap cannot be assessed with the available controls/evidence,
+stop the affected launch and escalate rather than assume inheritance fits it.
+
+## Runtime resolution facts
+
+| Runtime | Resolution and configuration rule |
 |---|---|
-| Reviewer or planner needs deeper reasoning | Override to a higher-tier model on that single agent only |
-| Subagent fan-out hits rate limits during waves | Use the runtime default (inherit) for cheap workers; override only the orchestrator/reviewer |
-| Replicating from another runtime that pinned a model | Translate to the target runtime's format; never carry the source id verbatim |
-| User wants vendor lock-in (e.g., Anthropic-only) | Override per agent and document the choice in `AGENTS.md` |
-| Project requires deterministic model id for compliance | Override per agent and pin the exact id; document the deprecation policy |
-| User unsure | Skip Q9b; runtime defaults remain in effect |
+| Copilot CLI | Use a per-call/session model only when the active surface advertises it. Agent `model:` remains omitted unless explicitly pinned. |
+| Claude Code | Per-call `model` → subagent frontmatter → `CLAUDE_CODE_SUBAGENT_MODEL` → parent. Explicit `inherit` chooses the parent model. |
+| OpenCode | Use an advertised configured `provider/model-id`; omitted agent `model:` follows OpenCode/session configuration. |
+| Codex CLI + App | Explicit spawn choice → `[agents]` default → parent, except an explicitly selected custom-agent file may pin `model`/`model_reasoning_effort` and override that resolution. Use only currently advertised effort values. |
+| Gemini CLI | Local subagent `model:` is optional; omitted values inherit the parent/session choice. Remote agent model selection belongs to the remote service. |
 
-## Per-runtime model surfaces
+## Replication
 
-### Copilot CLI
-
-- **Field:** `model:` in `.github/agents/<name>.agent.md` frontmatter; `--model <id>` on `copilot` invocation.
-- **Default when omitted:** the model selected for the Copilot CLI session inherits.
-- **Accepted ids:** internal Copilot model ids (e.g., `claude-sonnet-4.6`, `gpt-5`, `gpt-5-mini`, `claude-opus-4`); the available list depends on the user's Copilot plan and entitlement.
-- **Rate limits / availability:** controlled by the user's Copilot plan tier and any organization policy. Sources:
-  - <https://docs.github.com/en/copilot/concepts/agents/copilot-cli/about-custom-agents>
-  - <https://docs.github.com/en/copilot/reference/custom-agents-configuration>
-  - <https://docs.github.com/en/copilot/about-github-copilot/plans-for-github-copilot>
-- **Override guidance:** keep `model:` blank for portable agent files. Override per agent only when a specific role (e.g., reviewer) consistently benefits from a stronger model.
-
-### Claude Code
-
-- **Field:** `model:` in `.claude/agents/<name>.md` frontmatter; CLI `--model <id>`; `inherit` keeps the session's current model.
-- **Default when omitted:** `inherit` (the parent session's selected model).
-- **Accepted ids:** alias values `sonnet`, `opus`, `haiku`, plus full Anthropic model ids (e.g., `claude-sonnet-4-5`); the literal `inherit` is also valid.
-- **Rate limits / availability:** depend on the user's Claude plan (Free / Pro / Max / Team) and whether the workspace uses Claude API keys directly. Sources:
-  - <https://docs.claude.com/en/docs/claude-code/sub-agents>
-  - <https://docs.claude.com/en/api/rate-limits>
-  - <https://www.anthropic.com/pricing>
-- **Override guidance:** prefer aliases (`sonnet`, `opus`, `haiku`) so Claude can roll forward to the latest minor revision without breaking the file. Pin a full id only when compliance demands it.
-
-### OpenCode
-
-- **Field:** `model:` in `.opencode/agents/<name>.md` frontmatter using `provider/model-id` format (e.g., `anthropic/claude-sonnet-4-20250514`).
-- **Default when omitted:** the model configured in `opencode.json` for that mode, or the OpenCode session default.
-- **Accepted ids:** any `provider/model-id` the configured provider advertises; the provider list is user-controlled.
-- **Rate limits / availability:** governed by the configured provider's plan and quota, not by OpenCode itself. Sources:
-  - <https://opencode.ai/docs/agents/>
-  - <https://opencode.ai/docs/providers/>
-  - Provider docs for whichever provider is configured (Anthropic, OpenAI, etc.).
-- **Override guidance:** never copy Claude-only aliases like `sonnet` — OpenCode requires `provider/model-id`. Leave blank to defer to `opencode.json`.
-
-### OpenAI Codex (CLI + App)
-
-- **Field:** `model = "<id>"` and optional `model_reasoning_effort = "low|medium|high"` in `.codex/agents/<name>.toml`; `[agents]` defaults live in `.codex/config.toml`.
-- **Default when omitted:** inherit from the parent Codex session; the session uses whatever model the user selected in CLI/App.
-- **Accepted ids:** OpenAI Codex internal ids (e.g., `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.3-codex`); the available set depends on the user's ChatGPT plan and entitlement.
-- **Rate limits / availability:** governed by the user's ChatGPT plan (Plus / Pro / Business / Enterprise) plus separate OpenAI API limits for keyed usage. Sources:
-  - <https://developers.openai.com/codex/subagents>
-  - <https://platform.openai.com/docs/guides/rate-limits>
-  - <https://openai.com/chatgpt/pricing/>
-- **Override guidance:** when a reviewer needs deep reasoning, set `model_reasoning_effort = "high"` on that agent only; when subagents fan out heavily, leave the model blank so cheap workers inherit a lighter default.
-
-### Gemini CLI
-
-- **Field:** `model:` (and optional `temperature:`) in `.gemini/agents/<name>.md` frontmatter; `kind: local` agents only.
-- **Default when omitted:** inherit from the Gemini CLI parent session.
-- **Accepted ids:** Gemini model ids documented in the loader schema and Gemini Code Assist docs (e.g., `gemini-3-flash-preview`); availability depends on the user's plan.
-- **Rate limits / availability:** governed by the user's Gemini Code Assist plan (Free / Standard / Enterprise) and underlying Google AI quotas. Sources:
-  - <https://github.com/google-gemini/gemini-cli/blob/main/docs/core/subagents.md>
-  - <https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/agents/agentLoader.ts>
-  - <https://developers.google.com/gemini-code-assist/resources/quotas-and-limits>
-- **Override guidance:** never set `model:` on remote (`kind: remote`) Gemini agents; the remote A2A surface controls its own model. For local subagents, override only when the role needs a different reasoning/speed tradeoff than the root session.
+- Preserve an explicit source pin as intent, not as a verbatim cross-provider
+  identifier.
+- Translate only to an available approved target model with equivalent intent.
+  A changed explicit pin needs approval and a recorded mapping; availability
+  alone is not permission to replace it.
+- Preserve unknown imported values for review rather than fabricating a target
+  mapping.
+- If translation is lossy or impossible, report it in HandoffIR `lossiness`.
+- Do not turn an inherited source setting into a static target pin.
 
 ## Anti-patterns
 
-- **Copying ids across runtimes.** `sonnet` is valid for Claude Code but not OpenCode; `gpt-5.4` is valid for Codex but not Copilot CLI. Translate per target.
-- **Pinning deprecated ids.** Vendors retire model ids on schedule; prefer aliases (`sonnet`, `opus`, `haiku`, `inherit`) when the runtime supports them.
-- **Embedding rate-limit numbers.** RPM, TPM, and daily caps drift with plans and incidents; link to the live source instead.
-- **Overriding `model:` on every agent for "consistency".** It blocks the runtime's current default and increases premium-model usage during fan-out.
-- **Writing models without `--model`/frontmatter agreement.** When the user supplied a CLI flag default, do not silently override it in agent files unless they asked.
-- **Treating remote Gemini A2A agents as configurable models.** Their model lives on the remote service, not in the local file.
+- Pinning every worker to one model for consistency.
+- Selecting maximum effort for every task.
+- Assuming inherited workers use a cheap model.
+- Ignoring retry/cache/startup/latency cost.
+- Rewriting worker config during a task when no per-call control exists.
+- Bypassing user/org pins, provider restrictions, budgets, or mandatory gates.
+- Embedding live price, quota, or newest-model catalogs in generated files.
 
 ## Sources
 
-The links above are the canonical pointers. Re-verify them when adding a new runtime row or before promoting an experimental model to the recommended list.
+- Copilot custom agents:
+  <https://docs.github.com/en/copilot/reference/custom-agents-configuration>
+- Claude Code subagents:
+  <https://docs.claude.com/en/docs/claude-code/sub-agents>
+- OpenCode agents/providers:
+  <https://opencode.ai/docs/agents/> and <https://opencode.ai/docs/providers/>
+- Codex subagents and models:
+  <https://developers.openai.com/codex/subagents> and
+  <https://developers.openai.com/codex/models>
+- Gemini CLI subagents:
+  <https://geminicli.com/docs/core/subagents/>

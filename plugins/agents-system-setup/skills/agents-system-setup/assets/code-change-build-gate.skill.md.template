@@ -21,9 +21,9 @@ description: 'Use when a software-development project makes a code change that n
 ## Do Not Use
 
 - For documentation-only, content, or security-team-only projects.
-- For replacing the **compact Build Gate matrix in `AGENTS.md`** — that
-  matrix is the fail-closed enforcement surface; this skill is the
-  expanded procedure.
+- When the Build Gate is skipped or the project is non-development work.
+- Do not treat it as optional background: this local skill is the canonical
+  matrix and procedure for enabled Build Gates.
 - For bypassing reviewer/tester/security authority. `@change-validator`
   integrates evidence; it does not override correctness verdicts.
 
@@ -31,17 +31,19 @@ description: 'Use when a software-development project makes a code change that n
 
 1. **Compute bucket as `max(size_bucket, criticality_bucket)`.** Size never
    overrides criticality. A one-line change to auth middleware is L or XL.
-2. **The matrix is fail-closed.** Missing evidence for a required gate
-   blocks `@change-validator` sign-off; do not waive a `✅` gate.
+2. **This skill's matrix is canonical and fail-closed.** Missing/denied skill
+   context or missing evidence for a required gate blocks the affected code
+   action and validation sign-off; do not waive a `✅` gate.
 3. **`🟡` gates may be waived** only with rationale recorded in the plan
    and the validator's integration report.
-4. **Reuse existing roles before adding new ones.** `tester` →
-   unit-test gate, `playwright-e2e` / runtime equivalent → e2e gate,
-   `reviewer` → code-review gate.
+4. **Assign logical responsibilities before creating workers.** Reuse the host
+   or existing project roles when independence is not required. Review must be
+   independent of the writer.
 5. **`change-bug-hunter` and `vulnerability-researcher` are not duplicates.**
    Apply the mutual-exclusion routing rule below when both exist.
-6. **No silent gate.** Every required gate emits evidence in its owner's
-   Reporting Template; `@change-validator` aggregates.
+6. **No silent gate.** Every required gate emits evidence in its configured
+   owner's Reporting Template; the validation owner aggregates without
+   overriding authoritative verdicts.
 
 ## Procedure
 
@@ -94,25 +96,34 @@ together (or one `L` plus a security-team scope) → escalate to `XL`.
 
 ### 3. Compose the delegation packet
 
-For each required gate, the host uses `task-handoff` to compose an
+For each delegated gate, the host uses `task-delegation` to compose an
 assignment with:
 
 - task tag `code-change-build-gate`
 - the computed bucket
 - the specific gate this subagent owns
 - the evidence schema below
-- `Skills Referenced: task-handoff loaded=true`
+- host evidence `Skills Referenced: task-delegation loaded=true`
+- child delivery of the required Build Gate excerpt or a supported
+  child preload/load of this skill
+
+Host `loaded=true` evidence does not prove child context. If the gate owner does
+not receive the required procedure, block that gate. Apply the same rule to
+`code-quality` for code-edit/review work.
 
 ### 4. Gather evidence per gate
 
 | Gate | Owner | Evidence shape |
 |---|---|---|
-| Build | `@build-runner` | command, exit status, build artifact paths, log summary |
-| Unit test | `@tester` or language-specific runner | command, pass/fail counts, coverage delta (if available), failing test names |
-| E2E test | `@playwright-e2e` or runtime equivalent | command, scenarios run, pass/fail, screenshots/traces stored path |
-| Code review | `@reviewer` | reviewed file paths, signed-off-by, blocking comments resolved or waived |
-| Change bug hunt | `@change-bug-hunter` | scanned paths, candidate count, suspicion list, severity, evidence links |
-| Validation | `@change-validator` | aggregated gate status, required-approval status, residual risk note |
+| Build | owner named in Quality Gates (`@orchestrator` or `@build-runner`) | command, exit status, build artifact paths, log summary |
+| Unit test | `{{UNIT_TEST_OWNER}}` | command, pass/fail counts, coverage delta (if available), failing test names |
+| E2E test | `{{E2E_OWNER}}` | command, scenarios run, pass/fail, screenshots/traces stored path |
+| Code review | independent owner named in Quality Gates | reviewed file paths, signed-off-by, blocking comments resolved or waived |
+| Change bug hunt | owner named in Quality Gates (host/reviewer or `@change-bug-hunter`) | scanned paths, candidate count, suspicion list, severity, evidence links |
+| Validation | `{{CHANGE_VALIDATOR_OWNER}}` | aggregated gate status, required-approval status, residual risk note |
+
+An owner may be the host where independence is not required. Do not emit a
+specialist merely to satisfy a role count.
 
 ### 5. Apply the routing rule (when applicable) — Mutual-exclusion routing
 
@@ -127,9 +138,10 @@ When `vulnerability-researcher` exists (security-team setups):
 
 ### 6. Wave assignment
 
-- Build → Unit Test (sequential per language toolchain).
-- E2E · Review · Change bug hunt (parallel wave once build/unit pass).
-- Change Validation (final wave, `waits_for` every preceding gate).
+- Respect actual toolchain dependencies.
+- Run independent delegated gates concurrently only when it materially helps
+  and stays within runtime/user limits.
+- Validation runs after all required evidence is available.
 
 ### 7. Strictness modifier
 
@@ -137,7 +149,7 @@ When `vulnerability-researcher` exists (security-team setups):
 |---|---|
 | Standard | Use the matrix above as written. |
 | Strict | Promote every `🟡` to `✅`. XL requires two reviewer approvals and an explicit release-validator sign-off. |
-| Light | Merge `@change-validator` into `@reviewer`. XS keeps only build + review. M demotes e2e to `🟡`. |
+| Light | Merge validation into the independent review owner. XS keeps only build + review. M demotes e2e to `🟡`. |
 | Skip | Do not run the gate; the plugin should not have emitted this skill. |
 
 ## Anti-patterns
@@ -146,8 +158,8 @@ When `vulnerability-researcher` exists (security-team setups):
 - Letting `@change-validator` override reviewer/tester correctness verdicts.
 - Letting `@change-bug-hunter` duplicate full threat-model analysis when a
   security team is present.
-- Running the gate only when the user explicitly invokes the skill (the
-  matrix is also inlined in `AGENTS.md` for fail-closed enforcement).
+- Treating the compact root pointer as a second matrix or conflict authority.
+- Claiming host skill-loading evidence means a child received this procedure.
 - Marking a `✅` gate as `waived` (only `🟡` is waivable, with rationale).
 - Skipping evidence emission "because the gate trivially passed" — every
   required gate emits at least a one-line `Build gate:` summary in the
@@ -161,7 +173,7 @@ Subagents that own a build-gate role include in their Reporting Template:
 Build gate: bucket=<XS|S|M|L|XL>; gate=<build|unit|e2e|review|bug-hunt|validation>; status=<pass|fail|waived>; evidence=<summary>
 ```
 
-`@change-validator` aggregates and emits:
+`{{CHANGE_VALIDATOR_OWNER}}` aggregates and emits:
 
 ```text
 Build gate (validation): bucket=<XS|S|M|L|XL>; strictness=<standard|strict|light>; required=<list>; passed=<list>; waived=<list+rationale|none>; residual_risk=<summary|none>; sign-off=<accept|block>; integration_report=<path|inline>
@@ -169,13 +181,12 @@ Build gate (validation): bucket=<XS|S|M|L|XL>; strictness=<standard|strict|light
 
 ## Verification
 
-- The host orchestrator confirms `Build gate (validation): sign-off=accept`
-  before declaring the change done.
-- `AGENTS.md` › Build Gate (SDLC) section + this skill agree on the matrix;
-  if they drift, the AGENTS.md inline matrix wins (it is the fail-closed
-  surface).
+- The host confirms `Build gate (validation): sign-off=accept` before declaring
+  the change done.
+- This local skill is the one canonical matrix/procedure. The compact root block
+  contains enabled state, strictness, owners, fail-closed behavior, and a
+  pointer; it does not duplicate or override the matrix.
 - Codex (CLI + App) loads this skill at
-  `.codex/skills/code-change-build-gate/SKILL.md` via the skill loader
+  `.agents/skills/code-change-build-gate/SKILL.md` via the skill loader
   (`$code-change-build-gate` or `/skills`). Other runtimes use their
-  per-runtime skills path; the AGENTS.md inline matrix is the always-on
-  source of truth.
+  per-runtime skills path.
