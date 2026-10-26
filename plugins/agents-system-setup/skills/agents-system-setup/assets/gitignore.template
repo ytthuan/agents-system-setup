@@ -16,8 +16,9 @@
 # Copilot session state (local-only)
 .copilot/session-state/
 
-# agents-system-setup operational state (replication ledger, migration ledger,
-# MCP approval evidence, learning ledger, audit logs, .bak files).
+# agents-system-setup operational state (migration ledger,
+# MCP approval evidence, learning ledger, audit logs, .bak files, backups/
+# snapshots + backups.jsonl).
 # NEVER commit these and NEVER place runtime artifact subtrees inside
 # (`agents/`, `skills/`, `hooks/`, `commands/`, `prompts/`, `plugins/`) —
 # runtimes do not load them and runtime loaders may try to parse misplaced

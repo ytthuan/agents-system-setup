@@ -1,6 +1,8 @@
 # Local vs Git-Tracked Agent Artifacts
 
-Always ask how generated agent artifacts should be stored before writing project files.
+Resolve how generated artifacts are stored before writing project files. Ask
+when unknown; migration reuses the existing tracking choice and asks only before
+changing that scope or strategy.
 
 ## Modes
 
@@ -48,21 +50,26 @@ docs/agents/learnings.md
 .claude/settings.json
 .opencode/agents/
 .opencode/skills/
+.opencode/commands/agents-system-setup.md
+.agents/skills/
 .codex/agents/
 .codex/config.toml
 .gemini/agents/
+.gemini/skills/
 .gemini/settings.json
 .mcp.json
 opencode.json
+opencode.jsonc
 ```
 
 Only include paths the skill actually created or modified. If a file already exists and is tracked, do not hide it; ask before changing strategy.
 
 ## Operational state directory
 
-`.agents-system-setup/` is reserved for operational state — `replication.jsonl`,
-`migration.jsonl`, MCP approval evidence, learning ledgers, `.bak` files. It
-is `.gitignore`d in this project's template and **must never** contain
+`.agents-system-setup/` is reserved for operational state —
+`migration.jsonl`, MCP approval evidence, learning ledgers, `.bak` files, and
+`backups/` snapshots + `backups.jsonl` (see [backup & rollback](./backup-rollback.md)).
+It is `.gitignore`d in this project's template and **must never** contain
 runtime artifact subtrees (`agents/`, `skills/`, `hooks/`, `commands/`,
 `prompts/`, `plugins/`). No runtime loads artifacts from there. Existing
 misroutes go through [misplaced-artifacts-migration](./misplaced-artifacts-migration.md).

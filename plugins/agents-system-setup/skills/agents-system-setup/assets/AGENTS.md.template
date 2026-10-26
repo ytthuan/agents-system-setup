@@ -41,10 +41,9 @@
 
 ## Orchestration Operating Model
 
-`@orchestrator` is the host CLI session, not a subagent file. Act directly when
-ownership and gates allow. Delegate for specialist context, required independent
-review, or substantial separable work; zero specialists is valid. Keep writers'
-paths disjoint and integrate every dispatched result.
+`@orchestrator` is the host CLI session, not a subagent file.
+
+{{TOPOLOGY_BLOCK}}
 
 Load `task-delegation` from Skills before delegated assignments. Pass scoped context and
 required excerpts; a host skill load is not child content. Workers never

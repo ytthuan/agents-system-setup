@@ -30,6 +30,25 @@ Responsibilities are mandatory when applicable, not separate processes by
 default. Independent review remains independent; a parent load marker never
 stands in for context that a child did not receive.
 
+Execution topology is an interview choice (`agent_topology`), not a fixed
+mandate: `specialists` keeps host + specialist subagents; `solo` maps working
+responsibilities to reusable skills, with references or compatible merges.
+Modern models make single-agent execution viable *because* progressive
+disclosure keeps knowledge non-resident — the property that actually prevented
+the god-prompt. Three subagent guarantees do not convert to skills — runtime
+tool allowlists, fresh-context independent review, and per-task context
+unloading — so solo mode keeps exactly one read-only `reviewer` subagent for
+software-dev, and records permitted non-dev self-review as `not independent`.
+`migrate monolithic` is its own prompted flow: inventory and skill composition,
+approval, verified snapshot, replacement validation, then source retirement.
+Required independent gates survive the conversion.
+
+The Agent Skills 500-line recommendation is advisory, not a runtime format
+limit. Enforcing it as an error encouraged giant lines instead of readable
+instructions. Size warnings and progressive disclosure remain useful; migration
+correctness depends on capability coverage, resolved dependencies, and preserving
+user content, not matching agent and skill counts.
+
 The historical rationale below predates this contract. In particular, mandatory
 worker counts, unconditional parallelism, full inline root matrices, and
 symlink/copy defaults are superseded by the current skill and its
@@ -41,13 +60,13 @@ symlink/copy defaults are superseded by the current skill and its
 |---|---|---|
 | 1. Always interview first | Project type / language / scope drive every later decision; assumptions silently produce wrong subagents | Generic "helper" agents with no discovery surface |
 | 2. Detect existing footprint on entry | Users with an existing system mostly want **improve** or **replicate**, not a re-init that overwrites their work | Silent overwrite of `AGENTS.md` |
-| 3. Orchestrator + subagent topology mandatory | Single-agent systems collapse into a god-prompt; subagent topology preserves context and enables tool restriction | Context-window exhaustion, runaway tool calls |
+| 3. Topology is chosen, not imposed (specialists or solo+skills) | The god-prompt collapse was caused by resident knowledge, not agent count; the interview now offers `specialists` (host + specialist subagents) or `solo` (single agent + on-demand role skills), with solo's non-convertible guarantees disclosed and compensated | Resident god-prompts, context-window exhaustion, runaway tool calls; solo systems silently claiming allowlists or independent review they do not have |
 | 4. Directory Architecture enforced | Subagent boundaries must be machine-checkable for the orchestrator to route correctly | Two subagents fighting over the same files |
 | 5. Per-item opt-in for recommendations | Plugins/MCP servers carry security and trust implications — bulk-applying is hostile | Supply-chain compromise via a single bad MCP server |
 | 6. MCP approval gate | MCP servers run code on the user's machine and often hold credentials | Silent credential exfiltration; surprise network calls |
 | 7. Marketplace-first lookup with vendor attribution | Provenance must be auditable | Users installing forks of forks; typosquatting |
 | 8. Replication via Canonical IR (no pairwise mappings) | N runtimes × N targets = N² mappings; IR makes it N | Drift between mappings, dead code paths |
-| 9. Non-destructive updates with `.bak` | Users edit generated files; we must preserve their work | Lost manual customizations |
+| 9. Non-destructive updates with run-level snapshots | Users edit generated files; every write run snapshots preimages first so any run is reversible via `rollback`, while `.bak` covers intra-run merges | Lost manual customizations; irreversible mode/upgrade/conversion runs; rollback that clobbers newer user work |
 | 10. Per-platform paths and frontmatter | Copilot frontmatter in a Claude file is silently ignored | Agents that look installed but never trigger |
 | 11. Cross-OS aware | Plugin will be installed on Linux, macOS, Windows | `.sh` scripts on Windows, CRLF in bash files |
 | 12. Git is opt-in | Some users scaffold inside an existing repo; auto-initing would corrupt history | Detached HEAD, lost commits |
@@ -175,6 +194,8 @@ secrets, or generated scripts need the same governance as other risky writes.
 
 **Why `.bak` instead of git stash?** The plugin can't assume a clean working tree or even a git repo. `.bak` is universal.
 
+**Why run-level snapshots + `rollback` mode on top?** `.bak` files cover individual merges. A verified run-level before-state covers the full approved write set, even without git. Recorded postimages distinguish the run's edits from subsequent user edits; preimages alone cannot. Rollback snapshots the current state, restores old bytes/stamps, and reports partial restores honestly. Compatibility checks do not authorize upgrading restored files. The procedure and its evidence live in [backup & rollback](./plugins/agents-system-setup/skills/agents-system-setup/references/backup-rollback.md).
+
 ### Phase 6 — Optional Git Init
 
 **Why optional?** See hard rule #12. Auto-init in a non-git directory that's a subfolder of a parent repo creates a nested repo — a footgun.
@@ -201,9 +222,18 @@ Without IR, supporting N runtimes requires N×(N-1) pairwise mappings. With IR, 
 
 A successful emit is necessary but not sufficient. Round-tripping (re-parse the emitted file back to IR, diff against source IR) is the only way to detect lossy mappings the user accepted-but-forgot.
 
-### Why a replication ledger
+### Why marker-based provenance (no sidecar replication ledger)
 
-Replicated files drift over time as either the source or target changes. The ledger (timestamp + sha256 per file) lets `improve` mode detect "this Claude agent was replicated from Copilot 60 days ago and the source has changed since".
+Replicated files drift as the source changes. The original design recorded
+timestamp + sha256 in a sidecar `replication.jsonl`, but nothing ever read it
+back — write-only state that every replicate run maintained for no consumer.
+Provenance now travels with the artifact: each emitted file's
+`replicated-from` marker carries source runtime/path, the source artifact's `sha256:`,
+and `ts:`, so `improve` mode detects drift by re-hashing the source and
+comparing against the marker — no second file to keep in sync, and the record
+survives target-file moves. Missing source locators are reported as unavailable.
+Run history and approval context live in the single
+`backups.jsonl` run ledger (see Phase 5). One ledger, not two.
 
 ### Why MCP gate re-runs per new target
 
@@ -211,7 +241,7 @@ MCP approval is per-target, not global. Approving a server for Copilot CLI tells
 
 ## Anti-patterns and why we ban them
 
-- **Single monolithic agent** — kills tool-restriction and context-isolation benefits; everything funnels into one prompt.
+- **Resident god-prompt (everything inline in one always-loaded prompt)** — a solo topology with on-demand `solo-role` skills is valid; a solo topology that inlines every rule is not. Solo also cannot machine-enforce per-role tool allowlists or fresh-context review, so it keeps the reviewer exception and discloses the rest (hard rule #42).
 - **Generic descriptions** ("helps with code") — orchestrator never picks the agent.
 - **Bulk MCP install** — supply-chain risk concentrated into a single yes-click.
 - **Pairwise replication code** — N² maintenance burden.

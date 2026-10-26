@@ -1,8 +1,9 @@
 # Misplaced Artifacts Migration
 
 `.agents-system-setup/` is reserved for **operational state** —
-`replication.jsonl`, MCP approval evidence, learning ledgers, `.bak`
-files, this skill's own migration ledger. It is `.gitignore`d and **no
+MCP approval evidence, learning ledgers, `.bak`
+files, this skill's own migration ledger, and `backups/` snapshots +
+`backups.jsonl`. It is `.gitignore`d and **no
 runtime loads agents, skills, hooks, commands, prompts, or plugin metadata
 from it**, so anything placed there is silently inert.
 
@@ -233,8 +234,8 @@ for ledger readers that still expect them.
 The ledger lives at `.agents-system-setup/migration.jsonl`. It must
 **never** be placed inside any `agents/`, `skills/`, `hooks/`,
 `commands/`, `prompts/`, or `plugins/` directory — runtime loaders would
-parse a `.md` form of it as a malformed agent. The same rule that applies
-to `replication.jsonl` applies here.
+parse a `.md` form of it as a malformed agent. The same rule applies to
+every operational log this skill writes, including `backups.jsonl`.
 
 ## Wiring
 
@@ -400,9 +401,9 @@ do NOT include them in the proposed snippet.
 - Deleting the source before the target is verified.
 - Treating multi-runtime ambiguity as an automatic decision; always ask
   the user which target path to use.
-- Bundling all migrations into a single `Apply all` button — each
-  artifact gets its own `ask_user` so users can defer or skip
-  individually.
+- In this path-repair workflow, skipping per-artifact decisions behind an
+  unexplained `Apply all`. Topology conversion uses its own reviewed coverage
+  table and `Edit mapping` choice; every item still has an explicit disposition.
 - **Auto-deleting an orchestrator subagent file with custom content.**
   Default to `Back up + report custom additions for manual review` when
   `has_custom_content` is true; never auto-merge custom prose into
@@ -431,19 +432,24 @@ the current contract. Preserve historical ledger names and HandoffIR terminology
 | Codex skill path | Legacy project/user `.codex/skills` | Current `.agents/skills` / `~/.agents/skills`, subject to destination/overlapping-discovery review. Do not copy blindly or remove a working source first. |
 | Context inheritance claim | Host `loaded=true` or `recent` treated as child content | Preserve worker inline guards; supply excerpts or supported child loads and block missing required context. |
 | Forced topology/model | Minimum worker counts, mandatory fan-out, or inheritance described as cheap | Task-based responsibilities and adaptive-balanced selection; preserve explicit pins, budgets, providers, and required independent review. |
+| Topology conversion | A specialists system whose responsibilities can reuse/compose skills (or the reverse) | **Never automatic.** Use `migrate monolithic` / `migrate specialists` and the reviewed mapping in [topology conversion](./topology-conversion.md). Require a pre-conversion snapshot per [backup & rollback](./backup-rollback.md); improve/upgrade may only propose it, and a declined proposal leaves the existing roster untouched. |
+| Legacy replication ledger | A `.agents-system-setup/replication.jsonl` written by earlier plugin versions | Superseded, never current authority: provenance and the drift base use source runtime/path, SHA-256, and time per [replication](./replication.md); run history uses `backups.jsonl`. Offer archival or approved deletion; never silently remove it. |
 
 ### Coordinated repair sequence
 
 1. Classify ownership from markers, manifest and reviewed content. A familiar
    skill name is not proof of plugin ownership. Preserve domain skill bodies;
    unmarked/customized collisions require manual review.
-2. Record live source/destination preimages and proposed paths. Show before/after
+2. Record live source/destination hashes, proposed paths, and the planned
+   backup location. Show before/after
    root sizes, retained rules, local relocations, exact permission changes, and
    unresolved conflicts. Existing memory is audit input; never rerun native
    initialization over it just to force a fresh draft.
 3. Obtain content and separate runtime-permission approvals. A user-created
    `task-delegation` destination, divergent legacy body, denied permission,
    symlink, or concurrent edit blocks the affected migration for review.
+   Then capture and verify the run-level snapshot id per
+   [backup & rollback](./backup-rollback.md) before any replacement write.
 4. Prepare the replacement skills, project policy and worker consumers. Retain
    the existing twelve-field assignment contract and inline worker safety.
    Do not transiently re-add old root matrices, audience markers, or a
@@ -474,6 +480,13 @@ without invoking an initializer:
 {
   "memory_contract": "native-compact-v1",
   "model_selection_policy": "adaptive-balanced",
+  "agent_topology": "specialists",
+  "review_policy": {
+    "mode": "subagent",
+    "reviewer_id": "reviewer",
+    "additional_approvers": []
+  },
+  "skill_composition": [],
   "native_initialization": {
     "runtime": "<active harness>",
     "source": "existing",
@@ -501,6 +514,28 @@ its body marker `host-delegation`; retain the existing engine `kind: other`.
 See [native initialization](./native-initialization.md) and
 [instruction-memory audit](./instruction-memory-audit.md).
 
+Record the actual `agent_topology` (`specialists | solo`) and review policy
+(`subagent | self | external`, native reviewer ID or null, and any additional
+independent approvers). A missing field in an older manifest means inspect the
+live system; it does not authorize conversion. A partial migration retains its
+actual topology rather than prematurely recording the target.
+
+When capabilities are composed, each `skill_composition` item records:
+
+- `sources`: original runtime/path, SHA-256, responsibility/section and native
+  skill references, so unique content can be traced after retirement.
+- `decisions`: `reuse`, `reference`, `merge`, and/or `extract`.
+- `destinations`: native runtime, exact skill ID/path and content ownership.
+- `dependencies`: resolved IDs/paths, required/optional status, conditions and
+  ordering; external origins remain explicit.
+- `evidence`: coverage/verification result and approved backup run ID.
+
+Keep body text in skills or verified backups, not the manifest. Reused external
+skills remain dependencies; do not stamp or adopt them as generated artifacts.
+Preserve previously managed artifact entries and their actual stamps/checksums.
+The doctor checks memory and artifact reconciliation; the migration procedure
+also verifies topology, coverage and runtime dependency behavior.
+
 ## Version Stamp Detection & Migration Playbook
 
 Every artifact emitted by this plugin carries a `generated-by` stamp so
@@ -526,9 +561,10 @@ emission timestamp).
 
 ### Central manifest `.agents-system-setup/generated.json`
 
-Authoritative source-of-truth in case per-file stamps are accidentally edited
-away. Written atomically after every `init` / `update` / `improve` / `replicate`
-run.
+Authoritative generated-artifact inventory in case per-file stamps are
+accidentally edited away. Publish atomically after successful `init`, `update`,
+`improve`, `upgrade`, `replicate`, or `migrate` integration. Rollback restores
+its saved bytes instead of publishing a current-version inventory.
 
 ```json
 {
@@ -536,7 +572,7 @@ run.
   "plugin_version": "1.4.0",
   "last_run": {
     "at": "2026-05-26T08:00:00Z",
-    "mode": "init|update|improve|replicate",
+    "mode": "init|update|improve|upgrade|replicate|migrate",
     "host_runtime": "copilot-cli|claude-code|opencode|codex-cli|gemini-cli"
   },
   "artifacts": [

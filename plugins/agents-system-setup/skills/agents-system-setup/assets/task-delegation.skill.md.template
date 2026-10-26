@@ -40,6 +40,12 @@ description: 'Use when the host CLI session decides whether to execute work dire
 
 ## 1. Choose Direct or Delegated Execution
 
+Read the selected topology in `AGENTS.md` first. In `solo` (monolithic) mode,
+perform working roles directly using matching skills and their dependencies.
+Delegate only to the configured read-only reviewer; built-in workers, teams,
+parallel child sessions, and the specialist choices below are not enabled.
+Direct work needs no delegation packet. Required independent gates still apply.
+
 Prefer direct host execution when the work is a small lookup, a short
 single-surface edit, a tightly coupled investigation, or cannot be separated
 without duplicating context. Delegation is appropriate when at least one

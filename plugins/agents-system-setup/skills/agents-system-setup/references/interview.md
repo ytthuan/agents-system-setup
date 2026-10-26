@@ -29,7 +29,12 @@ artifacts, the captured `headline_purpose`, recommended mode, and
 inferred target runtime(s).
 
 - Q: "I detected `<footprint>`. How should I proceed?"
-- Choices: `["Improve current setup (Recommended when artifacts exist)", "Init new setup", "Replicate / sync to another runtime", "Update managed blocks", "Cancel"]`
+- Choices: `["Improve current setup (Recommended when artifacts exist)", "Init new setup", "Replicate / sync to another runtime", "Update managed blocks", "Migrate topology (subagents or mono + skills)", "Rollback to a backup snapshot (when backups exist)", "Cancel"]`
+- Offer migration when a source setup exists; use [topology conversion](./topology-conversion.md).
+  Explicit `migrate`/`rollback` requests bypass this generic mode interview.
+- Offer the rollback choice only when `.agents-system-setup/backups.jsonl` or
+  `.agents-system-setup/backups/` exists; otherwise omit it (never offer a
+  restore point that does not exist).
 - Then ask target runtimes only when the mode needs them:
   `["Copilot CLI only (Recommended for GitHub-centric teams)", "Claude Code only", "OpenCode only", "OpenAI Codex only (CLI + App artifacts)", "Gemini CLI only", "Copilot CLI + Claude Code", "All supported runtimes (Copilot + Claude Code + OpenCode + Codex + Gemini)"]`
 
@@ -52,7 +57,7 @@ inferred target runtime(s).
   flow.
 - Re-prompt only when detection or the initial answer is ambiguous, using the
   full Q0b choice set:
-  `["Improve current setup (Recommended when artifacts exist)", "Init new setup", "Replicate / sync to another runtime", "Update managed blocks", "Cancel"]`
+  `["Improve current setup (Recommended when artifacts exist)", "Init new setup", "Replicate / sync to another runtime", "Update managed blocks", "Migrate topology (subagents or mono + skills)", "Rollback to a backup snapshot (when backups exist)", "Cancel"]`
 - Never offer overwrite. If the user wants a fresh setup near existing
   artifacts, treat it as additive init or route through update/improve.
 
@@ -93,13 +98,52 @@ path for non-gated questions:
 - Choices: `["Project files, git-tracked (Recommended for teams)", "Project files, local-only / untracked (Recommended for personal setup)", "Personal/global outside this repo"]`
 - Record as `artifact_tracking`: `project-tracked`, `project-local`, or `personal-global`.
 
-## 9. Subagent Topology
-- Show justified responsibilities/owners via [topology.md](./topology.md).
+## 9. Execution Topology & Roster
+
+### Topology choice
+
+Ask this before the roster question; it decides how all later work executes.
+
+- Q: "How should work be executed in this system?"
+- Choices: `["Host + specialist subagents", "Single agent + on-demand skills (solo)"]`
+- Record as `agent_topology`: `specialists | solo`.
+- Put the signal-based recommendation first and label it `(Recommended)`;
+  preserve an explicit `migrate monolithic` choice rather than asking again.
+- Recommendation follows the signal table in
+  [topology.md › Solo topology](./topology.md#solo-topology-single-agent--skills):
+  solo is the better default for docs-only, personal, small/low-risk, or
+  single-concern projects; specialists for Build Gate `strict`, dedicated
+  security teams, monorepos, regulated data, or sustained parallel streams.
+  `security_team_depth` `dedicated|expanded` requires `specialists`.
+- Disclose the solo tradeoffs from that section **before** recording the
+  choice: tool discipline becomes advisory prose (not a runtime allowlist),
+  review is same-context self-review unless the reviewer exception is kept,
+  execution is sequential, and solo context accumulates. The user must choose
+  with those losses visible, not discover them later.
+- **Existing specialists system:** choosing `solo` here routes to the
+  [topology conversion](./topology-conversion.md) procedure and its conversion
+  prompt — never a silent rebuild. Natural-language triggers ("convert my
+  agents to a single agent with skills", "mono agent", "flatten to skills")
+  enter the same procedure directly.
+
+### Roster (specialists) or solo-role skills (solo)
+
+- `specialists`: show justified responsibilities/owners via [topology.md](./topology.md).
   Zero specialists is valid; do not create a minimum roster or require fan-out.
   Explain a separate worker only when specialization, context isolation, or
   required independence warrants it.
-- Q: "Suggested subagents: <list>. Accept, add, or remove?"
-- Freeform with the suggested list pre-printed.
+  - Q: "Suggested subagents: <list>. Accept, add, or remove?"
+  - Freeform with the suggested list pre-printed.
+- `solo`: present the capability mapping from [skill composition](./skill-composition.md),
+  reusing, referencing, merging, or extracting skills, plus the review decision:
+  - Software-dev (including Build Gate `skipped`): keep the single read-only
+    `reviewer` subagent exception; show it in the list.
+  - Non-dev without required independence: no reviewer is needed; record
+    self-review as `not independent` in the Security & Audit Matrix.
+  - Resolve multiple-reviewer gates and dedicated security-team constraints
+    before approval. Keeping extra working subagents remains `specialists`.
+  - Q: "Suggested solo skills: <list> (roles the host loads on trigger). Accept, add, or remove?"
+  - Freeform with the converted list pre-printed.
 
 ## 9a. Security team depth (only when requested or selected)
 
@@ -198,6 +242,8 @@ an optional add-on — never as a required step.
 - Default: `Standard profile` / `Standard least-privilege by role`. Persist as `copilot_tools_profile`. The detailed mapping lives in the plan and [Copilot CLI Standard Tool Profiles](./platforms.md#copilot-cli-standard-tool-profiles): orchestrator/edit-capable agents get `[vscode, execute, read, agent, edit, search, todo]`; reviewers/auditors get `[read, search]`; runner/research profiles stay narrow.
 
 ### 9e. Advisory supervision of child sessions (signal-gated, off by default)
+
+Solo topology skips this question and keeps `advisory_supervision = off`.
 
 **Default: skip this question entirely.** Record `advisory_supervision = off`.
 Cross-session supervision only exists in the GitHub Copilot app, and the standard

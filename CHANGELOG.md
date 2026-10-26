@@ -2,6 +2,51 @@
 
 All notable changes to this plugin are documented here. Format: [Keep a Changelog](https://keepachangelog.com).
 
+## [1.15.0] - 2026-10-26
+
+### Added
+
+- **Two topologies:** specialist subagents or a monolithic/solo working host
+  with on-demand skills. Software-dev keeps one read-only reviewer; solo does
+  not enable working-agent fan-out or agent teams.
+- **`migrate monolithic`**, aliases `migrate mono`/`migrate solo`/`update solo`, reverse
+  `migrate specialists`, and read-only `--dry-run`. The prompted workflow
+  inventories definitions and skill lists, previews coverage and diffs, gets
+  approval, verifies a backup, creates/reuses skills, updates consumers, and
+  retires agents only after replacement checks. Repeated migration is a no-op.
+- **Skill composition:** reuse existing skills, reference shared dependencies,
+  merge compatible procedures, or extract missing knowledge. Preserve custom
+  bodies, dependency conditions, scripts/assets, and unique rules; resolve
+  conflicts, missing dependencies, cycles, and skills that still launch working
+  agents before removal. Preserve unconditional source skill prerequisites.
+- **Backup/rollback procedure:** verified run-level preimages, observed
+  postimages for detecting later edits, reversible rollback, partial-restore
+  reporting, and original-version preservation. Backup history is retained.
+- **OpenCode command wrapper:** `/agents-system-setup migrate monolithic`,
+  installed by both installers. Previous skill/command installs are backed up
+  outside discovery paths; failed replacements restore prior files.
+- Validation for migration policy, rendered solo memory/skills, and installer
+  backup/rollback behavior.
+
+### Changed
+
+- `SKILL.md` size is advisory, following Agent Skills guidance; exceeding
+  500 lines no longer fails validation. Report lines and UTF-8 bytes instead
+  of encouraging compressed prose. The root `AGENTS.md` budget is separate.
+- Render one topology stance and keep skills in the Skills index, workers in
+  the roster. Required independent gates remain required; extra working agents
+  keep a partial conversion classified as specialists.
+- Save selected topology, review policy, and capability-composition provenance
+  in the generated manifest without claiming ownership of referenced skills.
+- Explicit migration and rollback bypass setup initialization/self-update;
+  rollback never regenerates restored state through the current-version pipeline.
+
+### Removed
+
+- Separate `replication.jsonl` generation. Provenance stays with artifacts;
+  run history uses the backup index. Existing legacy ledgers are retained until
+  archival/deletion is approved.
+
 ## [1.14.0] - 2026-09-08
 
 ### Added

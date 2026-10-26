@@ -241,6 +241,126 @@ unless the plan explicitly grants narrow owned paths and approvals.
 
 If the user requests 50, support it — generate one agent file per concern they list.
 
+## Solo Topology (single agent + skills)
+
+`agent_topology = solo` (also called monolithic/mono) executes working roles in
+the host CLI session, with the reviewer exception below. Reuse existing skills,
+reference shared skills, merge compatible procedures, or extract missing
+knowledge into a `skill-kind: solo-role` skill. Apply [skill composition](./skill-composition.md);
+there is no one-agent-to-one-skill requirement.
+`agent_topology = specialists` (default) keeps the host + specialist-subagent
+model. Both share the same governance, Directory Architecture, Quality Gates,
+and memory budgets; solo changes **who executes**, not what is mandatory.
+
+The historical failure this plugin guarded against — a single agent collapsing
+into a god-prompt — was caused by **resident** knowledge, not by agent count.
+On-demand role skills keep discovery cheap (~100 tokens) and bodies unloaded,
+so a solo system with lean root memory is a valid topology. What solo cannot
+reproduce is listed below and must be disclosed at generation (interview § 9).
+
+### What converts, what cannot
+
+| Subagent property | Solo equivalent | Guarantee |
+|---|---|---|
+| Knowledge, procedure, craft | Reused/composed skill body loaded on trigger | Preserved. |
+| Tool restriction (`tools:` / `permission:` frontmatter) | Advisory prose inside the skill — **not** a runtime allowlist | Downgraded; disclose. Security-sensitive writes keep their approval gates. |
+| Independent review (separate execution context) | The reviewer exception below, or same-context self-review recorded as `not independent` where permitted | Separate reviewer; fresh context does not guarantee freedom from bias. |
+| Separate context per task | None — solo context accumulates; prefer a fresh session for a new large task | Downgraded; disclose. |
+| Parallel waves | Sequential host execution; the reviewer exception runs alone | Downgraded; disclose. |
+
+### Reviewer exception (software-dev default)
+
+When Phase 1.7 classifies `software-dev`, solo keeps exactly **one** subagent:
+a read-only `reviewer`, even when the Build Gate is skipped. Reuse a suitable
+existing reviewer rather than duplicating it. Apply native read-only restrictions
+(Standard Tool Profile `read-only`; `sandbox_mode = "read-only"` on Codex).
+`reviewer` names the logical role; keep a suitable existing agent's native ID
+and substitute it in the root stance, roster, gates, and permission rules.
+Required independent review stays independent (hard rules #3/#15/#35/#40).
+Non-software-dev projects without an independent gate may omit the exception;
+the Security & Audit Matrix then records
+`review: self (same context) — not independent`, and no output, gate, or
+report may claim independence for it. `security_team_depth`
+`dedicated|expanded` requires `specialists`, never solo.
+
+If a gate requires multiple independent approvals (for example Strict XL),
+name external reviewers for the extra approvals or keep `specialists`.
+Do not count two reviews by the same reviewer as two independent approvers,
+silently weaken a gate, or create additional solo workers.
+
+### Topology recommendation signals
+
+| Signal | Recommended `agent_topology` |
+|---|---|
+| Docs-only, content, research, or no source code | `solo` |
+| Personal / single-maintainer setup, one runtime | `solo` |
+| Small CLI or library, Build Gate `light` | `solo` |
+| Software-dev, Build Gate `standard` | `solo` + reviewer exception, or `specialists` |
+| Build Gate `strict` | `specialists`; solo needs external owners for any additional independent approvals |
+| `security_team_depth` = `dedicated` or `expanded`; PII, payments, health, credentials, or regulated data | `specialists` |
+| Monorepo, sustained parallel streams, or 3+ disjoint ownership zones | `specialists` |
+
+### Solo conversion rules
+
+1. Use [skill composition](./skill-composition.md): reuse, reference, merge, or
+   extract. Preserve each source responsibility without duplicating shared
+   skills. One-shot procedures that are already skills stay reusable skills.
+2. Owned paths stay in the Directory Architecture with unchanged edit rules;
+   the owner label becomes `host (skill: <name>)` instead of `@<name>`.
+3. Gate triggers, owners, approvals, and missing-evidence blocking stay in
+   `AGENTS.md` — never inside a `solo-role` skill (same placement rule as
+   `domain` skills; a gate nobody loads is a gate nobody runs).
+4. `requirements-triage` and `content-quality` statuses are `merged` in solo
+   (Phases 1.11/1.12); separate intake workers are a specialists-only option.
+5. Build Gate responsibilities become host-owned + reused/composed skills
+   (`build-runner`, `change-bug-hunter` knowledge converts;
+   `change-validator` evidence duties fold into the host). Required
+   independent review routes to the reviewer exception.
+6. Topology conversion is **per-item opt-in** through the reviewed mapping's plan gate,
+   and requires a pre-conversion run-level snapshot per
+   [backup & rollback](./backup-rollback.md) so `rollback` mode restores the
+   prior topology wholesale. `improve` / `upgrade` never convert specialists
+   unasked; they may only propose it. The full conversion prompt and
+   procedure live in [topology conversion](./topology-conversion.md).
+
+### Solo sizing rule
+
+Prefer a small set of cohesive, trigger-specific workflows. Skill count alone
+does not determine topology; load only relevant dependencies, avoiding duplicate
+bodies and deep chains. Preserve the user's topology until they choose to change it.
+
+### AGENTS.md rendering in solo
+
+Substitute `{{TOPOLOGY_BLOCK}}` in [AGENTS.md.template](../assets/AGENTS.md.template)
+with exactly one execution stance; do not append solo to a specialists paragraph.
+For solo:
+
+```markdown
+Topology: solo (monolithic + skills). Perform working roles directly; load
+matching skills and their required dependencies on demand. Delegate only to
+the read-only `@reviewer` for independent review. Do not launch other workers,
+built-in agents, agent teams, or parallel child sessions. Skill instructions
+do not isolate permissions, and loaded bodies accumulate in this context.
+```
+
+For permitted zero-worker non-dev setups, replace the reviewer sentence with
+`Do not delegate; review is self-review in the same context, not independent.`
+When reusing a differently named reviewer, replace `@reviewer` with its native ID.
+For `specialists`:
+
+```markdown
+Topology: specialists. Act directly when ownership and gates allow. Delegate
+for specialist context, required independent review, or substantial separable
+work; zero specialists is valid. Keep writers' paths disjoint and integrate
+every dispatched result.
+```
+
+The root roster contains only actual execution roles (host and any workers).
+The Skills index lists workflows once, with triggers and native load paths.
+Persist `agent_topology` and review policy in `generated.json`; older manifests lacking it need
+inspection, not an assumed conversion. Solo clears `HOST_BUILTINS_ROUTING_BLOCK`
+and disables advisory child-session supervision.
+
 ## Directory Architecture Generation
 
 For every chosen subagent, derive a row in AGENTS.md › Directory Architecture:
@@ -251,7 +371,9 @@ For every chosen subagent, derive a row in AGENTS.md › Directory Architecture:
 
 Add applicable control rows regardless of specialist count. `@orchestrator` is
 the host CLI session reading `AGENTS.md`; other owner labels may name a
-specialist or a logical responsibility merged into the host/reviewer.
+specialist or a logical responsibility merged into the host/reviewer. In
+`agent_topology = solo`, role-owned rows label the host instead:
+`host (skill: <name>)`; the reviewer exception keeps its `@reviewer` label.
 
 | Path glob | Purpose | Owner | Edit rule |
 |---|---|---|---|

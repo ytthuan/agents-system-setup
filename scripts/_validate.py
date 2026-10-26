@@ -918,9 +918,11 @@ LEDGER_FORBIDDEN_DIRS = (
 
 
 def check_replication_ledger() -> None:
-    """The replication ledger and any operational log MUST NOT live inside an
-    agents/ directory or use a `.md` extension — runtime loaders walk those
-    trees by extension and will treat the file as a malformed agent.
+    """Replication provenance is marker-based (in-file `replicated-from` with
+    source + sha256 + ts); run history lives in `backups.jsonl`. There is no
+    sidecar replication ledger. Any stray replication-shaped log MUST NOT live
+    inside an agents/ directory or use a `.md` extension — runtime loaders walk
+    those trees by extension and will treat the file as a malformed agent.
     """
     patterns = ("*replication*", "*replicat*.log", "*replicat*.md", "*replicat*.jsonl")
     for path in REPO.rglob("*"):
@@ -932,11 +934,41 @@ def check_replication_ledger() -> None:
         rel = path.relative_to(REPO).as_posix()
         for forbidden in LEDGER_FORBIDDEN_DIRS:
             if forbidden in rel:
-                err(f"{rel}: replication ledger/log must not live inside `{forbidden}` — runtime will misread it as an agent. Move to `.agents-system-setup/replication.jsonl`.")
+                err(f"{rel}: replication log must not live inside `{forbidden}` — runtime will misread it as an agent. Operational logs belong under `.agents-system-setup/` as non-`.md`; replication provenance lives in each file's `replicated-from` marker.")
         if is_gemini_extension_agent_path(path):
-            err(f"{rel}: replication ledger/log must not live inside a Gemini extension `agents/` directory. Move to `.agents-system-setup/replication.jsonl`.")
+            err(f"{rel}: replication log must not live inside a Gemini extension `agents/` directory. Operational logs belong under `.agents-system-setup/` as non-`.md`; provenance lives in each file's `replicated-from` marker.")
         if path.suffix == ".md" and "/agents/" in f"/{rel}":
             err(f"{rel}: replication artifact with `.md` extension inside an agents/ tree will be parsed as a malformed agent.")
+    # Regression guard: the sidecar replication ledger was removed (write-only
+    # state, no reader). SKILL.md and replication.md must not reintroduce it;
+    # misplaced-artifacts-migration.md may mention it only as legacy upgrade
+    # input, and CHANGELOG.md history is exempt by design.
+    require_not_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            ".agents-system-setup/replication.jsonl",
+            "Write replication ledger",
+        ),
+    )
+    require_not_contains(
+        SKILL_ROOT / "references" / "replication.md",
+        (".agents-system-setup/replication.jsonl",),
+    )
+    require_not_contains(
+        SKILL_ROOT / "references" / "output-contract.md",
+        ("✅ Replication ledger:", ".agents-system-setup/replication.jsonl"),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "replication.md",
+        (
+            "replication ledger exists",
+            "sha256:<source-artifact-hash>",
+            "backups.jsonl` run/events **are** the run record",
+            "`approvals` (mcp decision + servers)",
+            "`artifact_tracking`",
+            "`overwrites`",
+        ),
+    )
 
 
 # ---------- 11b: operational state directory artifact-free ----------
@@ -2851,13 +2883,20 @@ def check_context_optimization() -> None:
 
     skill_path = SKILL_ROOT / "SKILL.md"
     try:
-        line_count = len(skill_path.read_text(encoding="utf-8").splitlines())
+        skill_text = skill_path.read_text(encoding="utf-8")
     except OSError:
         return
-    if line_count > 500:
-        err(f"{skill_path.relative_to(REPO).as_posix()}: SKILL.md exceeds hard 500-line limit ({line_count})")
-    elif line_count > 300:
-        warn(f"{skill_path.relative_to(REPO).as_posix()}: SKILL.md is {line_count} lines; target is about 250. Consider moving more detail to references.")
+    line_count = len(skill_text.splitlines())
+    byte_count = len(skill_text.encode("utf-8"))
+    # Agent Skills recommends <500 lines; it is not a runtime validity limit.
+    # The byte threshold is a local advisory, not a token estimate. It also
+    # catches prose compressed into giant lines to satisfy a line counter.
+    if line_count > 500 or byte_count > 32768:
+        warn(
+            f"{skill_path.relative_to(REPO).as_posix()}: activated skill is "
+            f"{line_count} lines / {byte_count} UTF-8 bytes. Size is advisory, "
+            "not a hard 500-line limit; consider on-demand references."
+        )
 
 
 def _check_codex_developer_instructions_budget(path: Path) -> None:
@@ -3653,11 +3692,11 @@ def check_runtime_invocation_policy() -> None:
             continue
         rel = path.relative_to(REPO).as_posix()
         for line_no, line in enumerate(lines, 1):
-            if "@agents-system-setup" in line:
+            if "@agents-system-setup" in line and "OpenCode" not in line:
                 err(
                     f"{rel}:{line_no}: stale Codex invocation example "
                     "`@agents-system-setup`; use `$agents-system-setup` "
-                    "or `/skills` for bundled skills"
+                    "or `/skills` for bundled skills (OpenCode V2 @skill examples must be labeled)"
                 )
             if "@<plugin-name>" in line:
                 negative_context = re.search(
@@ -4568,9 +4607,12 @@ def check_cross_session_orchestration_policy() -> None:
         SKILL_ROOT / "assets" / "AGENTS.md.template",
         (
             "## Orchestration Operating Model",
-            "Delegate for specialist context",
-            "zero specialists is valid",
+            "{{TOPOLOGY_BLOCK}}",
         ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "topology.md",
+        ("Topology: specialists.", "zero specialists is valid"),
     )
     require_contains(
         SKILL_ROOT / "SKILL.md",
@@ -4708,6 +4750,356 @@ def check_domain_skill_policy() -> None:
             "project-specific, load-on-demand, stable trigger",
         ),
     )
+
+
+def check_solo_topology_policy() -> None:
+    """Guard the dual execution topology (specialists vs solo).
+
+    Migration preserves capabilities via reuse, references, merges, or new
+    workflows. Solo keeps the software-dev reviewer and one execution stance.
+    """
+    require_contains(
+        SKILL_ROOT / "references" / "interview.md",
+        (
+            "`agent_topology`: `specialists | solo`",
+            "Single agent + on-demand skills (solo)",
+            "Suggested solo skills: <list>",
+            "Disclose the solo tradeoffs",
+            "`reviewer` subagent exception",
+            "[topology conversion](./topology-conversion.md)",
+            "mono agent",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "topology.md",
+        (
+            "## Solo Topology (single agent + skills)",
+            "### What converts, what cannot",
+            "### Reviewer exception (software-dev default)",
+            "### Topology recommendation signals",
+            "### Solo conversion rules",
+            "### Solo sizing rule",
+            "`skill-kind: solo-role` skill",
+            "`host (skill: <name>)`",
+            "not independent",
+            "requires `specialists`, never solo",
+            "never convert specialists",
+            "they may only propose it",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "topology-conversion.md",
+        (
+            "# Topology Conversion (specialists ⇄ solo)",
+            "## Conversion prompt (ask_user, shown before any write)",
+            "## Procedure (specialists → solo)",
+            "## Procedure (solo → specialists)",
+            "migrate monolithic --dry-run",
+            "already migrated",
+            "**Snapshot first**",
+            "**Compose capabilities**",
+            "**Emit skills first**",
+            "Apply migration (Recommended)",
+            "Edit mapping",
+            "Multi-file changes are not globally atomic",
+            "never label it `solo`",
+            "resident god-prompt",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "solo-role.skill.md.template",
+        (
+            "<!-- agents-system-setup:skill-kind: solo-role -->",
+            "advisory prose, NOT a runtime allowlist",
+            "Solo role loaded: {{SKILL_NAME}}",
+            "solo self-review is same-context and is recorded as not independent",
+            "stay in AGENTS.md, never here",
+            "{{SKILL_DEPENDENCY_ROWS}}",
+            "Missing/denied required loads block",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "AGENTS.md.template",
+        ("{{TOPOLOGY_BLOCK}}",),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "skill-format.md",
+        (
+            "| `solo-role` | project content; plugin scaffold |",
+            "advisory prose, never a runtime allowlist",
+            "not a universal runtime validity limit",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "context-optimization.md",
+        (
+            "A specialist's role knowledge, in `agent_topology = solo`",
+            "Solo role skills (`agent_topology = solo`)",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "Solo topology is honest about its guarantees",
+            "`agent_topology: specialists | solo`",
+            "recorded as `not independent` and never claimed as independent",
+            "keeps exactly one read-only `reviewer` subagent exception",
+            "solo uses the existing `merged` status",
+            "**Solo role skills** — in `agent_topology = solo`",
+            "Converting an existing system runs the prompt + procedure in [topology conversion](./references/topology-conversion.md)",
+            "Existing specialists systems convert via the [topology conversion](./references/topology-conversion.md) prompt + procedure",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "misplaced-artifacts-migration.md",
+        (
+            "| Topology conversion |",
+            "**Never automatic.**",
+        ),
+    )
+    # README must present both options to users choosing an install.
+    require_contains(
+        REPO / "README.md",
+        (
+            "## Topology: specialists or solo + skills",
+            "**Single agent + on-demand skills (solo)**",
+            "not a runtime allowlist",
+            "**Converting an existing system**",
+            "migrate monolithic",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "skill-composition.md",
+        (
+            "**Reuse** (first choice)", "**Reference**", "**Merge**", "**Extract**",
+            "same name but different bodies/providers are a collision",
+            "Detect self-reference and cycles before writes",
+            "Shared or externally installed skills remain available",
+            "source-agent `skills:` metadata",
+            "An unconditional native preload stays required",
+            "context: fork",
+            "does not disable its fork behavior",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "replication.md",
+        ("skill_refs:", "dependencies:", "composition: reuse | reference | merge | extract", "agent_topology: specialists | solo"),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "misplaced-artifacts-migration.md",
+        ('"agent_topology":', '"review_policy":', '"skill_composition":', "Reused external\nskills remain dependencies"),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "task-delegation.skill.md.template",
+        ("In `solo` (monolithic) mode", "Delegate only to the configured read-only reviewer"),
+    )
+    # Agent-only configuration must not leak into portable skill frontmatter.
+    require_not_contains(
+        SKILL_ROOT / "assets" / "solo-role.skill.md.template",
+        (
+            "tools: [",
+            "tool_allowlist",
+            "permission:",
+        ),
+    )
+
+
+def check_backup_rollback_policy() -> None:
+    """Guard the run-level backup + rollback contract.
+
+    `.bak` files answer "what did this one file look like"; they cannot answer
+    "undo the upgrade/replicate/topology-conversion run as a set". Every write
+    run therefore records a run-level snapshot (content-addressed blobs under
+    `.agents-system-setup/backups/`, indexed by `backups.jsonl` run/events)
+    before the first approved write, and `rollback` mode restores it with
+    integrity checks, a fresher-work guard, a safety snapshot of current
+    state, and the MCP gate re-rendered for config restores. These guards keep
+    the snapshot policy, the rollback procedure, the mode wiring, and the
+    honest-disclosure rules in sync across skill, references, templates, and
+    README.
+    """
+    require_contains(
+        SKILL_ROOT / "references" / "backup-rollback.md",
+        (
+            "# Backup & Rollback",
+            "## Snapshot policy (when, what, where)",
+            "## Rollback procedure (the `rollback` mode)",
+            "## Rollback to an older plugin version",
+            "Snapshots complement git",
+            "**content-addressed** blobs at `files/<sha256>`",
+            "`backups.jsonl`",
+            "**Never auto-deleted.**",
+            "never invent snapshots",
+            "silently clobber newer user work",
+            "**Safety snapshot**",
+            "rollback never bypasses the MCP gate",
+            "Rollback restores bytes, not intentions",
+            "installing a pinned release",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "SKILL.md",
+        (
+            "migrate <monolithic|specialists> [--dry-run] | rollback",
+            "restorable approval-gated via `rollback` mode",
+            "`backups/` snapshots + `backups.jsonl`",
+            "Rollback to a backup snapshot (when backups exist)",
+            "### Phase 1.5 — Improve / Upgrade / Replicate / Migrate / Rollback branch",
+            "If the user picked **rollback** → run the [rollback procedure]",
+            "### Phase 5a — Rollback Mode (restore a backup snapshot)",
+            "record the run-level snapshot first per [backup & rollback](./references/backup-rollback.md)",
+            "Snapshots are never auto-deleted.",
+            "never stamp or regenerate it through Phase 7",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "interview.md",
+        (
+            "Rollback to a backup snapshot (when backups exist)",
+            "never offer a",
+            "restore point that does not exist",
+        ),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "output-contract.md",
+        ("✅ Backup: run-id=",),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "local-tracking.md",
+        ("`backups/` snapshots + `backups.jsonl`",),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "misplaced-artifacts-migration.md",
+        ("run-level snapshot id",),
+    )
+    require_contains(
+        SKILL_ROOT / "references" / "topology.md",
+        ("pre-conversion run-level snapshot",),
+    )
+    require_contains(
+        SKILL_ROOT / "assets" / "gitignore.template",
+        ("snapshots + backups.jsonl",),
+    )
+    require_contains(
+        REPO / "README.md",
+        (
+            "| `rollback` |",
+            "## Backups & rollback",
+            "/agents-system-setup rollback",
+            "never auto-deleted",
+        ),
+    )
+    # The snapshot store must not create runtime-shaped subtrees inside the
+    # operational-state directory (hard rule #31) — preimages are hash-named
+    # blobs only, and the reference must say so.
+    require_contains(
+        SKILL_ROOT / "references" / "backup-rollback.md",
+        (
+            "no `agents/`, `skills/`",
+            "**postimages**, not preimages",
+            "Snapshots are **before-state**",
+            "partial rollback",
+            "Backup\n   failure blocks the first target write",
+        ),
+    )
+
+
+def check_opencode_installer_behavior() -> None:
+    """Exercise command installation, upgrade backups, and failed replacement."""
+    runners: list[tuple[str, list[str]]] = []
+    if os.name != "nt" and shutil.which("bash"):
+        runners.append(("bash", ["bash", str(REPO / "scripts/install-opencode.sh")]))
+    if shutil.which("pwsh"):
+        runners.append(("pwsh", ["pwsh", "-NoProfile", "-File", str(REPO / "scripts/install-opencode.ps1")]))
+    wrapper = (SKILL_ROOT / "assets/agents-system-setup.command.md").read_bytes()
+    require_contains(
+        SKILL_ROOT / "assets/agents-system-setup.command.md",
+        ("subagent: false", "$ARGUMENTS", "Load the `agents-system-setup` skill", "migrate monolithic"),
+    )
+    for name, runner in runners:
+        for scope in ("project", "global"):
+            with tempfile.TemporaryDirectory(prefix="agents installer-") as tmp:
+                root = Path(tmp)
+                env = dict(os.environ, XDG_CONFIG_HOME=str(root / "config"))
+                config = root / ".opencode" if scope == "project" else root / "config/opencode"
+                state = root if scope == "project" else config
+                skill = config / "skills/agents-system-setup/SKILL.md"
+                command = config / "commands/agents-system-setup.md"
+                support = skill.parent / "references/custom-note.md"
+
+                def install(
+                    extra_env: dict[str, str] | None = None,
+                    command_prefix: list[str] | None = None,
+                ) -> subprocess.CompletedProcess[str]:
+                    return subprocess.run(
+                        (command_prefix or runner) + [scope], cwd=root, env=extra_env or env,
+                        capture_output=True, text=True, encoding="utf-8", check=False,
+                    )
+
+                first = install()
+                if first.returncode or not skill.is_file() or not command.is_file():
+                    err(f"{name} {scope} installer failed: {first.stdout} {first.stderr}")
+                    continue
+                skill.write_bytes(b"user-customized skill\r\n")
+                command.write_bytes(b"user-customized command\r\n")
+                support.write_bytes(b"user-authored supporting reference\r\n")
+                second = install()
+                backups = state / ".agents-system-setup/installer-backups"
+                saved = [p for p in backups.iterdir() if (p / "skill/SKILL.md").is_file()]
+                if (
+                    second.returncode or len(saved) != 1
+                    or (saved[0] / "skill/SKILL.md").read_bytes() != b"user-customized skill\r\n"
+                    or (saved[0] / "command.md").read_bytes() != b"user-customized command\r\n"
+                    or not (saved[0] / "skill/references/custom-note.md").is_file()
+                    or (saved[0] / "skill/references/custom-note.md").read_bytes() != b"user-authored supporting reference\r\n"
+                    or support.exists()
+                    or command.read_bytes() != wrapper
+                    or skill.read_bytes() != (SKILL_ROOT / "SKILL.md").read_bytes()
+                    or len(list((config / "skills").glob("*/SKILL.md"))) != 1
+                ):
+                    err(f"{name} {scope} installer failed backup/command preservation: {second.stderr}")
+                    continue
+                # Use distinct content so leaving a new install behind cannot
+                # masquerade as a successful restoration of the prior install.
+                skill.write_bytes(b"newer skill edits before failed install\r\n")
+                command.write_bytes(b"newer command edits before failed install\r\n")
+                support.write_bytes(b"newer supporting reference\r\n")
+                before = (skill.read_bytes(), command.read_bytes(), support.read_bytes())
+                if name == "bash":
+                    # Fail the second destination move, after the skill was installed.
+                    tools = root / "fake-tools"
+                    tools.mkdir()
+                    mv = tools / "mv"
+                    real_mv = shutil.which("mv")
+                    mv.write_text(
+                        '#!/bin/sh\ncase "$1" in */new-command.md) exit 17;; esac\n'
+                        f'exec "{real_mv}" "$@"\n', encoding="utf-8",
+                    )
+                    mv.chmod(0o755)
+                    failed = install(dict(env, PATH=str(tools) + os.pathsep + env.get("PATH", "")))
+                else:
+                    driver = root / "fail-install.ps1"
+                    driver.write_text(
+                        "param([string]$Installer, [string]$Scope)\n"
+                        "$ErrorActionPreference = 'Stop'\n"
+                        "function Move-Item {\n"
+                        "    [CmdletBinding()]\n"
+                        "    param([string]$LiteralPath, [string]$Destination)\n"
+                        "    if ((Split-Path $LiteralPath -Leaf) -eq 'new-command.md') {\n"
+                        "        throw 'Injected command replacement failure'\n"
+                        "    }\n"
+                        "    Microsoft.PowerShell.Management\\Move-Item -LiteralPath $LiteralPath -Destination $Destination\n"
+                        "}\n"
+                        "& $Installer -Scope $Scope\n",
+                        encoding="utf-8",
+                    )
+                    failed = install(command_prefix=[
+                        runner[0], "-NoProfile", "-File", str(driver),
+                        str(REPO / "scripts/install-opencode.ps1"),
+                    ])
+                after = tuple(p.read_bytes() if p.is_file() else None for p in (skill, command, support))
+                if failed.returncode == 0 or after != before:
+                    err(f"{name} {scope} installer did not restore prior files after failure: {failed.stderr}")
 
 
 def check_tool_catalog_json_schema() -> None:
@@ -5155,7 +5547,7 @@ def _doctor_fixture_test_memory_budget(doctor: dict[str, Any], root: Path) -> No
 def _doctor_fixture_test_generated_relationships(
     doctor: dict[str, Any], parent: Path, rendered_engine: str
 ) -> None:
-    skills = (
+    base_skills = (
         "task-delegation", "agents-doctor", "tool-catalog-audit",
         "code-quality", "code-change-build-gate",
     )
@@ -5201,16 +5593,52 @@ def _doctor_fixture_test_generated_relationships(
         "E2E_OWNER": "human reviewer",
         "CHANGE_VALIDATOR_OWNER": "@orchestrator",
     }
+    topology_text = (SKILL_ROOT / "references" / "topology.md").read_text(encoding="utf-8")
+    stances = {
+        match.group(2): match.group(1).strip()
+        for match in re.finditer(
+            r"```markdown\n(Topology: (solo|specialists)[^\n]*\n.*?)\n```",
+            topology_text, re.DOTALL,
+        )
+    }
     cases = [
-        (profile, specialists)
+        (profile, topology, specialists)
         for profile in ("Compact", "Balanced", "Full")
-        for specialists in ((), ("reviewer",), ("builder", "security-auditor", "tester"))
+        for topology, specialists in (
+            ("specialists", ()), ("specialists", ("reviewer",)),
+            ("specialists", ("builder", "security-auditor", "tester")),
+            ("solo", ("reviewer",)),
+        )
     ]
-    for profile, specialists in cases:
-        label = f"profile-{profile.casefold()}-{len(specialists)}-specialists"
+    for profile, topology, specialists in cases:
+        skills = base_skills + (("api-work",) if topology == "solo" else ())
+        label = f"profile-{profile.casefold()}-{topology}-{len(specialists)}-workers"
         root = _doctor_fixture_new_root(parent, label)
         values = dict(base_values)
         values["CONTEXT_PROFILE"] = profile
+        values["TOPOLOGY_BLOCK"] = stances[topology]
+        if topology == "solo":
+            values.update({
+                "DIRECTORY_ARCHITECTURE_ROWS": "| src/** | API | host (skill: api-work) | owned |",
+                "SKILL_NAME": "api-work",
+                "WHAT_AND_WHEN": "Use when changing API behavior",
+                "TRIGGERS": "API changes",
+                "ANTI_TRIGGERS": "unrelated docs",
+                "ROLE_DISPLAY_NAME": "API Work",
+                "USE_CASE_1": "Implement API behavior.",
+                "USE_CASE_2": "Review API compatibility.",
+                "RESPONSIBILITY": "Preserve API behavior and contracts",
+                "OWNED_PATHS": "src/**",
+                "TOOL_DISCIPLINE": "Edit owned source only",
+                "SKILL_DEPENDENCY_ROWS": "| code-quality | Before code edits | Required | ../code-quality/SKILL.md |",
+                "RULE_1": "Preserve existing public contracts.",
+                "RULE_2": "Record test evidence.",
+                "STEP_1": "Load code-quality before editing.",
+                "STEP_2": "Implement the scoped API change.",
+                "STEP_3": "Run the root test command and request independent review.",
+                "ANTI_1": "Silently changing a public contract.",
+                "OUTPUT_FORMAT": "Report paths, tests, and unresolved questions.",
+            })
         values["AGENT_ROSTER_ROWS"] = "\n".join(
             ["| @orchestrator | Host delivery | Direct work |"]
             + [f"| @{name} | Scoped {name} work | Assigned by host |" for name in specialists]
@@ -5229,7 +5657,8 @@ def _doctor_fixture_test_generated_relationships(
         artifacts.append((policy, "other"))
         for name in skills:
             relative = f".github/skills/{name}/SKILL.md"
-            _doctor_fixture_write(root, relative, _doctor_fixture_render_asset(f"{name}.skill.md.template", values))
+            asset = "solo-role.skill.md.template" if name == "api-work" else f"{name}.skill.md.template"
+            _doctor_fixture_write(root, relative, _doctor_fixture_render_asset(asset, values))
             artifacts.append((relative, "skill"))
         for name in specialists:
             relative = f".github/agents/{name}.agent.md"
@@ -6258,6 +6687,9 @@ def main() -> int:
     check_cross_session_orchestration_policy()
     check_advisory_supervision_policy()
     check_domain_skill_policy()
+    check_solo_topology_policy()
+    check_backup_rollback_policy()
+    check_opencode_installer_behavior()
     check_tool_catalog_json_schema()
     check_tool_catalog_reference()
     check_tool_catalog_audit_skill_template()

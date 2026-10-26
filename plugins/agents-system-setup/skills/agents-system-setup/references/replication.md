@@ -48,6 +48,15 @@ tools:
   webfetch:true|false
   task:    true|false                 # subagent-spawn capability
 mcp_refs: [<server-name>, ...]        # references to MCPServerIR.name
+skill_refs:                          # collect native lists AND body instructions
+  - id: <exact native load ID>
+    origin: <runtime/plugin/project>
+    path: <resolved path|null>
+    required: true
+    when: <task condition>
+    after: []                         # prerequisite native skill IDs, if ordered
+    source_location: <frontmatter field or body section>
+    status: resolved | missing | ambiguous | denied
 plugin_component_refs:                # optional plugin-bundled components
   skills: [<skill-name>, ...]
   apps: [<app-id>, ...]
@@ -82,15 +91,23 @@ name: <kebab-case>
 description: "Use when ..."
 argument_hint: "<...>"
 kind: <source skill-kind>              # task-delegation uses host-delegation
-body_owner: plugin | user              # domain skill bodies stay user-owned
+body_owner: plugin | user              # domain/imported solo-role content stays user-owned
 locations: {<runtime>: <native-path>}   # inspect overlapping discovery before emit
 discovery_status: unobserved           # target discovery/load evidence is not inherited
+dependencies: []                      # same resolved records as AgentIR.skill_refs
+source_refs: []                       # source paths/sections; preserve custom content
+composition: reuse | reference | merge | extract
 body: |                               # full markdown body
   ...
 assets:                               # optional bundled files
   - { path: "scripts/foo.sh", role: script }
   - { path: "templates/x.md", role: template }
 ```
+
+Skill dependency fields are in-memory IR, not portable runtime frontmatter.
+Render them as a body table per [skill composition](./skill-composition.md).
+Migration maps every original skill reference to a retained dependency or an
+approved merged destination; report unresolved references rather than dropping them.
 
 ### 1c. MCPServerIR
 ```yaml
@@ -111,6 +128,11 @@ memory_contract: native-compact-v1
 budget: {max_lines: 150, max_utf8_bytes: 12288}
 profile: balanced | compact | full
 model_selection_policy: adaptive-balanced | inherit | pinned
+agent_topology: specialists | solo     # preserve selected execution topology
+review_policy:
+  mode: subagent | self | external
+  reviewer_id: <native ID|null>
+  additional_approvers: []             # preserve required independent gate owners
 native_initialization:
   runtime: <active harness>
   source: native | existing | user-supplied | fallback
@@ -228,27 +250,42 @@ Triggered when the user picks **mode: `replicate`** in Phase 1, or when Phase 1 
                         top-level `x-agents-system-setup` metadata when
                         schema-safe, or in a sibling
                         `<config>.agents-system-setup.approval.json` sidecar.
-7. EMIT per target    → write per-platform paths + frontmatter/TOML (platforms.md)
-                        with `<!-- agents-system-setup:replicated-from: <source> -->`
-                        marker just under the frontmatter.
-8. WRITE ledger       → append one JSON object per line to
-                        `.agents-system-setup/replication.jsonl` at the repo root.
-                        **NEVER** place the ledger inside any agents/ directory
-                        (`.claude/agents/`, `.codex/agents/`, `.opencode/agents/`,
-                        `.github/agents/`) and **NEVER** use a `.md` extension —
-                        agent loaders walk those trees by extension and will
-                        treat the file as a malformed agent.
-                        Each line:
-                        `{"ts":"<ISO8601>","source":"<runtime>","targets":["..."],
-                         "files":[{"path":"...","sha256":"..."}],
-                         "approvals":{"mcp":{"decision":"approve_all|selective|skip",
-                         "servers":["..."]},"artifact_tracking":"project-tracked|project-local|personal-global",
-                         "overwrites":[{"path":"...","approved_by":"orchestrator"}]}}`
+7. SNAPSHOT + EMIT    → verify the complete approved target write-set backup first;
+                         then emit per-platform paths + frontmatter/TOML.
+                         Use a native comment carrying `agents-system-setup:replicated-from: <runtime>
+                         path:<encoded-source-path> sha256:<source-artifact-hash>
+                         ts:<ISO8601>`. Use HTML comments after Markdown frontmatter
+                         and `#` comments in TOML. The marker is the provenance
+                         AND the drift base: `improve` mode re-hashes the source
+                         artifact and compares against `sha256:` — mismatch means
+                         the source changed since replication.
+8. RECORD the run     → the replicate run already snapshots per
+                         [backup & rollback](./backup-rollback.md); the
+                         `backups.jsonl` run/events **are** the run record — carry
+                         `approvals` (mcp decision + servers), `artifact_tracking`, and
+                         `overwrites` (approved replacement paths) in it. **No separate
+                         replication ledger exists.** **NEVER** write any operational log
+                         inside an agents/ directory (`.claude/agents/`,
+                         `.codex/agents/`, `.opencode/agents/`, `.github/agents/`)
+                         or with a `.md` extension — agent loaders walk those trees by
+                         extension and will treat the file as a malformed agent.
 9. VERIFY round-trip  → re-parse the emitted files back to IR; assert structural
                         equality on (name, description, tools-canonical, mcp_refs,
                         governance metadata that the target can represent).
                         Surface any drift.
 ```
+
+The source path is a percent-encoded, approved scope-relative locator, not a
+runtime name or guessed filename. For multi-source synthesis, record each
+source separately. `improve` compares raw-byte SHA-256 only when the source
+can be resolved in approved scope. Missing/moved/out-of-scope sources or legacy
+markers without a path/hash yield `provenance unavailable`, not fabricated drift.
+Never read arbitrary external paths just because a marker names them.
+
+For strict JSON/config formats that reject comments or extension keys, record
+the same `source_refs` in the existing generated-manifest artifact entry. Do
+not insert HTML comments into JSON or create a separate replication ledger.
+Improve reads these source references when the file cannot carry a marker.
 
 ### Central MCP config approval evidence
 
@@ -270,7 +307,7 @@ machine-readable approval evidence:
 
 If the runtime rejects extension keys, write a sibling sidecar named
 `<config>.agents-system-setup.approval.json` with the same `mcp_approval`
-object. Replication ledgers may reference this evidence, but the central config
+object. Run records in `backups.jsonl` may reference this evidence, but the central config
 or sidecar remains the validator-facing proof.
 
 ## 4. Improve Mode (audit + targeted upgrade)
@@ -309,6 +346,9 @@ Common improve targets:
 - Plugin/MCP/skill recommendation has no source URL or untrusted source → remove or replace with a tiered marketplace candidate.
 - Design-pattern guidance is absent or contradictory → add architecture reviewer delta and ADR plan.
 - New marketplace plugin/skill exists for an installed capability (compare against [marketplaces.md](./marketplaces.md)) — surface as opt-in upgrade.
+- Replicated file whose source has drifted → hash the source artifact named in its `replicated-from` marker and compare against the marker's `sha256:`; mismatch surfaces as a `warn` delta ("source changed since replication at `ts:`") offering re-replicate or keep.
+- Reused or composed solo skills → preserve source knowledge and ownership;
+  audit dependency loading and working-agent launches without silently changing topology.
 
 ## 5. Anti-patterns
 
@@ -319,7 +359,7 @@ Common improve targets:
 - **Writing Gemini docs spelling blindly.** `mcpServers` appears in upstream prose, but generated local Gemini agents must use loader-valid `mcp_servers:`.
 - **Recursive Gemini workers.** Gemini subagents cannot invoke other subagents; root/orchestrator must own fan-out.
 - **Skipping the round-trip verify.** A successful emit isn't success — re-parse and diff IR.
-- **Markdown-format replication ledger inside an agents/ directory.** A `.md` file named like `agent-replication.md` placed in `.claude/agents/`, `.codex/agents/`, `.opencode/agents/`, or `.github/agents/` will be parsed as a malformed agent by the runtime and either silently ignored *or* corrupt the agent list. Always write the ledger as `.agents-system-setup/replication.jsonl` (JSON Lines, never `.md`, never inside an agents tree). Same rule applies to any other operational log this skill writes.
+- **Markdown-format replication record inside an agents/ directory.** A `.md` file named like `agent-replication.md` placed in `.claude/agents/`, `.codex/agents/`, `.opencode/agents/`, or `.github/agents/` will be parsed as a malformed agent by the runtime and either silently ignored *or* corrupt the agent list. There is no sidecar replication ledger: provenance lives in each file's `replicated-from` marker (source + `sha256:` + `ts:`), run history in `.agents-system-setup/backups.jsonl` (JSON Lines, never `.md`, never inside an agents tree). Same rule applies to any other operational log this skill writes.
 - **Dropping governance metadata silently.** Security controls, audit requirements, architecture decisions, quality gates, and sensitive paths must either round-trip or appear in the lossiness report.
 - **False target capability evidence.** Reset discovery/load observations on
   target emission; source host loads and known source paths do not prove target

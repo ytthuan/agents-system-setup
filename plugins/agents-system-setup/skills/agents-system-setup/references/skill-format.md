@@ -43,18 +43,24 @@ Folder name MUST equal `name` in frontmatter.
 |---|---|---|---|
 | Copilot CLI | Auto-loads when relevant (`disable-model-invocation: false`) | `/<name>` slash command when `user-invocable: true` | Default behavior |
 | Claude Code | Auto-loads when relevant | `/<name>` slash command | Same frontmatter |
-| OpenCode | Loaded on demand through the `skill` tool | No direct `/<name>` shortcut; use commands for slash UX | Gated by `permission.skill` |
+| OpenCode V2 | Loaded on demand through the `skill` tool by exact ID | `@skill-id`; command wrapper for slash UX | `permissions` rules with action `skill` |
 | Gemini CLI | Model activates via skill loading/tooling | `/skills` to list/manage; no `/<name>` slash command | No direct per-skill slash command |
 | Codex CLI + App | Model activates via skill loading | `$skill-name` or `/skills` in CLI; Skills UI in App | `$` prefix is Codex-specific — not universal syntax |
 
 > **Gemini note:** Gemini does not expose a `/<skill-name>` shortcut. Users browse available skills with `/skills` and the model applies them automatically. Do not document `/<name>` invocation for Gemini.
 > **Codex note:** `$skill-name` is Codex's selection syntax. Do not use `$` as a cross-platform skill invocation pattern.
 
+OpenCode V2 sources: <https://opencode.ai/v2/docs/skills> and
+<https://opencode.ai/v2/docs/commands>. Its legacy `permission.skill` map is
+migration input; new proposals use ordered `permissions` rules. The installer
+ships a host-session `/agents-system-setup` command wrapper, so its slash form
+is backed by a command file rather than assuming all skills become commands.
+
 ## Structure
 
 ```text
 <runtime-skill-root>/<name>/
-├── SKILL.md          # required, < 500 lines
+├── SKILL.md          # required; concise body, no universal hard line cap
 ├── references/       # docs loaded on demand
 ├── assets/           # templates / boilerplate
 └── scripts/          # executable helpers
@@ -93,6 +99,7 @@ Every generated `SKILL.md` carries a kind marker on its own line so `improve` /
 | Kind | Owner | Body authored by | Upgrade behavior |
 |---|---|---|---|
 | `host-delegation`, `host-audit`, `host-doctor`, `sdlc-build-gate`, `code-quality` | plugin | plugin | Regenerated from the plugin's templates. |
+| `solo-role` | project content; plugin scaffold | Converted source instructions plus approved synthesis | Preserve imported/user-authored content. Propose diffs with backups; never regenerate a body merely because of its kind marker. |
 | `domain` | project | **the user** | **Never overwritten.** Scaffold only; `improve`/`upgrade` may propose additions, never replace the body. |
 
 New generated task-assignment skills use `name: task-delegation` with
@@ -105,6 +112,17 @@ and this repo's own coordination conventions — the knowledge that is specific 
 *this* project and needed on *some* tasks. Which knowledge belongs there rather
 than in `AGENTS.md` is decided by the placement rule in
 [context optimization](./context-optimization.md#2a-placement-rule--where-a-piece-of-knowledge-goes).
+
+`solo-role` skills encode a former specialist's knowledge and procedure for
+direct host execution. They are **not** a place for routing, gate triggers,
+owners, or approvals — those stay resident in `AGENTS.md` — and their tool
+discipline is advisory prose, never a runtime allowlist.
+
+Existing skills keep their identity and kind when reused. A role skill may
+reference shared skills or merge compatible procedures; see
+[skill composition](./skill-composition.md) for dependency tables, merge
+criteria, conflict handling, and preservation of existing bodies. Do not copy
+agent `skills:` frontmatter into a portable skill or eagerly load its whole list.
 
 ### Admission gate for a `domain` skill
 
@@ -122,6 +140,14 @@ than knowledge relocated — `instruction-memory-audit` treats a domain skill th
 restates an `AGENTS.md` row as redundancy, not coverage.
 
 ## Progressive Loading
+
+The [Agent Skills specification](https://agentskills.io/specification) recommends
+under 500 lines and roughly 5,000 tokens for the activated body, but states
+that the body has no format restrictions. These are authoring recommendations,
+not a universal runtime validity limit. This repo warns about large skills;
+it does not reject them solely for crossing 500 lines. Do not collapse prose
+onto giant lines to satisfy a counter. Prefer clear steps and on-demand references.
+Runtime-specific documented limits still apply.
 
 - Discovery: ~100 tokens (name + description)
 - SKILL.md body loads when relevant

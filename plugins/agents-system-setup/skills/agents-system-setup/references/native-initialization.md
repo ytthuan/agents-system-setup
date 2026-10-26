@@ -16,7 +16,8 @@
 ## Non-negotiable boundaries
 
 1. Run an initializer only after artifact tracking and the complete file plan
-   are approved. Record intended paths and preimages first.
+   are approved. Record intended paths and verify the run-level
+   [backup](./backup-rollback.md) first, including `absent` destinations.
 2. Invoke only the active harness. Never initialize every replication target.
 3. When user-authored memory already exists, use the existing instruction-memory
    audit. Do not initialize over it merely to obtain a new draft.
@@ -45,8 +46,10 @@
 - Detect the active harness, version, working directory, configured context
   filenames, existing instruction files, symlinks, and path collisions.
 - Complete artifact-tracking and file-plan approvals before invocation.
-- Capture content hashes or byte-identical preimages for every path the native
-  command could affect.
+- Capture and verify byte-identical preimages for every approved path the
+  native command could affect; record absent paths too. Hashes alone cannot
+  restore overwritten content. If the possible write set cannot be bounded,
+  use the approved fallback rather than promising a complete restore point.
 - If canonical or customized memory exists, stop here and audit that memory
   instead of running initialization over it.
 

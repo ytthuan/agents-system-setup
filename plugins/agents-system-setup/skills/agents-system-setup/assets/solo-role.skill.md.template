@@ -1,0 +1,59 @@
+---
+name: {{SKILL_NAME}}
+description: '{{WHAT_AND_WHEN}}. USE FOR: {{TRIGGERS}}. DO NOT USE FOR: {{ANTI_TRIGGERS}}.'
+---
+
+<!-- agents-system-setup:generated-by: {{PLUGIN_VERSION}} -->
+<!-- agents-system-setup:generated-at: {{GENERATED_AT}} -->
+<!-- agents-system-setup:skill-kind: solo-role -->
+
+<!--
+  Solo-topology role skill: the host CLI session loads this on trigger and
+  performs the role directly (interview Q9, `agent_topology = solo`).
+  Tool discipline below is advisory prose, NOT a runtime allowlist (hard
+  rule #42). Gate triggers, owners, approvals, and missing-evidence blocking
+  stay in AGENTS.md, never here. Same-context review is not independent.
+  Preserve converted source knowledge and user edits; this kind marker does
+  not make the body plugin-owned or authorize regeneration on upgrade.
+-->
+
+# {{ROLE_DISPLAY_NAME}}
+
+## When to Use
+- {{USE_CASE_1}}
+- {{USE_CASE_2}}
+
+## Role Contract
+- Responsibility: {{RESPONSIBILITY}}
+- Owned paths: {{OWNED_PATHS}} — Directory Architecture row `host (skill: {{SKILL_NAME}})`; edit rule unchanged.
+- Tool discipline: {{TOOL_DISCIPLINE}} (advisory — solo has no runtime allowlist for this role).
+
+## Skills Used
+
+| Skill / native load ID | Load when | Requirement | Resolved path / origin |
+|---|---|---|---|
+{{SKILL_DEPENDENCY_ROWS}}
+
+Load matching required skills before their steps using the active runtime's
+loader; links do not load content. Reuse already-loaded unchanged definitions
+in this context. Missing/denied required loads block the affected step; report
+optional skips. Dependencies do not spawn agents or grant permissions.
+
+## Hard Rules
+1. {{RULE_1}}
+2. {{RULE_2}}
+3. Report `Solo role loaded: {{SKILL_NAME}}` when this skill drives the work.
+
+## Procedure
+1. {{STEP_1}}
+2. {{STEP_2}}
+3. {{STEP_3}}
+
+## Anti-patterns
+- {{ANTI_1}}
+- Claiming independent review from this role — solo self-review is same-context and is recorded as not independent.
+- Parking gate triggers, owners, or approvals in this skill instead of `AGENTS.md`.
+- Duplicating shared skill bodies instead of referencing them, or creating dependency cycles.
+
+## Output Contract
+{{OUTPUT_FORMAT}}

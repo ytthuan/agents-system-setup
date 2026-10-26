@@ -1,6 +1,6 @@
 # Output Contract
 
-Use this contract at the end of `init`, `update`, `improve`, and `replicate` flows. Keep the user-facing summary concise; include full detail only when useful or requested. For `Compact` and `Balanced`, lead with a compact summary, then warnings/approvals, then detail-on-request.
+Use this contract at the end of setup, maintenance, and migration flows. Rollback reports restored state without publishing a current-version manifest. Keep the user-facing summary concise; include full detail only when useful or requested. For `Compact` and `Balanced`, lead with a compact summary, then warnings/approvals, then detail-on-request.
 
 ```text
 ✅ Mode/platforms: <mode> · <selected platforms only>
@@ -10,6 +10,8 @@ Use this contract at the end of `init`, `update`, `improve`, and `replicate` flo
 ✅ Recon: <signals|n/a|skipped>; redactions=<count|none>
 ✅ Path migration: <none|moved=N copied=N skipped=N manual=N failed=N>
 ✅ Files: created=<n>, updated=<n with .bak>, platform breakdown=<compact>
+✅ Backup: run-id=<id|n/a>, verified=<yes|no|n/a>, before-version=<version|unversioned>, restore=<runtime-correct rollback invocation>, retained=<snapshots / total bytes>
+✅ Migration: topology=<from → to|unchanged>, reused=<n>, referenced=<n>, merged=<n>, created=<n>, retired=<n>, dependencies=<resolved|blockers>, status=<preview|complete|partial|already migrated|n/a>
 ✅ Agents: subagents=<n>, skills=<n>, waves=<n>
 ✅ Requirements triage: <separate|merged|skipped>; ambiguities=<n>; triage_question_requests=<count|none>; routing=<wave_0 summary|n/a>
 ✅ Gates: security/audit=<present|n/a>, threat model=<present|n/a>, architecture=<count|n/a>, quality gates=<summary>
@@ -60,7 +62,7 @@ Details on request:
 ✅ Target runtimes: <list>
 ✅ Lossy field drops: <list per target>
 ✅ Round-trip verify: <pass | drift on <fields>>
-✅ Replication ledger: <path>
+✅ Replication provenance: <source markers / unavailable>; run=<backup run ID>
 
 # improve mode adds:
 ✅ Audit findings: <ok / warn / fail counts>
@@ -79,7 +81,7 @@ Try it:
   - If `claude` selected: `claude` then describe the task; invoke a specialist only when justified
   - If `opencode` selected: `opencode` then describe the task to the primary; permission-gated specialists are optional
   - If `codex-cli` selected: `codex`; CLI can use `/agent`; CLI + App artifacts are `AGENTS.md` plus `.codex/agents/*.toml`
-  - If `gemini-cli` selected: `gemini` then `@<agent-name> <task>` or rely on description-based delegation
+  - If `gemini-cli` selected: `gemini` then describe the task; invoke a worker only when the selected topology permits it
 
 Suggested next customizations:
   - <suggestion 1>

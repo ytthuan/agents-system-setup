@@ -127,6 +127,11 @@ User picks one in Q9d:
 | Light | Validation merges into the independent review owner; XS keeps only build + review; M demotes e2e to `🟡`. Suitable for small teams or library code with thin runtime. |
 | Skip | Do not generate Build Gate roles, snippet, or skill. Render `n/a — user skipped` in AGENTS.md. |
 
+Solo topology keeps its one software-dev reviewer even with `Skip`. Strict XL
+still needs two independent approvers: name an external second reviewer and
+the release-validation owner, or keep specialists topology. Do not substitute
+two calls to the same reviewer or silently reduce the gate on migration.
+
 ## Roles
 
 The Build Gate defines logical responsibilities. Map them to existing project

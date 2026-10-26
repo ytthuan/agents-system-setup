@@ -37,6 +37,7 @@ always-loaded memory. Do not pad a small project to meet the target length.
 | Native memory adapters | Thin `@AGENTS.md` imports where supported, not policy copies. Copilot/OpenCode/Codex can use root memory directly. |
 | Runtime agent files | Role, owned/read-only paths, compact project digest, fail-closed intake, safety, and reporting. |
 | Host workflow skills | Load for delegation, code quality, Build Gate, or doctor work; do not inline their full bodies in root memory. |
+| Solo role skills (`agent_topology = solo`) | Host loads the role body only on its trigger; routing, gates, and approvals stay resident in `AGENTS.md`. |
 | Project domain skills | Load project-specific knowledge only for concrete matching triggers. Preserve user-owned bodies. |
 | Project policy | Local governance detail, capability coverage, ADRs, and review responsibilities; never eagerly import it. |
 | Operational state | Native-init evidence, approvals, migration events, and checksums belong in JSON/JSONL, not root memory. |
@@ -47,6 +48,7 @@ always-loaded memory. Do not pad a small project to meet the target length.
 |---|---|---|
 | Needed on every task | `AGENTS.md` | Routing, ownership, approval boundaries, and gate triggers stay resident. |
 | Needed on some tasks and project-specific | A `skill-kind: domain` skill | A concrete trigger selects the body; metadata is not the full procedure. |
+| A specialist's role knowledge, in `agent_topology = solo` | Reuse or compose skills; extract unique knowledge as `skill-kind: solo-role` | Apply [skill composition](./skill-composition.md); the host executes, while gates and routing stay resident. |
 | Generic craft | An existing host skill such as `task-delegation`, `code-quality`, or `code-change-build-gate` | Reuse one versioned workflow instead of repeating it. |
 | Deep task detail | That skill's `references/` or local project policy | Load only the relevant section. |
 
@@ -60,7 +62,7 @@ it does not prove runtime discovery or a skill load.
 | Surface | Target | Enforced rule |
 |---|---|---|
 | Complete synthesized `AGENTS.md` | 80-120 physical lines | At most **150 lines AND 12,288 UTF-8 bytes** after substitution and merging, including user content. |
-| Main `SKILL.md` | About 250 lines | At most 500 lines; move detail into references, not giant lines. |
+| Main `SKILL.md` | Concise; under 500 lines / about 5,000 tokens recommended by Agent Skills | Advisory only, not a universal hard limit. Move detail into references; never compress into giant lines to pass a counter. |
 | Skill description | Trigger-rich and concise | Follow the native schema; do not paste the procedure into metadata. |
 | Worker instructions | Under about 80 lines | Retain fail-closed intake, ownership, safety, and reporting. Codex has its own body budget. |
 

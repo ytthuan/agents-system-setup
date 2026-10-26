@@ -7,7 +7,10 @@
 [![Cross-OS](https://img.shields.io/badge/cross--os-linux%20%7C%20macos%20%7C%20windows-blue)](.github/workflows/ci.yml)
 [![Runtimes](https://img.shields.io/badge/runtimes-Copilot%20CLI%20%7C%20Claude%20Code%20%7C%20Codex%20%7C%20OpenCode%20%7C%20Gemini-purple)](#install--per-runtime)
 
-- A multi-runtime plugin/skill package that **bootstraps**, **updates**, **improves**, **upgrades**, or **replicates** a complete multi-agent system across five supported runtimes: **GitHub Copilot CLI**, **Claude Code**, **OpenCode**, **OpenAI Codex (CLI + App)**, and **Gemini CLI** artifact layouts — from a single skill, with a Canonical IR for bidirectional replication, parallel-aware orchestration, mandatory security/audit/architecture governance, version-stamped artifacts, and compact-by-default context output baked in.
+A multi-runtime plugin/skill package to set up, maintain, migrate, and roll back
+agent systems across **Copilot CLI**, **Claude Code**, **OpenCode**,
+**OpenAI Codex (CLI + App)**, and **Gemini CLI** artifact layouts. Choose specialist
+subagents or one working agent with reusable on-demand skills.
 
 ## Native-first compact memory (current source)
 
@@ -60,8 +63,8 @@ This plugin **complements** Copilot's built-in `/init` and native `AGENTS.md` in
 `agents-system-setup` adds capabilities no built-in command provides:
 
 - **A governed multi-agent system, not one guidance file.** Generates an Agent Roster, Capability Matrix, Security & Audit Matrix, Threat Model, Architecture/ADR decisions, and N specialized subagents with parallel-safety waves, wired to a host-session Orchestration Operating Model.
-- **Cross-runtime, via a Canonical IR.** Emits and *replicates* the same system across five runtimes — Copilot CLI, Claude Code, OpenCode, OpenAI Codex, Gemini CLI — each in its native agent/skill/permission format. `/init` is Copilot-only.
-- **Lifecycle, not one-shot.** Five modes: `init`, `update` (non-destructive managed blocks), `improve` (audit → opt-in fixes), `upgrade` (version-stamped migration of an existing system), and `replicate` (port between runtimes).
+- **Cross-runtime, via a Canonical IR.** Emits and replicates the same system across five runtimes in their native agent/skill/permission formats.
+- **Lifecycle support.** `init`, `update`, `improve`, `upgrade`, `replicate`, `migrate` (change topology), and `rollback`.
 - **Security & governance gates.** A mandatory MCP approval gate (no MCP config is written without explicit approval) and a source-backed baseline (OWASP GenAI, NIST SSDF, MCP Security Best Practices, SLSA, …).
 - **Opt-in plugin/MCP discovery** from vendor-official catalogs, every item tagged `[Tier · Vendor]` and approved per item.
 
@@ -70,7 +73,7 @@ In short: `/init` writes the first file for one agent; this plugin architects, g
 ## What it generates
 
 - `AGENTS.md` at repo root with a **Read First** section, **Context Loading Policy**, **Directory Architecture**, **Agent Roster (with parallel-safety waves)**, **Capability Matrix**, **Security & Audit Matrix**, **Threat Model**, **Architecture / Design Pattern Decisions**, **ADR Index**, and **Quality Gates**.
-- **Host-session Orchestration Operating Model + N specialized subagents** — the host CLI session (Copilot CLI, Claude Code, OpenCode, Codex CLI, Gemini CLI) reads the new `## Orchestration Operating Model` section in `AGENTS.md` and adopts the orchestrator role directly. No runtime emits an `orchestrator.agent.md` / `.claude/agents/orchestrator.md` / `.opencode/agents/orchestrator.md` / `.codex/agents/orchestrator.toml` / `.gemini/agents/orchestrator.md` subagent file. Specialized subagents (3–50, sized to scope) are emitted in each runtime's native format with a **fan-out clause** so parallel-safe subagents always run in one wave. `@orchestrator` remains a routing alias for the host session.
+- **Host-session Orchestration Operating Model** — `@orchestrator` is the host session reading `AGENTS.md`, never a generated subagent file. Specialists are justified by the work, with no minimum count or forced fan-out. Solo uses reusable skills and a software-dev reviewer exception — see [Topology](#topology-specialists-or-solo--skills).
 - A **Plan Handoff Contract** that normalizes VS Code Plan agent output, Spec-Kit `/plan`, or user-written plans before emitting runtime-correct Copilot, Claude Code, OpenCode, Codex, or Gemini CLI artifacts.
 - **`AGENT-TEAMS.md`** for Claude Code projects when the roster benefits from peer-to-peer teammates (3+ independent concerns).
 - Project-scoped **skills** under each runtime's conventional path.
@@ -98,6 +101,8 @@ In short: `/init` writes the first file for one agent; this plugin architects, g
 | `improve` | Audit existing system → propose checklist of targeted fixes → opt-in apply |
 | `upgrade` | Version-aware migration of an existing agent system to the current plugin's principles (reads `agents-system-setup:generated-by` stamps + `.agents-system-setup/generated.json`, walks per-version delta playbook). Trigger: `/agents-system-setup upgrade` or `agents-system-setup upgrade` |
 | `replicate` | Port agents/skills/MCP from one runtime to another (Copilot ↔ Claude ↔ OpenCode ↔ OpenAI Codex ↔ Gemini CLI) via Canonical IR |
+| `migrate monolithic` | Convert subagent responsibilities to reusable/composable skills; `migrate specialists` reverses the topology. Add `--dry-run` to preview without writes. |
+| `rollback` | Restore a prior state from a run-level backup snapshot — pick a snapshot, verify checksums, keep post-snapshot user edits, restore byte-exact. Trigger: `/agents-system-setup rollback`, "restore backup", "undo the last agent change" |
 
 ## Install — per runtime
 
@@ -157,7 +162,11 @@ cd agents-system-setup
 pwsh ./scripts/install-opencode.ps1 -Scope project
 ```
 
-This places the skill at `.opencode/skills/agents-system-setup/` (or `~/.config/opencode/skills/` for global).
+This installs the skill at `.opencode/skills/agents-system-setup/` and the
+`/agents-system-setup` wrapper at `.opencode/commands/agents-system-setup.md`
+(global equivalents under `~/.config/opencode/`). Existing installs are moved
+to a printed `installer-backups` location outside runtime discovery before
+replacement. OpenCode reloads automatically; `/reload` forces a refresh.
 
 ### Gemini CLI artifact support
 
@@ -173,7 +182,7 @@ Inside Gemini CLI, invoke generated subagents with Gemini's agent invocation syn
 
 ## Install a specific release
 
-The commands above track the default branch and give you whatever is newest. To pin a released version — for reproducible setups, CI, or to stay on a known-good release — use the syntax below. Replace `v1.13.0` with the tag you want; see [releases](https://github.com/ytthuan/agents-system-setup/releases) and [CHANGELOG.md](./CHANGELOG.md).
+The commands above track the default branch and give you whatever is newest. To pin a released version — for reproducible setups, CI, or to stay on a known-good release — use the syntax below. Replace `v1.15.0` with the tag you want; see [releases](https://github.com/ytthuan/agents-system-setup/releases) and [CHANGELOG.md](./CHANGELOG.md).
 
 Two things to know before picking a command:
 
@@ -183,7 +192,7 @@ Two things to know before picking a command:
 ### GitHub Copilot CLI
 
 ```bash
-copilot plugin marketplace add ytthuan/agents-system-setup#v1.13.0
+copilot plugin marketplace add ytthuan/agents-system-setup#v1.15.0
 copilot plugin install agents-system-setup@ytthuan
 ```
 
@@ -192,14 +201,14 @@ copilot plugin install agents-system-setup@ytthuan
 Local-directory alternative, useful when you want the exact tree on disk:
 
 ```bash
-git clone --depth 1 --branch v1.13.0 https://github.com/ytthuan/agents-system-setup.git
+git clone --depth 1 --branch v1.15.0 https://github.com/ytthuan/agents-system-setup.git
 copilot plugin install ./agents-system-setup
 ```
 
 ### Claude Code
 
 ```text
-/plugin marketplace add https://github.com/ytthuan/agents-system-setup.git#v1.13.0
+/plugin marketplace add https://github.com/ytthuan/agents-system-setup.git#v1.15.0
 /plugin install agents-system-setup@ytthuan
 ```
 
@@ -208,7 +217,7 @@ Appending `#<ref>` to a Git URL pins a branch or tag. Source: <https://code.clau
 ### OpenAI Codex CLI
 
 ```bash
-codex plugin marketplace add ytthuan/agents-system-setup --ref v1.13.0
+codex plugin marketplace add ytthuan/agents-system-setup --ref v1.15.0
 codex
 > /plugins        # install agents-system-setup from the pinned marketplace
 ```
@@ -220,7 +229,7 @@ Codex is the one runtime here with a documented per-marketplace `--ref` flag. So
 OpenCode installs by clone-and-copy, so pin the clone:
 
 ```bash
-git clone --depth 1 --branch v1.13.0 https://github.com/ytthuan/agents-system-setup.git
+git clone --depth 1 --branch v1.15.0 https://github.com/ytthuan/agents-system-setup.git
 cd agents-system-setup
 ./scripts/install-opencode.sh project   # or "global"
 ```
@@ -230,7 +239,7 @@ cd agents-system-setup
 Gemini support here is artifact-based — this repo ships no `gemini-extension.json`, so `gemini extensions install` does **not** apply to it. Pin by cloning the tag, then generate or copy artifacts into your project:
 
 ```bash
-git clone --depth 1 --branch v1.13.0 https://github.com/ytthuan/agents-system-setup.git
+git clone --depth 1 --branch v1.15.0 https://github.com/ytthuan/agents-system-setup.git
 ```
 
 ### Universal fallbacks
@@ -239,17 +248,17 @@ These work regardless of runtime plugin support:
 
 ```bash
 # Clone at the tag (detached HEAD at that commit)
-git clone --depth 1 --branch v1.13.0 https://github.com/ytthuan/agents-system-setup.git
+git clone --depth 1 --branch v1.15.0 https://github.com/ytthuan/agents-system-setup.git
 
 # Move an existing clone to the tag
-git fetch --tags && git checkout v1.13.0
+git fetch --tags && git checkout v1.15.0
 
 # Release tarball published by the release workflow
-gh release download v1.13.0 --repo ytthuan/agents-system-setup
+gh release download v1.15.0 --repo ytthuan/agents-system-setup
 
 # Or the plain source archive, no gh required
-curl -fL -o agents-system-setup-v1.13.0.tar.gz \
-  https://github.com/ytthuan/agents-system-setup/archive/refs/tags/v1.13.0.tar.gz
+curl -fL -o agents-system-setup-v1.15.0.tar.gz \
+  https://github.com/ytthuan/agents-system-setup/archive/refs/tags/v1.15.0.tar.gz
 ```
 
 Every release ships a `agents-system-setup-<version>.tar.gz` plus a `.sha256` checksum. Verify before use:
@@ -285,6 +294,9 @@ Or be explicit:
 /agents-system-setup update
 /agents-system-setup improve
 /agents-system-setup replicate
+/agents-system-setup migrate monolithic --dry-run
+/agents-system-setup migrate monolithic
+/agents-system-setup rollback
 ```
 
 For Gemini CLI, there is no `/plugin install` or `/agents-system-setup` command documented by this repo. Use Gemini normally after generated `.gemini/agents/*.md` artifacts are present, then call the generated subagents with `@<agent-name>`.
@@ -302,9 +314,59 @@ CLI tool profile, output detail (`Balanced` by default), and Memory & Learning
 profile. Model overrides are opt-in and scoped by all agents, role, or
 exceptions so large rosters do not trigger one prompt per agent.
 
+## Topology: specialists or solo + skills
+
+The wizard asks how work should execute (interview Q9, `agent_topology`):
+
+- **Host + specialist subagents (default)** — the host can delegate to justified specialists with separate contexts and runtime-specific permissions.
+- **Single agent + on-demand skills (solo)** — also called monolithic/mono. The host reuses existing skills, references shared skills, merges compatible procedures, or creates focused workflow skills. Software projects keep one read-only `reviewer`, including when the Build Gate is skipped.
+
+Solo mode is honest about what skills cannot reproduce: tool discipline inside a role skill is advisory prose (not a runtime allowlist), execution is sequential, and review is same-context self-review unless the reviewer exception is kept — the Security & Audit Matrix then records it as not independent. Both topologies share the same governance, Directory Architecture, Quality Gates, and memory budgets.
+
+### Migrate to monolithic style
+
+**Converting an existing system** uses one explicit command:
+
+| Runtime | Command / prompt |
+|---|---|
+| Copilot CLI or OpenCode (installed wrapper) | `/agents-system-setup migrate monolithic` |
+| Claude Code | `/agents-system-setup:agents-system-setup migrate monolithic` |
+| Codex CLI | `$agents-system-setup migrate monolithic` |
+| OpenCode without wrapper | `@agents-system-setup migrate monolithic` |
+| Gemini CLI with the setup skill installed | Confirm it in `/skills`, then ask `Use agents-system-setup to migrate monolithic` |
+
+Add `--dry-run` to preview. These are in-session skill invocations, not shell
+commands. "Convert my agents to a single agent with skills" and "flatten my
+agents into skills" are aliases.
+
+The flow is **inspect → map skills → approve → verify backup → create/reuse
+skills → update routing → retire converted agents → verify**. Existing agent
+skill lists become conditional dependencies; shared skills are referenced once,
+compatible workflows can merge, and custom knowledge is preserved. Missing
+dependencies or conflicts are resolved before removal. Re-running a completed
+migration is a no-op. See [conversion](./plugins/agents-system-setup/skills/agents-system-setup/references/topology-conversion.md)
+and [skill composition](./plugins/agents-system-setup/skills/agents-system-setup/references/skill-composition.md).
+
+## Backups & rollback
+
+Every write run (`update` / `improve` / `upgrade` / `replicate` / topology conversion) records a run-level snapshot in `.agents-system-setup/backups/` **before the first approved write**: content-addressed preimages of every touched file plus a `backups.jsonl` ledger (run id, mode, plugin version, topology, per-file SHA-256). Snapshots are never auto-deleted and work without git — for `project-tracked` files, git history remains the shared team restore point.
+
+`rollback` restores the selected run's **before-state**. It checks current files
+against recorded postimages so later edits are preserved or explicitly reviewed,
+and snapshots the current state before restoration. An upgrade vX → vY snapshot
+restores vX. Undo multiple runs newest-first; partial restores are labeled partial.
+Old stamps remain unchanged. The plugin itself rolls back by
+[installing a pinned release](#install-a-specific-release). The setup skill
+performs this file-based procedure; it is not an automatic backup service.
+See [backup & rollback](./plugins/agents-system-setup/skills/agents-system-setup/references/backup-rollback.md).
+
 ## Parallel subagents & Claude Code agent teams
 
-The host CLI session orchestrator always fans out **parallel-safe subagents** in one wave (multiple `Task` calls in a single response), then awaits before the next wave. Parallel-safety is computed automatically from the Directory Architecture — see [parallelism reference](./plugins/agents-system-setup/skills/agents-system-setup/references/parallelism.md). Under the **GitHub Copilot app**, that same parallel-safety computation also identifies which units can become independent **child sessions / parallel PRs** (1 session per branch/PR) via `/orchestrate` — an advisory third primitive that portable generated files never depend on.
+In specialists topology, the host may group substantial independent work into
+parallel-safe waves using Directory Architecture ownership. Solo keeps working
+roles in the host and does not enable teams or child-session fan-out. See the
+[parallelism reference](./plugins/agents-system-setup/skills/agents-system-setup/references/parallelism.md)
+for optional Copilot-app child sessions / parallel PRs and runtime capabilities.
 
 Dispatching a child is one half; **supervising it while it runs** is the other. Opt in with `advisory_supervision` (`off` by default) and the host adds a plan gate on children created in plan mode, steers only on premise invalidation by a sibling — polling is banned — and refuses to close a wave until every dispatched unit is `returned`, `reconciled-from-artifact`, or `explicitly-abandoned`, because no completion callback is documented and the branch/PR is the source of truth. It fails closed: if the app-only tools are absent from the host's surface the protocol is `n/a` rather than simulated. See [supervising a running child session](./plugins/agents-system-setup/skills/agents-system-setup/references/parallelism.md#supervising-a-running-child-session).
 
@@ -313,6 +375,12 @@ For Claude Code, when 3+ subagents are independent and would benefit from peer-t
 ## Context optimization
 
 Generated output is **compact by default**. The skill asks for an output profile (`Balanced`, `Compact`, or `Full`) and records where long detail lives. `AGENTS.md` stays the routing and policy index; exhaustive marketplace research, long threat rationale, full ADR text, and platform schema detail are linked as references instead of repeated in every agent file.
+
+`SKILL.md` has **no universal hard 500-line limit**. The
+[Agent Skills specification](https://agentskills.io/specification) recommends
+under 500 lines / roughly 5,000 tokens; validation treats size as advisory.
+Clear procedures and on-demand references matter more than a line counter.
+The separately defined always-loaded `AGENTS.md` budget still applies.
 
 Knowledge is placed by **how often it is actually needed**, since `AGENTS.md` is loaded in every host session and is the fallback a subagent opens when it needs a rule beyond its compact project-standard digest. Every-task knowledge — routing, ownership, gates — stays resident there. Project knowledge that only *some* tasks need (business rules, regulatory constraints, this repo's own coordination conventions) becomes a **`skill-kind: domain` skill**, which costs ~100 tokens to discover and loads its body only when its trigger matches. Those skills are derived from the project (purpose, domain classification, stack, ownership zones, existing docs/ADRs) and confirmed at the normal plan gate — never elicited by a blank "what skills do you want?" prompt — and must pass a four-part admission gate so the layer does not become a dumping ground. The plugin owns the scaffold; **you own the body, and `improve`/`upgrade` never overwrite it.** See the [placement rule](./plugins/agents-system-setup/skills/agents-system-setup/references/context-optimization.md#2a-placement-rule--where-a-piece-of-knowledge-goes).
 
@@ -371,7 +439,8 @@ Cross-OS: Linux, macOS, Windows (native PowerShell + Git Bash + WSL).
 
 ## Design rationale
 
-The procedure is intentional, not arbitrary. See [DESIGN.md](./DESIGN.md) for the reasoning behind every phase (why interview-first, why MCP gate, why Canonical IR, why per-item opt-in, why parallel-by-default).
+See [DESIGN.md](./DESIGN.md) for the reasoning behind the interview, approval
+gates, Canonical IR, topology choices, and on-demand skill composition.
 
 ## Contributing
 
